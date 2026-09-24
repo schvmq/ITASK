@@ -1,43 +1,48 @@
 import React, { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { GuestLayout } from '@/Layouts/GuestLayout';
 import { Button, FormField, Checkbox, Alert } from '@/Components';
 
+interface LoginForm {
+    email: string;
+    password: string;
+    remember: boolean;
+    general?: string;
+}
+
 export default function Login() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [remember, setRemember] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const { data, setData, post, processing, errors, setError, clearErrors } = useForm<LoginForm>({
+        email: '',
+        password: '',
+        remember: false,
+    });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
-        setErrors({});
+        clearErrors();
 
-        // Client-side institutional validation preview
-        const newErrors: Record<string, string> = {};
-        if (!email) {
-            newErrors.email = 'Institutional email is required.';
-        } else if (!email.endsWith('@carsu.edu.ph')) {
-            newErrors.email = 'Please enter your official @carsu.edu.ph institutional email.';
-        }
+        const trimmedEmail = data.email.trim();
 
-        if (!password) {
-            newErrors.password = 'Password is required.';
-        }
-
-        if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
-            setIsLoading(false);
+        if (!trimmedEmail) {
+            setError('email', 'Institutional email is required.');
             return;
         }
 
-        // Simulated submit for Day 2 UI demonstration
-        setTimeout(() => {
-            setIsLoading(false);
-        }, 1200);
+        // Institutional email validation: must be an official @carsu.edu.ph address
+        const carsuEmailRegex = /^[^\s@]+@carsu\.edu\.ph$/i;
+        if (!carsuEmailRegex.test(trimmedEmail)) {
+            setError('email', 'Please enter your official @carsu.edu.ph institutional email.');
+            return;
+        }
+
+        if (!data.password) {
+            setError('password', 'Password is required.');
+            return;
+        }
+
+        post('/login');
     };
 
     return (
@@ -48,8 +53,10 @@ export default function Login() {
                 <h3 className="text-xl font-bold text-slate-900 tracking-tight">
                     Welcome to ITASK
                 </h3>
+
                 <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                    Sign in using your institutional account to access your projects, committees, activities, and assigned tasks.
+                    Sign in using your institutional account to access your projects,
+                    committees, activities, and assigned tasks.
                 </p>
             </div>
 
@@ -64,8 +71,11 @@ export default function Login() {
                     label="Institutional Email"
                     type="email"
                     name="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={data.email}
+                    onChange={(e) => {
+                        setData('email', e.target.value);
+                        if (errors.email) clearErrors('email');
+                    }}
                     placeholder="username@carsu.edu.ph"
                     required
                     error={errors.email}
@@ -79,13 +89,17 @@ export default function Login() {
                         label="Password"
                         type={showPassword ? 'text' : 'password'}
                         name="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        value={data.password}
+                        onChange={(e) => {
+                            setData('password', e.target.value);
+                            if (errors.password) clearErrors('password');
+                        }}
                         placeholder="••••••••"
                         required
                         error={errors.password}
                         autoComplete="current-password"
                     />
+
                     <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -99,9 +113,10 @@ export default function Login() {
                 <div className="flex items-center justify-between pt-1">
                     <Checkbox
                         label="Remember me"
-                        checked={remember}
-                        onChange={(e) => setRemember(e.target.checked)}
+                        checked={data.remember}
+                        onChange={(e) => setData('remember', e.target.checked)}
                     />
+
                     <span className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer">
                         Forgot password?
                     </span>
@@ -112,13 +127,25 @@ export default function Login() {
                         type="submit"
                         variant="primary"
                         size="md"
-                        isLoading={isLoading}
+                        isLoading={processing}
                         className="w-full justify-center font-semibold"
                     >
                         Sign In
                     </Button>
                 </div>
             </form>
+
+            <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+                <p className="text-xs text-slate-600">
+                    Don't have an ITASK account?{' '}
+                    <Link
+                        href="/register"
+                        className="font-semibold text-[#F68233] hover:text-[#E06D1F] transition underline decoration-[#F68233]/40"
+                    >
+                        Register here
+                    </Link>
+                </p>
+            </div>
         </GuestLayout>
     );
 }
