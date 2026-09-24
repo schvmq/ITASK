@@ -33,7 +33,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     const navigation: NavItem[] = [
         {
             name: 'Dashboard',
-            href: '/',
+            href: '/dashboard',
             active: true,
             icon: (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
@@ -89,7 +89,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-white border-r border-slate-200/80 shrink-0">
                 {/* Brand Header */}
                 <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2.5">
+                    <Link href="/dashboard" className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-linear-to-br from-[#F68233] to-[#E06D1F] flex items-center justify-center text-white shadow-xs">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -130,16 +130,29 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 </div>
 
                 {/* Sidebar Footer User Area */}
-                <div className="p-4 border-t border-slate-100 bg-slate-50/50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#003300] text-white flex items-center justify-center text-xs font-semibold">
-                            {user.name.charAt(0)}
+                <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-[#003300] text-white flex items-center justify-center text-xs font-semibold shrink-0">
+                            {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-slate-800 truncate">{user.name}</p>
                             <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
                         </div>
                     </div>
+                    {auth?.user && (
+                        <Link
+                            href="/logout"
+                            method="post"
+                            as="button"
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition cursor-pointer shrink-0"
+                            title="Sign Out"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
+                            </svg>
+                        </Link>
+                    )}
                 </div>
             </aside>
 
@@ -162,7 +175,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
                         <div className="hidden sm:block">
                             <span className="text-xs font-medium text-slate-400">
-                                Faculty Workflow Coordination System
+                                Integrated Task Assignment and Knowledge Sharing
                             </span>
                         </div>
                     </div>
@@ -180,14 +193,24 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                             <span className="w-2 h-2 rounded-full bg-[#F68233] absolute top-2 right-2 ring-2 ring-white" />
                         </button>
 
-                        {/* Quick Auth links for preview */}
                         <div className="flex items-center gap-2 pl-2 border-l border-slate-100 text-xs">
-                            <Link href="/login" className="px-2.5 py-1 text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-50 transition">
-                                Login
-                            </Link>
-                            <Link href="/register" className="px-2.5 py-1 text-[#F68233] hover:text-[#E06D1F] font-medium rounded-md hover:bg-orange-50 transition">
-                                Register
-                            </Link>
+                            {auth?.user ? (
+                                <Link
+                                    href="/logout"
+                                    method="post"
+                                    as="button"
+                                    className="px-2.5 py-1 text-slate-500 hover:text-rose-600 font-medium rounded-md hover:bg-slate-50 transition cursor-pointer"
+                                >
+                                    Sign Out
+                                </Link>
+                            ) : (
+                                <Link
+                                    href="/login"
+                                    className="px-2.5 py-1 text-slate-600 hover:text-slate-900 rounded-md hover:bg-slate-50 transition"
+                                >
+                                    Sign In
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </header>

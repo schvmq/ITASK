@@ -52,17 +52,17 @@ export default function Register() {
 
     return (
         <GuestLayout
-            title="Register Faculty Account"
-            subtitle="Create an account to join projects and committees"
+            title="CCIS Personnel Registration"
+            subtitle="Create your CCIS personnel account using your institutional email address."
         >
-            <Head title="Register" />
+            <Head title="CCIS Personnel Registration" />
 
             <div className="mb-5 p-3 rounded-lg bg-orange-50/70 border border-orange-200/80 text-xs text-orange-950 flex items-start gap-2">
                 <svg className="w-4 h-4 text-[#F68233] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
                 </svg>
                 <span>
-                    <strong>Notice:</strong> Only faculty members with an active <strong>@carsu.edu.ph</strong> email address are authorized to register.
+                    <strong>Requirement:</strong> Registration is restricted to CCIS personnel with an active <strong>@carsu.edu.ph</strong> address. Project-scoped roles are assigned per project by Project Leaders.
                 </span>
             </div>
 
@@ -73,7 +73,7 @@ export default function Register() {
                     name="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Dr. Juan Dela Cruz"
+                    placeholder="Juan Dela Cruz"
                     required
                     error={errors.name}
                     autoComplete="name"
@@ -89,7 +89,7 @@ export default function Register() {
                     placeholder="jdelacruz@carsu.edu.ph"
                     required
                     error={errors.email}
-                    helperText="Official Caraga State University address"
+                    helperText="Must be your official @carsu.edu.ph email"
                     autoComplete="username"
                 />
 
@@ -124,9 +124,9 @@ export default function Register() {
                         variant="primary"
                         size="md"
                         isLoading={isLoading}
-                        className="w-full justify-center"
+                        className="w-full justify-center font-semibold"
                     >
-                        Create Account
+                        Register CCIS Personnel Account
                     </Button>
                 </div>
             </form>

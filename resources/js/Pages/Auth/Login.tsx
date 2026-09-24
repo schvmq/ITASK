@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { GuestLayout } from '@/Layouts/GuestLayout';
 import { Button, FormField, Checkbox, Alert } from '@/Components';
 
@@ -21,7 +21,7 @@ export default function Login() {
         if (!email) {
             newErrors.email = 'Institutional email is required.';
         } else if (!email.endsWith('@carsu.edu.ph')) {
-            newErrors.email = 'Please use your official @carsu.edu.ph institutional email.';
+            newErrors.email = 'Please enter your official @carsu.edu.ph institutional email.';
         }
 
         if (!password) {
@@ -41,11 +41,17 @@ export default function Login() {
     };
 
     return (
-        <GuestLayout
-            title="Sign in to ITASK"
-            subtitle="Faculty Workflow Coordination System — CCIS"
-        >
-            <Head title="Sign In" />
+        <GuestLayout>
+            <Head title="Sign In — ITASK" />
+
+            <div className="mb-6 text-center">
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight">
+                    Welcome to ITASK
+                </h3>
+                <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                    Sign in using your institutional account to access your projects, committees, activities, and assigned tasks.
+                </p>
+            </div>
 
             {errors.general && (
                 <Alert variant="danger" className="mb-5">
@@ -63,7 +69,7 @@ export default function Login() {
                     placeholder="username@carsu.edu.ph"
                     required
                     error={errors.email}
-                    helperText="Must be your official university email"
+                    helperText="Official @carsu.edu.ph institutional address"
                     autoComplete="username"
                     autoFocus
                 />
@@ -83,7 +89,7 @@ export default function Login() {
                     <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-8 text-slate-400 hover:text-slate-600 text-xs transition cursor-pointer"
+                        className="absolute right-3 top-8 text-slate-400 hover:text-slate-600 text-xs transition cursor-pointer select-none"
                         tabIndex={-1}
                     >
                         {showPassword ? 'Hide' : 'Show'}
@@ -92,11 +98,11 @@ export default function Login() {
 
                 <div className="flex items-center justify-between pt-1">
                     <Checkbox
-                        label="Remember this device"
+                        label="Remember me"
                         checked={remember}
                         onChange={(e) => setRemember(e.target.checked)}
                     />
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer">
                         Forgot password?
                     </span>
                 </div>
@@ -107,24 +113,12 @@ export default function Login() {
                         variant="primary"
                         size="md"
                         isLoading={isLoading}
-                        className="w-full justify-center"
+                        className="w-full justify-center font-semibold"
                     >
-                        Sign In to Workspace
+                        Sign In
                     </Button>
                 </div>
             </form>
-
-            <div className="mt-6 pt-5 border-t border-slate-100 text-center">
-                <p className="text-xs text-slate-600">
-                    New faculty member?{' '}
-                    <Link
-                        href="/register"
-                        className="font-semibold text-[#F68233] hover:text-[#E06D1F] transition underline decoration-[#F68233]/40"
-                    >
-                        Register an account
-                    </Link>
-                </p>
-            </div>
         </GuestLayout>
     );
 }

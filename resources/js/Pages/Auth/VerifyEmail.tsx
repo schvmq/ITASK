@@ -7,7 +7,7 @@ export interface VerifyEmailProps {
     email?: string;
 }
 
-export default function VerifyEmail({ email = 'faculty@carsu.edu.ph' }: VerifyEmailProps) {
+export default function VerifyEmail({ email = 'account@carsu.edu.ph' }: VerifyEmailProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -26,9 +26,9 @@ export default function VerifyEmail({ email = 'faculty@carsu.edu.ph' }: VerifyEm
     return (
         <GuestLayout
             title="Verify Institutional Email"
-            subtitle="Security confirmation required"
+            subtitle="Security confirmation required for ITASK access"
         >
-            <Head title="Verify Email" />
+            <Head title="Verify Email — ITASK" />
 
             <div className="text-center mb-6">
                 <div className="w-14 h-14 bg-orange-50 border border-orange-200 text-[#F68233] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xs">
@@ -38,10 +38,10 @@ export default function VerifyEmail({ email = 'faculty@carsu.edu.ph' }: VerifyEm
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
-                    Thanks for registering! Before accessing your projects, committees, and tasks, please verify your email address by clicking the link we just sent to:
+                    Before accessing protected ITASK functions (including projects, committees, activities, and tasks), you must verify your institutional email address. A verification link was sent to:
                 </p>
 
-                <div className="mt-2.5 inline-block px-3 py-1.5 bg-slate-100/80 rounded-lg border border-slate-200 text-xs font-semibold text-slate-800">
+                <div className="mt-3 inline-block px-3.5 py-1.5 bg-slate-100 rounded-lg border border-slate-200 text-xs font-semibold text-slate-800 tracking-wide">
                     {email}
                 </div>
             </div>
@@ -58,7 +58,7 @@ export default function VerifyEmail({ email = 'faculty@carsu.edu.ph' }: VerifyEm
                     variant="primary"
                     size="md"
                     isLoading={isLoading}
-                    className="w-full justify-center"
+                    className="w-full justify-center font-semibold"
                 >
                     Resend Verification Email
                 </Button>
@@ -72,10 +72,10 @@ export default function VerifyEmail({ email = 'faculty@carsu.edu.ph' }: VerifyEm
                     </Link>
 
                     <Link
-                        href="/"
+                        href="/login"
                         className="text-xs text-rose-600 hover:text-rose-700 transition"
                     >
-                        Log Out
+                        Cancel
                     </Link>
                 </div>
             </form>
