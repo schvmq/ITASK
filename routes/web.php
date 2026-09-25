@@ -28,9 +28,10 @@ Route::get('/register', function () {
 Route::post('/register', [AuthController::class, 'register'])->name('register');
 
 // Email Verification Notice
-Route::get('/verify-email', function () {
+Route::get('/verify-email', function (Request $request) {
     return Inertia::render('Auth/VerifyEmail', [
         'email' => Auth::user()?->email,
+        'status' => $request->session()->get('status'),
     ]);
 })->middleware('auth')->name('verification.notice');
 
@@ -58,6 +59,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('Welcome');
     })->name('dashboard');
+
+    Route::get('/projects', function () {
+        return Inertia::render('Projects/Index');
+    })->name('projects.index');
+
+    Route::get('/projects/{project}', function ($project) {
+        return Inertia::render('Projects/Show', [
+            'projectId' => $project,
+        ]);
+    })->name('projects.show');
 });
 
 // Logout

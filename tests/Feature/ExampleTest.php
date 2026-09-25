@@ -360,4 +360,97 @@ class ExampleTest extends TestCase
         // Restore testing environment
         App::detectEnvironment(fn () => 'testing');
     }
+
+    /**
+     * Test that guests cannot access the projects page and are redirected to login.
+     */
+    public function test_guests_cannot_access_projects_page(): void
+    {
+        $response = $this->get('/projects');
+
+        $response->assertRedirect('/login');
+    }
+
+    /**
+     * Test that unverified authenticated users cannot access the projects page.
+     */
+    public function test_unverified_user_cannot_access_projects_page(): void
+    {
+        $user = User::create([
+            'name' => 'Unverified Member',
+            'email' => 'unverified_proj_' . uniqid() . '@carsu.edu.ph',
+            'password' => 'ValidPassword123!',
+        ]);
+
+        $response = $this->actingAs($user)->get('/projects');
+
+        $response->assertRedirect('/verify-email');
+    }
+
+    /**
+     * Test that verified users can access the projects page.
+     */
+    public function test_verified_user_can_access_projects_page(): void
+    {
+        $user = User::create([
+            'name' => 'Verified Member',
+            'email' => 'verified_proj_' . uniqid() . '@carsu.edu.ph',
+            'password' => 'ValidPassword123!',
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        $response = $this->actingAs($user)->get('/projects');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Projects/Index')
+        );
+    }
+
+    /**
+     * Test that guests cannot access the project detail page.
+     */
+    public function test_guests_cannot_access_project_detail_page(): void
+    {
+        $response = $this->get('/projects/proj-1');
+
+        $response->assertRedirect('/login');
+    }
+
+    /**
+     * Test that unverified users cannot access the project detail page.
+     */
+    public function test_unverified_user_cannot_access_project_detail_page(): void
+    {
+        $user = User::create([
+            'name' => 'Unverified Staff',
+            'email' => 'unverified_detail_' . uniqid() . '@carsu.edu.ph',
+            'password' => 'ValidPassword123!',
+        ]);
+
+        $response = $this->actingAs($user)->get('/projects/proj-1');
+
+        $response->assertRedirect('/verify-email');
+    }
+
+    /**
+     * Test that verified users can access the project detail page.
+     */
+    public function test_verified_user_can_access_project_detail_page(): void
+    {
+        $user = User::create([
+            'name' => 'Verified Leader',
+            'email' => 'verified_detail_' . uniqid() . '@carsu.edu.ph',
+            'password' => 'ValidPassword123!',
+        ]);
+        $user->forceFill(['email_verified_at' => now()])->save();
+
+        $response = $this->actingAs($user)->get('/projects/proj-1');
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Projects/Show')
+            ->where('projectId', 'proj-1')
+        );
+    }
 }

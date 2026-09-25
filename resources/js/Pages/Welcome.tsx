@@ -1,239 +1,207 @@
-import React, { useState } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import React from 'react';
+import { Head, usePage } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
+import { PageProps } from '@/types';
 import {
-    Button,
-    Card,
-    Badge,
-    Alert,
-    EmptyState,
-    Modal,
-    Spinner,
-    FormField,
-} from '@/Components';
+    FolderOpen,
+    CheckSquare,
+    Users,
+    Clock,
+    TrendingUp,
+    AlertCircle,
+} from 'lucide-react';
+
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+
+interface StatCardProps {
+    label: string;
+    value: string | number;
+    sub: string;
+    icon: React.ComponentType<{ className?: string }>;
+    accent?: boolean;
+}
+
+function StatCard({ label, value, sub, icon: Icon, accent }: StatCardProps) {
+    return (
+        <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 flex items-start gap-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:border-[color:var(--color-border-dark)] transition-colors">
+            <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                style={{
+                    backgroundColor: accent
+                        ? 'var(--color-brand-active-warm-orange)'
+                        : 'var(--color-surface-muted)',
+                }}
+            >
+                <span
+                    className="flex items-center justify-center"
+                    style={{
+                        color: accent
+                            ? 'var(--color-brand-action-orange)'
+                            : 'var(--color-text-muted)',
+                    }}
+                >
+                    <Icon className="w-5 h-5" />
+                </span>
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-muted)]">
+                    {label}
+                </p>
+                <p className="text-2xl font-bold text-[color:var(--color-text-main)] mt-0.5 leading-none">
+                    {value}
+                </p>
+                <p className="text-xs text-[color:var(--color-text-subtle)] mt-1">{sub}</p>
+            </div>
+        </div>
+    );
+}
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+
+function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+    return (
+        <div className="mb-4">
+            <h2 className="text-sm font-semibold text-[color:var(--color-text-main)]">{title}</h2>
+            {subtitle && (
+                <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">{subtitle}</p>
+            )}
+        </div>
+    );
+}
+
+// ─── Empty Placeholder ───────────────────────────────────────────────────────
+
+function EmptyPlaceholder({
+    icon: Icon,
+    title,
+    description,
+}: {
+    icon: React.ComponentType<{ className?: string }>;
+    title: string;
+    description: string;
+}) {
+    return (
+        <div className="flex flex-col items-center justify-center py-10 px-4 text-center rounded-xl border border-dashed border-[color:var(--color-border-dark)] bg-[color:var(--color-surface-subtle)]">
+            <div className="w-10 h-10 rounded-full bg-[color:var(--color-surface-muted)] flex items-center justify-center mb-3" style={{ color: 'var(--color-text-subtle)' }}>
+                <Icon className="w-5 h-5" />
+            </div>
+            <p className="text-sm font-medium text-[color:var(--color-text-muted)]">{title}</p>
+            <p className="text-xs text-[color:var(--color-text-subtle)] mt-1 max-w-xs leading-relaxed">
+                {description}
+            </p>
+        </div>
+    );
+}
+
+// ─── Dashboard Page ───────────────────────────────────────────────────────────
 
 export default function Welcome() {
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [alertDismissed, setAlertDismissed] = useState(false);
-    const [demoInput, setDemoInput] = useState('');
-    const [isActionLoading, setIsActionLoading] = useState(false);
+    const { auth } = usePage<PageProps>().props;
+    const user = auth?.user;
 
-    const handleActionClick = () => {
-        setIsActionLoading(true);
-        setTimeout(() => setIsActionLoading(false), 1000);
-    };
+    const greeting = (() => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good morning';
+        if (hour < 17) return 'Good afternoon';
+        return 'Good evening';
+    })();
+
+    const firstName = user?.name?.split(' ')[0] ?? 'there';
 
     return (
         <AppLayout
-            title="Faculty Workflow Dashboard"
-            subtitle="Overview of assigned projects, committees, and pending activity reviews"
-            headerAction={
-                <div className="flex items-center gap-2.5">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsModalOpen(true)}
-                    >
-                        Component Preview
-                    </Button>
-                    <Link href="/login">
-                        <Button variant="primary" size="sm">
-                            Sign In
-                        </Button>
-                    </Link>
-                </div>
-            }
+            title="Dashboard"
+            subtitle="Your ITASK workspace overview"
         >
-            <Head title="Dashboard & Component Showcase" />
+            <Head title="Dashboard" />
 
             <div className="space-y-6">
-                {/* Notice Alert */}
-                {!alertDismissed && (
-                    <Alert
-                        variant="info"
-                        title="Day 2 Frontend Foundation Ready"
-                        onClose={() => setAlertDismissed(true)}
-                    >
-                        The frontend foundation, design tokens (primary orange{' '}
-                        <code className="text-[#F68233] font-semibold">#F68233</code> and brand green{' '}
-                        <code className="text-[#003300] font-semibold">#003300</code>), base layouts, and authentication pages are fully established.
-                    </Alert>
-                )}
 
-                {/* Quick Navigation Cards to Auth Pages */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card padding="md" className="hover:border-slate-300 transition-colors">
-                        <div className="flex items-start justify-between">
-                            <Badge variant="primary" dot>Auth Page</Badge>
-                            <span className="text-xs text-slate-400 font-mono">/login</span>
-                        </div>
-                        <h4 className="font-semibold text-slate-900 mt-3 text-base">Sign In Portal</h4>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                            Faculty login interface with @carsu.edu.ph validation and password visibility toggle.
+                {/* ── Greeting ── */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-base font-semibold text-[color:var(--color-text-main)]">
+                            {greeting}, {firstName} 👋
+                        </h2>
+                        <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
+                            Here's a summary of your assigned work and activity.
                         </p>
-                        <div className="mt-4">
-                            <Link href="/login">
-                                <Button variant="outline" size="sm" className="w-full justify-center">
-                                    Open Login Page
-                                </Button>
-                            </Link>
-                        </div>
-                    </Card>
-
-                    <Card padding="md" className="hover:border-slate-300 transition-colors">
-                        <div className="flex items-start justify-between">
-                            <Badge variant="secondary" dot>Auth Page</Badge>
-                            <span className="text-xs text-slate-400 font-mono">/register</span>
-                        </div>
-                        <h4 className="font-semibold text-slate-900 mt-3 text-base">Faculty Registration</h4>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                            Registration with institutional email policy notice, password confirmation, and error states.
-                        </p>
-                        <div className="mt-4">
-                            <Link href="/register">
-                                <Button variant="outline" size="sm" className="w-full justify-center">
-                                    Open Register Page
-                                </Button>
-                            </Link>
-                        </div>
-                    </Card>
-
-                    <Card padding="md" className="hover:border-slate-300 transition-colors">
-                        <div className="flex items-start justify-between">
-                            <Badge variant="warning" dot>Auth Page</Badge>
-                            <span className="text-xs text-slate-400 font-mono">/verify-email</span>
-                        </div>
-                        <h4 className="font-semibold text-slate-900 mt-3 text-base">Email Verification</h4>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                            Security verification requirement interface with resend verification action.
-                        </p>
-                        <div className="mt-4">
-                            <Link href="/verify-email">
-                                <Button variant="outline" size="sm" className="w-full justify-center">
-                                    Open Verify Page
-                                </Button>
-                            </Link>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Component Showcase Card */}
-                <Card
-                    title="Reusable Design System & Component Library"
-                    subtitle="Centralized design tokens and consistent variants"
-                >
-                    <div className="space-y-6">
-                        {/* Buttons Showcase */}
-                        <div>
-                            <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                                Button Variants & States
-                            </h5>
-                            <div className="flex flex-wrap items-center gap-3">
-                                <Button variant="primary">Primary (#F68233)</Button>
-                                <Button variant="secondary">Secondary (#003300)</Button>
-                                <Button variant="outline">Outline</Button>
-                                <Button variant="danger">Danger</Button>
-                                <Button variant="ghost">Ghost</Button>
-                                <Button
-                                    variant="primary"
-                                    isLoading={isActionLoading}
-                                    onClick={handleActionClick}
-                                >
-                                    {isActionLoading ? 'Saving...' : 'Click to Load'}
-                                </Button>
-                                <Button variant="primary" disabled>
-                                    Disabled
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Status Badges Showcase */}
-                        <div className="pt-4 border-t border-slate-100">
-                            <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                                Status Badges (Project, Activity & Task States)
-                            </h5>
-                            <div className="flex flex-wrap items-center gap-2.5">
-                                <Badge variant="neutral">Planning</Badge>
-                                <Badge variant="primary" dot>In Progress</Badge>
-                                <Badge variant="warning" dot>Under Review</Badge>
-                                <Badge variant="danger" dot>Returned for Revision</Badge>
-                                <Badge variant="success" dot>Completed</Badge>
-                                <Badge variant="secondary">Archived</Badge>
-                            </div>
-                        </div>
-
-                        {/* Form Inputs Showcase */}
-                        <div className="pt-4 border-t border-slate-100">
-                            <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
-                                Form Controls & Error States
-                            </h5>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl">
-                                <FormField
-                                    label="Default Form Field"
-                                    placeholder="Enter text..."
-                                    value={demoInput}
-                                    onChange={(e) => setDemoInput(e.target.value)}
-                                    helperText="Normal state with smooth focus ring"
-                                />
-                                <FormField
-                                    label="Required Field With Error"
-                                    required
-                                    placeholder="Required value..."
-                                    error="This field is required by CCIS protocol."
-                                />
-                            </div>
-                        </div>
                     </div>
-                </Card>
-
-                {/* Empty State Showcase */}
-                <Card
-                    title="Empty State Convention"
-                    subtitle="Standardized pattern for lists with zero items"
-                >
-                    <EmptyState
-                        title="No active project activities found"
-                        description="Activities assigned to your committee will appear here once created by your Project Staff."
-                        actionLabel="Open Component Modal"
-                        onAction={() => setIsModalOpen(true)}
-                    />
-                </Card>
-            </div>
-
-            {/* Reusable Modal Preview */}
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title="Component Modal Preview"
-                description="Demonstrating the reusable modal with accessible escape key listener and custom actions."
-                footer={
-                    <>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setIsModalOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => setIsModalOpen(false)}
-                        >
-                            Confirm Action
-                        </Button>
-                    </>
-                }
-            >
-                <div className="space-y-3">
-                    <p className="text-xs text-slate-600">
-                        This modal is fully reusable across project creation, committee assignment, activity review, and MOV uploads.
-                    </p>
-                    <Alert variant="success">
-                        Modal backdrop blur and keyboard accessibility (ESC) are active.
-                    </Alert>
                 </div>
-            </Modal>
+
+                {/* ── Stats Grid ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <StatCard
+                        label="Active Projects"
+                        value="—"
+                        sub="Assigned to you"
+                        icon={FolderOpen}
+                        accent
+                    />
+                    <StatCard
+                        label="Open Tasks"
+                        value="—"
+                        sub="Pending completion"
+                        icon={CheckSquare}
+                    />
+                    <StatCard
+                        label="Committee Roles"
+                        value="—"
+                        sub="Across all projects"
+                        icon={Users}
+                    />
+                    <StatCard
+                        label="Overdue Items"
+                        value="—"
+                        sub="Require attention"
+                        icon={AlertCircle}
+                    />
+                </div>
+
+                {/* ── Two column layout ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                    {/* My Tasks (wide) */}
+                    <div className="lg:col-span-2 bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+                        <SectionHeader
+                            title="My Tasks"
+                            subtitle="Tasks assigned to you across all projects"
+                        />
+                        <EmptyPlaceholder
+                            icon={CheckSquare}
+                            title="No tasks assigned yet"
+                            description="Once a Project Staff assigns tasks to you, they will appear here for tracking."
+                        />
+                    </div>
+
+                    {/* Recent activity (narrow) */}
+                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+                        <SectionHeader
+                            title="Recent Activity"
+                            subtitle="Latest changes in your projects"
+                        />
+                        <EmptyPlaceholder
+                            icon={Clock}
+                            title="No activity yet"
+                            description="Project activity and updates will be shown here."
+                        />
+                    </div>
+                </div>
+
+                {/* ── Projects ── */}
+                <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+                    <SectionHeader
+                        title="My Projects"
+                        subtitle="CCIS projects where you hold an active role"
+                    />
+                    <EmptyPlaceholder
+                        icon={TrendingUp}
+                        title="No projects yet"
+                        description="Projects assigned to you by a Project Leader or Director will appear here."
+                    />
+                </div>
+
+            </div>
         </AppLayout>
     );
 }
