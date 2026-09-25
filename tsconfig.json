@@ -12,7 +12,8 @@
         "isolatedModules": true,
         "noEmit": true,
         "paths": {
-            "@/*": ["./resources/js/*"]
+            "@/*": ["./resources/js/*"],
+            "@/components/*": ["./resources/js/Components/*"]
         }
     },
     "include": [
