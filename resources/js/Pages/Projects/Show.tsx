@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import React, { useState, useEffect } from 'react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { type ProjectRole } from '@/Config/navigation';
+import { Modal } from '@/Components/Modal';
+import { FormField } from '@/Components/FormField';
+import { Label } from '@/Components/Label';
+import { InputError } from '@/Components/InputError';
+import { Button } from '@/Components/Button';
 import {
     FolderOpen,
     Calendar,
@@ -24,12 +29,129 @@ import {
     X,
     ExternalLink,
     AlertCircle,
+    AlertTriangle,
+    Archive,
+    Download,
+    UserPlus,
 } from 'lucide-react';
 
 // ─── Types & Definitions ──────────────────────────────────────────────────────
 
+export interface DocumentItem {
+    id: string;
+    original_name: string;
+    file_size: number;
+    mime_type: string;
+    uploaded_at?: string;
+    uploader_name?: string;
+    download_url?: string;
+}
+
+export interface CommitteeItem {
+    id: string;
+    name: string;
+    description?: string | null;
+    progress: number;
+    membersCount: number;
+    activitiesCount: number;
+    leadName: string;
+    head?: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    members?: Array<{
+        id: number;
+        name: string;
+        email: string;
+    }>;
+}
+
+export interface PersonnelItem {
+    id: number;
+    name: string;
+    email: string;
+    committee_id?: string | null;
+}
+
+export interface ProjectActivityItem {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    due_date?: string | null;
+    due_date_raw?: string | null;
+    committee: {
+        id: string;
+        name: string;
+    };
+    tasksCount: number;
+    completedTasksCount: number;
+    creator?: {
+        id: number;
+        name: string;
+    } | null;
+}
+
+export interface ProjectTaskItem {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    due_date?: string | null;
+    due_date_raw?: string | null;
+    activity: {
+        id: string;
+        title: string;
+    };
+    committee: {
+        id: string;
+        name: string;
+    };
+    assignee?: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+}
+
+export interface ProjectData {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    start_date?: string | null;
+    end_date?: string | null;
+    start_date_raw?: string | null;
+    end_date_raw?: string | null;
+    created_at?: string | null;
+    role?: ProjectRole;
+    can?: {
+        update?: boolean;
+        archive?: boolean;
+    };
+    creator?: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    leader?: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    committees?: CommitteeItem[];
+    projectStaff?: PersonnelItem[];
+    projectMembers?: PersonnelItem[];
+    availablePersonnel?: PersonnelItem[];
+    documents?: DocumentItem[];
+    activities?: ProjectActivityItem[];
+    tasks?: ProjectTaskItem[];
+}
+
 export interface ProjectShowProps {
     projectId?: string;
+    project?: ProjectData | null;
 }
 
 type TabKey = 'overview' | 'committees' | 'activities' | 'tasks' | 'timeline';
@@ -59,6 +181,7 @@ interface ProjectDocument {
     status: 'Approved' | 'Verified' | 'Pending';
     updatedAt: string;
     size: string;
+    downloadUrl?: string;
 }
 
 // ─── Mock Project Data (Single Representative Project) ────────────────────────
@@ -163,9 +286,29 @@ const MOCK_DOCUMENTS: ProjectDocument[] = [
 
 // ─── Status Badge Component ──────────────────────────────────────────────────
 function ProjectStatusBadge({ status }: { status: string }) {
+    const isArchived = status === 'Archived';
+    const isCompleted = status === 'Completed';
+    const isPlanning = status === 'Planning';
+
+    const colorClasses = isArchived
+        ? 'bg-slate-100 text-slate-700 border-slate-300'
+        : isCompleted
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        : isPlanning
+        ? 'bg-slate-50 text-slate-700 border-slate-200'
+        : 'bg-sky-50 text-sky-700 border-sky-200';
+
+    const dotColor = isArchived
+        ? 'bg-slate-500'
+        : isCompleted
+        ? 'bg-emerald-500'
+        : isPlanning
+        ? 'bg-slate-400'
+        : 'bg-sky-500';
+
     return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border bg-sky-50 text-sky-700 border-sky-200">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-sky-500" />
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${colorClasses}`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
             <span>{status}</span>
         </span>
     );
@@ -181,9 +324,203 @@ function ProjectRoleBadge({ role }: { role: ProjectRole }) {
     );
 }
 
+function ActivityStatusBadge({ status }: { status: string }) {
+    const config: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+        'To Do': { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', dot: 'bg-slate-400' },
+        'In Progress': { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', dot: 'bg-sky-500' },
+        'Under Review': { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', dot: 'bg-purple-500' },
+        'Completed': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+        'Returned for Revision': { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', dot: 'bg-rose-500' },
+    };
+
+    const style = config[status] || config['To Do'];
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style.bg} ${style.text} ${style.border}`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
+            <span>{status}</span>
+        </span>
+    );
+}
+
+function TaskStatusBadge({ status }: { status: string }) {
+    const config: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+        'To Do': { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', dot: 'bg-slate-400' },
+        'In Progress': { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', dot: 'bg-sky-500' },
+        'Completed': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+    };
+
+    const style = config[status] || config['To Do'];
+
+    return (
+        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${style.bg} ${style.text} ${style.border}`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />
+            <span>{status}</span>
+        </span>
+    );
+}
+
+function formatFileSize(bytes: number): string {
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return bytes + ' B';
+}
+
 // ─── Main Project Detail Page Shell ───────────────────────────────────────────
-export default function ProjectShow({ projectId: _projectId }: ProjectShowProps) {
+export default function ProjectShow({ projectId: _projectId, project: initialProject }: ProjectShowProps) {
     const [activeTab, setActiveTab] = useState<TabKey>('overview');
+
+    // Role-aware authorization (Project Leader only for edit and archive)
+    const isLeader = initialProject
+        ? (initialProject.can?.update ?? initialProject.role === 'Project Leader')
+        : true;
+
+    // Modals state
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+    const [archiveProcessing, setArchiveProcessing] = useState(false);
+    const [isCreateCommitteeModalOpen, setIsCreateCommitteeModalOpen] = useState(false);
+    const [isAssignPersonnelModalOpen, setIsAssignPersonnelModalOpen] = useState(false);
+
+    // Edit Project form state
+    const {
+        data: editData,
+        setData: setEditData,
+        patch: submitEdit,
+        processing: editProcessing,
+        errors: editErrors,
+        clearErrors: clearEditErrors,
+    } = useForm({
+        title: initialProject?.title ?? '',
+        description: initialProject?.description ?? '',
+        start_date: initialProject?.start_date_raw ?? '',
+        end_date: initialProject?.end_date_raw ?? '',
+        status: initialProject?.status ?? 'Planning',
+    });
+
+    // Create Committee form state
+    const {
+        data: committeeData,
+        setData: setCommitteeData,
+        post: submitCommittee,
+        processing: committeeProcessing,
+        errors: committeeErrors,
+        reset: resetCommitteeForm,
+        clearErrors: clearCommitteeErrors,
+    } = useForm({
+        name: '',
+        description: '',
+        user_id: '',
+    });
+
+    // Assign Personnel form state
+    const {
+        data: personnelData,
+        setData: setPersonnelData,
+        post: submitPersonnel,
+        processing: personnelProcessing,
+        errors: personnelErrors,
+        reset: resetPersonnelForm,
+        clearErrors: clearPersonnelErrors,
+    } = useForm({
+        user_id: '',
+        role: 'Project Staff' as 'Project Staff' | 'Project Member',
+    });
+
+    useEffect(() => {
+        if (initialProject) {
+            setEditData({
+                title: initialProject.title,
+                description: initialProject.description ?? '',
+                start_date: initialProject.start_date_raw ?? '',
+                end_date: initialProject.end_date_raw ?? '',
+                status: initialProject.status,
+            });
+        }
+    }, [initialProject]);
+
+    const handleOpenEditModal = () => {
+        if (initialProject) {
+            setEditData({
+                title: initialProject.title,
+                description: initialProject.description ?? '',
+                start_date: initialProject.start_date_raw ?? '',
+                end_date: initialProject.end_date_raw ?? '',
+                status: initialProject.status,
+            });
+        }
+        clearEditErrors();
+        setIsEditModalOpen(true);
+    };
+
+    const handleEditSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!initialProject) {
+            setIsEditModalOpen(false);
+            return;
+        }
+
+        submitEdit(`/projects/${initialProject.id}`, {
+            onSuccess: () => {
+                setIsEditModalOpen(false);
+            },
+        });
+    };
+
+    const handleArchiveConfirm = () => {
+        if (!initialProject) {
+            setIsArchiveModalOpen(false);
+            return;
+        }
+
+        setArchiveProcessing(true);
+        router.post(
+            `/projects/${initialProject.id}/archive`,
+            {},
+            {
+                onFinish: () => setArchiveProcessing(false),
+                onSuccess: () => {
+                    setIsArchiveModalOpen(false);
+                },
+            }
+        );
+    };
+
+    const handleOpenCreateCommittee = () => {
+        resetCommitteeForm();
+        clearCommitteeErrors();
+        setIsCreateCommitteeModalOpen(true);
+    };
+
+    const handleCreateCommitteeSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!initialProject) return;
+
+        submitCommittee(`/projects/${initialProject.id}/committees`, {
+            onSuccess: () => {
+                setIsCreateCommitteeModalOpen(false);
+                resetCommitteeForm();
+            },
+        });
+    };
+
+    const handleOpenAssignPersonnel = () => {
+        resetPersonnelForm();
+        clearPersonnelErrors();
+        setIsAssignPersonnelModalOpen(true);
+    };
+
+    const handleAssignPersonnelSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!initialProject) return;
+
+        submitPersonnel(`/projects/${initialProject.id}/personnel`, {
+            onSuccess: () => {
+                setIsAssignPersonnelModalOpen(false);
+                resetPersonnelForm();
+            },
+        });
+    };
 
     // Informational placeholder notification for actions that will be implemented in later steps
     const [actionNotice, setActionNotice] = useState<string | null>(null);
@@ -193,6 +530,52 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
             `"${actionName}" will be available when project management is connected.`
         );
     };
+
+    const displayCommittees: CommitteeItem[] = (initialProject?.committees && initialProject.committees.length > 0)
+        ? initialProject.committees
+        : (initialProject ? [] : MOCK_COMMITTEES.map((c) => ({ ...c, description: null })));
+
+    const project = initialProject
+        ? {
+              id: String(initialProject.id),
+              title: initialProject.title,
+              description: initialProject.description || 'No project description provided.',
+              status: initialProject.status,
+              role: (initialProject.role ?? 'Project Leader') as ProjectRole,
+              progress: 0,
+              deadline: initialProject.end_date ?? 'No deadline specified',
+              startDate: initialProject.start_date ?? 'Not set',
+              leaderName: initialProject.leader ? initialProject.leader.name : (initialProject.creator ? initialProject.creator.name : 'Unassigned'),
+              leaderEmail: initialProject.leader?.email ?? initialProject.creator?.email,
+              summary: {
+                  committees: initialProject.committees?.length ?? 0,
+                  activities: initialProject.activities?.length ?? 0,
+                  tasks: initialProject.tasks?.length ?? 0,
+              },
+          }
+        : {
+              ...MOCK_PROJECT,
+              leaderName: 'Prof. Althea Ramos',
+              leaderEmail: 'aramos@carsu.edu.ph',
+          };
+
+    const displayDocuments: ProjectDocument[] = (initialProject?.documents && initialProject.documents.length > 0)
+        ? initialProject.documents.map((d) => ({
+              id: d.id,
+              title: d.original_name,
+              type: d.mime_type.includes('pdf')
+                  ? 'PDF Document'
+                  : (d.mime_type.includes('image') || d.mime_type.includes('png') || d.mime_type.includes('jpeg')
+                      ? 'Image File'
+                      : (d.mime_type.includes('word') || d.mime_type.includes('officedocument')
+                          ? 'Word Document'
+                          : 'Official Document')),
+              status: 'Approved' as const,
+              updatedAt: d.uploaded_at ?? 'Uploaded upon creation',
+              size: formatFileSize(d.file_size),
+              downloadUrl: d.download_url,
+          }))
+        : MOCK_DOCUMENTS;
 
     // Navigation Tabs Definition
     const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -205,15 +588,15 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
 
     return (
         <AppLayout
-            title={MOCK_PROJECT.title}
+            title={project.title}
             subtitle="Project Workspace & Hierarchy Overview"
             currentProject={{
-                title: MOCK_PROJECT.title,
-                role: MOCK_PROJECT.role,
-                status: MOCK_PROJECT.status,
+                title: project.title,
+                role: project.role,
+                status: project.status,
             }}
         >
-            <Head title={`${MOCK_PROJECT.title} — ITASK`} />
+            <Head title={`${project.title} — ITASK`} />
 
             <div className="space-y-6">
 
@@ -228,7 +611,7 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                     </Link>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
                     <span className="font-semibold text-[color:var(--color-text-main)] truncate max-w-xs sm:max-w-md">
-                        {MOCK_PROJECT.title}
+                        {project.title}
                     </span>
                 </div>
 
@@ -259,34 +642,67 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                         {/* Left: Title, Description, and Badges */}
                         <div className="space-y-2.5 max-w-3xl">
                             <div className="flex flex-wrap items-center gap-2">
-                                <ProjectStatusBadge status={MOCK_PROJECT.status} />
-                                <ProjectRoleBadge role={MOCK_PROJECT.role} />
+                                <ProjectStatusBadge status={project.status} />
+                                <ProjectRoleBadge role={project.role} />
+                                {project.startDate && project.startDate !== 'Not set' && (
+                                    <span className="text-xs text-[color:var(--color-text-muted)] flex items-center gap-1 font-medium">
+                                        <Calendar className="w-3.5 h-3.5 text-[color:var(--color-text-subtle)]" />
+                                        <span>Start: {project.startDate}</span>
+                                    </span>
+                                )}
                                 <span className="text-xs text-[color:var(--color-text-muted)] flex items-center gap-1 font-medium">
                                     <Clock className="w-3.5 h-3.5 text-[color:var(--color-text-subtle)]" />
-                                    <span>Deadline: {MOCK_PROJECT.deadline}</span>
+                                    <span>Deadline: {project.deadline}</span>
                                 </span>
+                                {project.leaderName && (
+                                    <span className="text-xs text-[color:var(--color-text-muted)] flex items-center gap-1 font-medium">
+                                        <Users className="w-3.5 h-3.5 text-[color:var(--color-text-subtle)]" />
+                                        <span>Leader: <strong className="text-[color:var(--color-text-main)] font-semibold">{project.leaderName}</strong></span>
+                                    </span>
+                                )}
                             </div>
 
                             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--color-text-main)] leading-snug">
-                                {MOCK_PROJECT.title}
+                                {project.title}
                             </h1>
 
                             <p className="text-xs sm:text-sm text-[color:var(--color-text-muted)] leading-relaxed">
-                                {MOCK_PROJECT.description}
+                                {project.description}
                             </p>
                         </div>
 
-                        {/* Right: Project Actions Area (Visual Placeholders) */}
+                        {/* Right: Project Actions Area */}
                         <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
-                            <button
-                                type="button"
-                                onClick={() => handleActionClick('Edit Project')}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] hover:bg-slate-100 transition-colors cursor-pointer"
-                                title="Edit project details (Placeholder)"
-                            >
-                                <Edit3 className="w-3.5 h-3.5 text-slate-500" />
-                                <span>Edit Project</span>
-                            </button>
+                            {isLeader && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenEditModal}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] hover:bg-slate-100 transition-colors cursor-pointer"
+                                        title="Edit project details"
+                                    >
+                                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                                        <span>Edit Project</span>
+                                    </button>
+
+                                    {project.status !== 'Archived' ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsArchiveModalOpen(true)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+                                            title="Archive project"
+                                        >
+                                            <Archive className="w-3.5 h-3.5 text-rose-600" />
+                                            <span>Archive</span>
+                                        </button>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200">
+                                            <Archive className="w-3.5 h-3.5 text-slate-400" />
+                                            <span>Archived</span>
+                                        </span>
+                                    )}
+                                </>
+                            )}
 
                             <button
                                 type="button"
@@ -322,20 +738,33 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                 </span>
                             </div>
                             <span className="font-extrabold text-[color:var(--color-brand-action-orange)]">
-                                {MOCK_PROJECT.progress}% Complete
+                                {project.progress}% Complete
                             </span>
                         </div>
                         <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div
                                 className="h-full rounded-full transition-all duration-500"
                                 style={{
-                                    width: `${MOCK_PROJECT.progress}%`,
+                                    width: `${project.progress}%`,
                                     backgroundColor: 'var(--color-brand-action-orange)',
                                 }}
                             />
                         </div>
                     </div>
                 </div>
+
+                {/* ── Archived Notice Banner ── */}
+                {project.status === 'Archived' && (
+                    <div className="p-4 rounded-xl border border-slate-300 bg-slate-100/90 flex items-start gap-3 text-xs text-slate-700 animate-in fade-in duration-200">
+                        <Archive className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-bold text-slate-800">This project is archived</p>
+                            <p className="text-slate-600 mt-0.5 leading-relaxed">
+                                This project is retained for institutional and audit records. All committees, tasks, activities, and official approval documents remain safely preserved.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Project Level Navigation (Tabs) ── */}
                 <div className="border-b border-[color:var(--color-border-light)] overflow-x-auto scrollbar-none">
@@ -358,17 +787,17 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                     <span>{tab.label}</span>
                                     {tab.key === 'committees' && (
                                         <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
-                                            {MOCK_PROJECT.summary.committees}
+                                            {project.summary.committees}
                                         </span>
                                     )}
                                     {tab.key === 'activities' && (
                                         <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
-                                            {MOCK_PROJECT.summary.activities}
+                                            {project.summary.activities}
                                         </span>
                                     )}
                                     {tab.key === 'tasks' && (
                                         <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
-                                            {MOCK_PROJECT.summary.tasks}
+                                            {project.summary.tasks}
                                         </span>
                                     )}
                                 </button>
@@ -390,13 +819,13 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                     Project Progress
                                 </p>
                                 <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {MOCK_PROJECT.progress}%
+                                    {project.progress}%
                                 </p>
                                 <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                                     <div
                                         className="h-full rounded-full"
                                         style={{
-                                            width: `${MOCK_PROJECT.progress}%`,
+                                            width: `${project.progress}%`,
                                             backgroundColor: 'var(--color-brand-action-orange)',
                                         }}
                                     />
@@ -409,7 +838,7 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                     Committees
                                 </p>
                                 <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {MOCK_PROJECT.summary.committees}
+                                    {project.summary.committees}
                                 </p>
                                 <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
                                     Active groups
@@ -422,7 +851,7 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                     Activities
                                 </p>
                                 <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {MOCK_PROJECT.summary.activities}
+                                    {project.summary.activities}
                                 </p>
                                 <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
                                     Planned & active
@@ -435,7 +864,7 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                     Tasks
                                 </p>
                                 <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {MOCK_PROJECT.summary.tasks}
+                                    {project.summary.tasks}
                                 </p>
                                 <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
                                     Assigned items
@@ -448,7 +877,7 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                     Deadline
                                 </p>
                                 <p className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] mt-1 leading-snug">
-                                    Oct 18, 2026
+                                    {project.deadline}
                                 </p>
                                 <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
                                     Target conclusion
@@ -553,41 +982,52 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                 </div>
 
                                 <div className="space-y-4">
-                                    {MOCK_COMMITTEES.map((committee) => (
-                                        <div
-                                            key={committee.id}
-                                            className="p-4 rounded-lg border border-[color:var(--color-border-light)] hover:border-slate-300 transition-colors bg-white space-y-2.5"
-                                        >
-                                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-                                                <div>
-                                                    <h4 className="text-xs font-bold text-[color:var(--color-text-main)]">
-                                                        {committee.name}
-                                                    </h4>
-                                                    <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
-                                                        Led by {committee.leadName}
-                                                    </p>
+                                    {displayCommittees.length > 0 ? (
+                                        displayCommittees.map((committee) => (
+                                            <Link
+                                                key={committee.id}
+                                                href={`/projects/${project.id}/committees/${committee.id}`}
+                                                className="block p-4 rounded-lg border border-[color:var(--color-border-light)] hover:border-slate-300 transition-colors bg-white space-y-2.5"
+                                            >
+                                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-[color:var(--color-text-main)] hover:text-[color:var(--color-brand-action-orange)] transition-colors">
+                                                            {committee.name}
+                                                        </h4>
+                                                        <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
+                                                            Led by {committee.leadName}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-[11px] font-semibold text-[color:var(--color-text-muted)]">
+                                                            {committee.membersCount} members
+                                                        </span>
+                                                        <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)] min-w-[36px] text-right">
+                                                            {committee.progress}%
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-[11px] font-semibold text-[color:var(--color-text-muted)]">
-                                                        {committee.membersCount} members · {committee.activitiesCount} activities
-                                                    </span>
-                                                    <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)] min-w-[36px] text-right">
-                                                        {committee.progress}%
-                                                    </span>
-                                                </div>
-                                            </div>
 
-                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full transition-all duration-300"
-                                                    style={{
-                                                        width: `${committee.progress}%`,
-                                                        backgroundColor: 'var(--color-brand-dark-green)',
-                                                    }}
-                                                />
-                                            </div>
+                                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-300"
+                                                        style={{
+                                                            width: `${committee.progress}%`,
+                                                            backgroundColor: 'var(--color-brand-dark-green)',
+                                                        }}
+                                                    />
+                                                </div>
+                                            </Link>
+                                        ))
+                                    ) : (
+                                        <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center">
+                                            <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                            <p className="text-xs font-semibold text-slate-600">No committees established yet</p>
+                                            <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
+                                                Functional committees and assigned working groups will appear here once created.
+                                            </p>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
 
@@ -653,14 +1093,26 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                                {MOCK_DOCUMENTS.map((doc) => (
+                                {displayDocuments.map((doc) => (
                                     <div
                                         key={doc.id}
-                                        onClick={() => handleActionClick(`View Document: ${doc.title}`)}
+                                        onClick={() => {
+                                            if (doc.downloadUrl) {
+                                                window.location.href = doc.downloadUrl;
+                                            } else {
+                                                handleActionClick(`Document "${doc.title}" is securely stored on server.`);
+                                            }
+                                        }}
                                         role="button"
                                         tabIndex={0}
                                         onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleActionClick(`View Document: ${doc.title}`);
+                                            if (e.key === 'Enter') {
+                                                if (doc.downloadUrl) {
+                                                    window.location.href = doc.downloadUrl;
+                                                } else {
+                                                    handleActionClick(`Document "${doc.title}" is securely stored on server.`);
+                                                }
+                                            }
                                         }}
                                         className="p-3.5 rounded-lg border border-[color:var(--color-border-light)] hover:border-[color:var(--color-brand-action-orange)] transition-colors bg-white cursor-pointer group flex items-start gap-3"
                                     >
@@ -668,9 +1120,16 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                             <FileText className="w-4 h-4" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate group-hover:text-[color:var(--color-brand-action-orange)] transition-colors">
-                                                {doc.title}
-                                            </p>
+                                            <div className="flex items-start justify-between gap-1">
+                                                <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate group-hover:text-[color:var(--color-brand-action-orange)] transition-colors">
+                                                    {doc.title}
+                                                </p>
+                                                {doc.downloadUrl && (
+                                                    <span className="text-[color:var(--color-brand-action-orange)] shrink-0 p-0.5 rounded hover:bg-orange-50 transition-colors" title="Download Document">
+                                                        <Download className="w-3.5 h-3.5" />
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
                                                 {doc.type} · {doc.size}
                                             </p>
@@ -691,9 +1150,9 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                     </div>
                 )}
 
-                {/* ── TAB 2: COMMITTEES PLACEHOLDER ── */}
+                {/* ── TAB 2: COMMITTEES ── */}
                 {activeTab === 'committees' && (
-                    <div className="space-y-5">
+                    <div className="space-y-6">
                         <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
                                 <div>
@@ -704,200 +1163,356 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                                         Form functional committees, designate staff leads, and assign working groups
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleActionClick('Create Committee')}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer self-start sm:self-auto shadow-xs"
-                                >
-                                    <span>+ Add Committee</span>
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {MOCK_COMMITTEES.map((committee) => (
-                                    <div
-                                        key={committee.id}
-                                        className="p-5 rounded-xl border border-[color:var(--color-border-light)] bg-white space-y-3 shadow-xs hover:border-slate-300 transition-colors"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                                                Committee
-                                            </span>
-                                            <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)]">
-                                                {committee.progress}%
-                                            </span>
-                                        </div>
-                                        <h4 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                            {committee.name}
-                                        </h4>
-                                        <p className="text-xs text-[color:var(--color-text-muted)]">
-                                            {committee.leadName}
-                                        </p>
-                                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full rounded-full"
-                                                style={{
-                                                    width: `${committee.progress}%`,
-                                                    backgroundColor: 'var(--color-brand-dark-green)',
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-[color:var(--color-text-subtle)]">
-                                            <span>{committee.membersCount} members</span>
-                                            <span>{committee.activitiesCount} activities</span>
-                                        </div>
+                                {isLeader && (
+                                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                                        <button
+                                            type="button"
+                                            onClick={handleOpenAssignPersonnel}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
+                                        >
+                                            <UserPlus className="w-3.5 h-3.5 text-slate-500" />
+                                            <span>Assign Personnel</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleOpenCreateCommittee}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                                        >
+                                            <span>+ Add Committee</span>
+                                        </button>
                                     </div>
-                                ))}
+                                )}
                             </div>
 
-                            {/* Informative Shell Note */}
-                            <div className="mt-6 p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 text-center">
-                                <Users className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                                <h4 className="text-xs font-bold text-slate-800">
-                                    Committee Management Placeholder
-                                </h4>
-                                <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                                    Detailed committee member management, staff assignments, and committee deliverable tracking will appear here in subsequent development steps.
-                                </p>
+                            {displayCommittees.length > 0 ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {displayCommittees.map((committee) => (
+                                        <div
+                                            key={committee.id}
+                                            className="p-5 rounded-xl border border-[color:var(--color-border-light)] bg-white space-y-3.5 shadow-xs hover:border-slate-300 transition-colors flex flex-col justify-between"
+                                        >
+                                            <div className="space-y-2.5">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                                        Committee
+                                                    </span>
+                                                    <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)]">
+                                                        {committee.progress}%
+                                                    </span>
+                                                </div>
+                                                <h4 className="text-sm font-bold text-[color:var(--color-text-main)]">
+                                                    {committee.name}
+                                                </h4>
+                                                {committee.description && (
+                                                    <p className="text-xs text-slate-500 line-clamp-2">
+                                                        {committee.description}
+                                                    </p>
+                                                )}
+                                                <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[color:var(--color-text-subtle)] text-[11px]">Head:</span>
+                                                        <span className="font-semibold text-slate-800">{committee.leadName}</span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[color:var(--color-text-subtle)] text-[11px]">Members:</span>
+                                                        <span className="font-semibold text-slate-800">{committee.membersCount} members</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-2 border-t border-slate-100">
+                                                <Link
+                                                    href={`/projects/${project.id}/committees/${committee.id}`}
+                                                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
+                                                >
+                                                    <span>View Committee</span>
+                                                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50">
+                                    <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                                    <h4 className="text-sm font-bold text-slate-800">
+                                        No Committees Established
+                                    </h4>
+                                    <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                                        Organize your project into functional committees. Each committee is headed by a designated Project Staff member and supported by Project Members.
+                                    </p>
+                                    {isLeader && (
+                                        <div className="mt-4 flex items-center justify-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleOpenCreateCommittee}
+                                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                                            >
+                                                <span>+ Create Committee</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Project Personnel Roster */}
+                        <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+                                <div>
+                                    <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
+                                        Project Roster & Roles
+                                    </h3>
+                                    <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
+                                        Assigned personnel who can head or participate in committees
+                                    </p>
+                                </div>
+                                {isLeader && (
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenAssignPersonnel}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer self-start sm:self-auto shadow-xs"
+                                    >
+                                        <UserPlus className="w-3.5 h-3.5 text-slate-500" />
+                                        <span>Assign Personnel</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                                {/* Project Staff column */}
+                                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                                        <div className="flex items-center gap-2">
+                                            <Shield className="w-4 h-4 text-emerald-600" />
+                                            <h4 className="text-xs font-bold text-slate-800">
+                                                Project Staff ({initialProject?.projectStaff?.length ?? 0})
+                                            </h4>
+                                        </div>
+                                        <span className="text-[10px] text-slate-500 font-medium">
+                                            Eligible Committee Heads
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {(initialProject?.projectStaff ?? []).map((staff) => (
+                                            <div
+                                                key={staff.id}
+                                                className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-xs"
+                                            >
+                                                <div>
+                                                    <p className="font-semibold text-slate-800">{staff.name}</p>
+                                                    <p className="text-[11px] text-slate-500">{staff.email}</p>
+                                                </div>
+                                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                                    Staff
+                                                </span>
+                                            </div>
+                                        ))}
+                                        {(initialProject?.projectStaff ?? []).length === 0 && (
+                                            <p className="text-xs text-slate-400 italic py-2 text-center">
+                                                No Project Staff assigned yet. Assign staff to designate committee heads.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Project Members column */}
+                                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 space-y-3">
+                                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="w-4 h-4 text-sky-600" />
+                                            <h4 className="text-xs font-bold text-slate-800">
+                                                Project Members ({initialProject?.projectMembers?.length ?? 0})
+                                            </h4>
+                                        </div>
+                                        <span className="text-[10px] text-slate-500 font-medium">
+                                            Working Groups
+                                        </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {(initialProject?.projectMembers ?? []).map((member) => (
+                                            <div
+                                                key={member.id}
+                                                className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between text-xs"
+                                            >
+                                                <div>
+                                                    <p className="font-semibold text-slate-800">{member.name}</p>
+                                                    <p className="text-[11px] text-slate-500">{member.email}</p>
+                                                </div>
+                                                <span className="text-[10px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded">
+                                                    Member
+                                                </span>
+                                            </div>
+                                        ))}
+                                        {(initialProject?.projectMembers ?? []).length === 0 && (
+                                            <p className="text-xs text-slate-400 italic py-2 text-center">
+                                                No Project Members assigned yet. Assign members to participate in committees.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* ── TAB 3: ACTIVITIES PLACEHOLDER ── */}
+                {/* ── TAB 3: ACTIVITIES ── */}
                 {activeTab === 'activities' && (
                     <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-5">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div>
                                 <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
-                                    Project Activities
+                                    Project Activities ({initialProject?.activities?.length ?? 0})
                                 </h3>
                                 <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                    Planned events, submissions, and Project Staff approval workflow
+                                    Committee milestones, tasks progress, and operational deliverables
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => handleActionClick('Create Activity')}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer self-start sm:self-auto shadow-xs"
-                            >
-                                <span>+ New Activity</span>
-                            </button>
                         </div>
 
-                        {/* Activities Table Preview Placeholder */}
-                        <div className="border border-[color:var(--color-border-light)] rounded-xl overflow-hidden">
-                            <table className="w-full text-left text-xs">
-                                <thead className="bg-slate-50 border-b border-[color:var(--color-border-light)] text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
-                                    <tr>
-                                        <th className="px-4 py-3">Activity</th>
-                                        <th className="px-4 py-3 hidden sm:table-cell">Committee</th>
-                                        <th className="px-4 py-3">Status</th>
-                                        <th className="px-4 py-3 hidden md:table-cell">Timeline</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[color:var(--color-border-light)] text-[color:var(--color-text-main)]">
-                                    <tr>
-                                        <td className="px-4 py-3 font-semibold">Keynote Speaker Invitation & Confirmation</td>
-                                        <td className="px-4 py-3 hidden sm:table-cell text-slate-500">Program & Events Committee</td>
-                                        <td className="px-4 py-3">
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                Approved
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 hidden md:table-cell text-slate-500">Oct 01 - Oct 10</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3 font-semibold">Stage & Audio-Visual System Rehearsal</td>
-                                        <td className="px-4 py-3 hidden sm:table-cell text-slate-500">Technical Committee</td>
-                                        <td className="px-4 py-3">
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
-                                                Under Review
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 hidden md:table-cell text-slate-500">Oct 11 - Oct 15</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="px-4 py-3 font-semibold">Student Attendance & Registration Verification</td>
-                                        <td className="px-4 py-3 hidden sm:table-cell text-slate-500">Documentation Committee</td>
-                                        <td className="px-4 py-3">
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                                Pending Submission
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 hidden md:table-cell text-slate-500">Oct 16 - Oct 18</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 text-center">
-                            <ListTodo className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                            <h4 className="text-xs font-bold text-slate-800">
-                                Activity Workflow Placeholder
-                            </h4>
-                            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                                Activities assigned to this project and their respective committee approval pipelines will be managed here.
-                            </p>
-                        </div>
+                        {initialProject?.activities && initialProject.activities.length > 0 ? (
+                            <div className="border border-[color:var(--color-border-light)] rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-50 border-b border-[color:var(--color-border-light)] text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
+                                        <tr>
+                                            <th className="px-4 py-3">Activity</th>
+                                            <th className="px-4 py-3 hidden sm:table-cell">Committee</th>
+                                            <th className="px-4 py-3">Status</th>
+                                            <th className="px-4 py-3 hidden md:table-cell">Tasks</th>
+                                            <th className="px-4 py-3 hidden lg:table-cell">Due Date</th>
+                                            <th className="px-4 py-3 text-right">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[color:var(--color-border-light)] text-[color:var(--color-text-main)]">
+                                        {initialProject.activities.map((act) => (
+                                            <tr key={act.id} className="hover:bg-slate-50/60 transition-colors">
+                                                <td className="px-4 py-3.5">
+                                                    <div className="font-semibold text-slate-800">{act.title}</div>
+                                                    {act.description && (
+                                                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{act.description}</p>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3.5 hidden sm:table-cell text-slate-600">
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">
+                                                        {act.committee.name}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <ActivityStatusBadge status={act.status} />
+                                                </td>
+                                                <td className="px-4 py-3.5 hidden md:table-cell text-slate-600">
+                                                    <span className="font-medium">{act.completedTasksCount} / {act.tasksCount}</span>
+                                                    <span className="text-slate-400 text-[11px]"> completed</span>
+                                                </td>
+                                                <td className="px-4 py-3.5 hidden lg:table-cell text-slate-500">
+                                                    {act.due_date ?? <span className="text-slate-400 italic">No deadline</span>}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right">
+                                                    <Link
+                                                        href={`/projects/${initialProject.id}/committees/${act.committee.id}/activities/${act.id}`}
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline"
+                                                    >
+                                                        <span>View Details</span>
+                                                        <ChevronRight className="w-3.5 h-3.5" />
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="p-8 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 text-center">
+                                <ListTodo className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                                <h4 className="text-xs font-bold text-slate-800">
+                                    No Activities Created Yet
+                                </h4>
+                                <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                                    Project Staff can create activities within their assigned committees to establish deliverables and milestones.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* ── TAB 4: TASKS PLACEHOLDER ── */}
+                {/* ── TAB 4: TASKS ── */}
                 {activeTab === 'tasks' && (
                     <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-5">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div>
                                 <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
-                                    Project Tasks
+                                    Project Tasks ({initialProject?.tasks?.length ?? 0})
                                 </h3>
                                 <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                    Operational member assignments and status tracking
+                                    Operational assignments and status tracking across all committees
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => handleActionClick('Create Task')}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer self-start sm:self-auto shadow-xs"
-                            >
-                                <span>+ New Task</span>
-                            </button>
                         </div>
 
-                        <div className="space-y-2.5">
-                            {[
-                                { title: 'Draft opening program script and welcoming remarks', committee: 'Program & Events', assignee: 'Member: Sarah Chen', status: 'Completed' },
-                                { title: 'Test gym PA audio amplifiers and wireless lapel mics', committee: 'Technical', assignee: 'Member: Juan Dela Cruz', status: 'In Progress' },
-                                { title: 'Prepare print certificate templates for attending students', committee: 'Documentation', assignee: 'Member: Mark Bryan', status: 'Pending' },
-                            ].map((task, i) => (
-                                <div
-                                    key={i}
-                                    className="p-3.5 rounded-lg border border-[color:var(--color-border-light)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-                                >
-                                    <div>
-                                        <p className="text-xs font-semibold text-[color:var(--color-text-main)]">
-                                            {task.title}
-                                        </p>
-                                        <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
-                                            {task.committee} · Assigned to {task.assignee}
-                                        </p>
-                                    </div>
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 self-start sm:self-auto">
-                                        {task.status}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 text-center">
-                            <CheckSquare className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                            <h4 className="text-xs font-bold text-slate-800">
-                                Task Management Placeholder
-                            </h4>
-                            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                                Tasks associated with this project and individual member deliverables will appear here.
-                            </p>
-                        </div>
+                        {initialProject?.tasks && initialProject.tasks.length > 0 ? (
+                            <div className="border border-[color:var(--color-border-light)] rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-50 border-b border-[color:var(--color-border-light)] text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
+                                        <tr>
+                                            <th className="px-4 py-3">Task</th>
+                                            <th className="px-4 py-3 hidden sm:table-cell">Activity & Committee</th>
+                                            <th className="px-4 py-3 hidden md:table-cell">Assignee</th>
+                                            <th className="px-4 py-3">Status</th>
+                                            <th className="px-4 py-3 hidden lg:table-cell">Due Date</th>
+                                            <th className="px-4 py-3 text-right">Parent Activity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-[color:var(--color-border-light)] text-[color:var(--color-text-main)]">
+                                        {initialProject.tasks.map((task) => (
+                                            <tr key={task.id} className="hover:bg-slate-50/60 transition-colors">
+                                                <td className="px-4 py-3.5">
+                                                    <div className="font-semibold text-slate-800">{task.title}</div>
+                                                    {task.description && (
+                                                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{task.description}</p>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3.5 hidden sm:table-cell">
+                                                    <div className="font-medium text-slate-700">{task.activity.title}</div>
+                                                    <div className="text-[11px] text-slate-500">{task.committee.name}</div>
+                                                </td>
+                                                <td className="px-4 py-3.5 hidden md:table-cell">
+                                                    {task.assignee ? (
+                                                        <span className="font-medium text-slate-800">{task.assignee.name}</span>
+                                                    ) : (
+                                                        <span className="text-slate-400 italic">Unassigned</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <TaskStatusBadge status={task.status} />
+                                                </td>
+                                                <td className="px-4 py-3.5 hidden lg:table-cell text-slate-500">
+                                                    {task.due_date ?? <span className="text-slate-400 italic">No deadline</span>}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right">
+                                                    <Link
+                                                        href={`/projects/${initialProject.id}/committees/${task.committee.id}/activities/${task.activity.id}`}
+                                                        className="inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline"
+                                                    >
+                                                        <span>View Activity</span>
+                                                        <ChevronRight className="w-3.5 h-3.5" />
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="p-8 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 text-center">
+                                <CheckSquare className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                                <h4 className="text-xs font-bold text-slate-800">
+                                    No Tasks Created Yet
+                                </h4>
+                                <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                                    Tasks are created under activities within each committee by Project Staff to delegate operational duties.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -964,6 +1579,320 @@ export default function ProjectShow({ projectId: _projectId }: ProjectShowProps)
                         </div>
                     </div>
                 )}
+
+                {/* ── Edit Project Modal ── */}
+                <Modal
+                    isOpen={isEditModalOpen}
+                    onClose={() => !editProcessing && setIsEditModalOpen(false)}
+                    title="Edit Project"
+                    description="Update project details and settings. Only assigned Project Leaders may edit project details."
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleEditSubmit} className="space-y-4 pt-1">
+                        <FormField
+                            label="Project Title"
+                            id="edit-project-title"
+                            name="title"
+                            value={editData.title}
+                            onChange={(e) => setEditData('title', e.target.value)}
+                            error={editErrors.title}
+                            required
+                            placeholder="e.g., CCIS General Assembly 2026"
+                            autoFocus
+                        />
+
+                        <div className="space-y-1">
+                            <Label htmlFor="edit-project-description">Description</Label>
+                            <textarea
+                                id="edit-project-description"
+                                name="description"
+                                rows={3}
+                                value={editData.description}
+                                onChange={(e) => setEditData('description', e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                placeholder="Brief project charter, scope, or background..."
+                            />
+                            <InputError message={editErrors.description} />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <FormField
+                                label="Start Date"
+                                id="edit-project-start-date"
+                                type="date"
+                                value={editData.start_date}
+                                onChange={(e) => setEditData('start_date', e.target.value)}
+                                error={editErrors.start_date}
+                            />
+
+                            <FormField
+                                label="End Date"
+                                id="edit-project-end-date"
+                                type="date"
+                                value={editData.end_date}
+                                onChange={(e) => setEditData('end_date', e.target.value)}
+                                error={editErrors.end_date}
+                                helperText="Target conclusion date"
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="edit-project-status">Status</Label>
+                            <select
+                                id="edit-project-status"
+                                name="status"
+                                value={editData.status}
+                                onChange={(e) => setEditData('status', e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                            >
+                                <option value="Planning">Planning</option>
+                                <option value="Active">Active</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Archived">Archived</option>
+                            </select>
+                            <InputError message={editErrors.status} />
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsEditModalOpen(false)}
+                                disabled={editProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={editProcessing}
+                                disabled={editProcessing}
+                            >
+                                Save Changes
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* ── Archive Confirmation Modal ── */}
+                <Modal
+                    isOpen={isArchiveModalOpen}
+                    onClose={() => !archiveProcessing && setIsArchiveModalOpen(false)}
+                    title="Archive Project"
+                    description="Please review before archiving this project workspace."
+                    maxWidth="md"
+                >
+                    <div className="space-y-4 pt-1">
+                        <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3 text-xs text-amber-900">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                                <p className="font-semibold">
+                                    Are you sure you want to archive &ldquo;{project.title}&rdquo;?
+                                </p>
+                                <p className="text-amber-800 leading-relaxed">
+                                    The project will be marked as <strong>Archived</strong> and will no longer be treated as an active project.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-lg bg-slate-50 border border-slate-200 p-3.5 text-xs text-slate-600 space-y-1.5">
+                            <p className="font-medium text-slate-800">What happens when you archive:</p>
+                            <ul className="list-disc list-inside space-y-1 text-slate-600">
+                                <li>Existing project data and records are safely retained in the database.</li>
+                                <li>Committees, activities, and tasks will remain intact.</li>
+                                <li>Official approval documents remain securely accessible to assigned members.</li>
+                                <li>The project will be visibly marked as Archived in project lists and details.</li>
+                            </ul>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsArchiveModalOpen(false)}
+                                disabled={archiveProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="danger"
+                                onClick={handleArchiveConfirm}
+                                isLoading={archiveProcessing}
+                                disabled={archiveProcessing}
+                            >
+                                Confirm Archive
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+
+                {/* ── Create Committee Modal ── */}
+                <Modal
+                    isOpen={isCreateCommitteeModalOpen}
+                    onClose={() => !committeeProcessing && setIsCreateCommitteeModalOpen(false)}
+                    title="Create Committee"
+                    description="Establish a functional committee under this project and designate an assigned Project Staff member as head."
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleCreateCommitteeSubmit} className="space-y-4 pt-1">
+                        <FormField
+                            label="Committee Name"
+                            id="create-committee-name"
+                            name="name"
+                            value={committeeData.name}
+                            onChange={(e) => setCommitteeData('name', e.target.value)}
+                            error={committeeErrors.name}
+                            required
+                            placeholder="e.g., Logistics & Procurement Committee"
+                            autoFocus
+                        />
+
+                        <div className="space-y-1">
+                            <Label htmlFor="create-committee-description">Description (Optional)</Label>
+                            <textarea
+                                id="create-committee-description"
+                                name="description"
+                                rows={3}
+                                value={committeeData.description}
+                                onChange={(e) => setCommitteeData('description', e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                placeholder="Mandate, responsibilities, or scope of this committee..."
+                            />
+                            <InputError message={committeeErrors.description} />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="create-committee-staff">Committee Head (Project Staff) *</Label>
+                            {(initialProject?.projectStaff ?? []).length > 0 ? (
+                                <select
+                                    id="create-committee-staff"
+                                    name="user_id"
+                                    value={committeeData.user_id}
+                                    onChange={(e) => setCommitteeData('user_id', e.target.value)}
+                                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                    required
+                                >
+                                    <option value="">Select a Project Staff member...</option>
+                                    {(initialProject?.projectStaff ?? []).map((staff) => (
+                                        <option key={staff.id} value={staff.id}>
+                                            {staff.name} ({staff.email})
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-2">
+                                    <p>
+                                        No <strong>Project Staff</strong> have been assigned to this project yet. A committee requires a designated Project Staff member as its head.
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsCreateCommitteeModalOpen(false);
+                                            handleOpenAssignPersonnel();
+                                        }}
+                                        className="text-amber-900 font-semibold underline hover:text-amber-950 inline-flex items-center gap-1"
+                                    >
+                                        <UserPlus className="w-3.5 h-3.5" />
+                                        <span>Assign Project Staff first</span>
+                                    </button>
+                                </div>
+                            )}
+                            <InputError message={committeeErrors.user_id} />
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsCreateCommitteeModalOpen(false)}
+                                disabled={committeeProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={committeeProcessing}
+                                disabled={committeeProcessing || (initialProject?.projectStaff ?? []).length === 0}
+                            >
+                                Create Committee
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* ── Assign Personnel Modal ── */}
+                <Modal
+                    isOpen={isAssignPersonnelModalOpen}
+                    onClose={() => !personnelProcessing && setIsAssignPersonnelModalOpen(false)}
+                    title="Assign Personnel to Project"
+                    description="Assign verified institutional users to this project as Project Staff or Project Members."
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleAssignPersonnelSubmit} className="space-y-4 pt-1">
+                        <div className="space-y-1">
+                            <Label htmlFor="assign-personnel-user">Verified User *</Label>
+                            {(initialProject?.availablePersonnel ?? []).length > 0 ? (
+                                <select
+                                    id="assign-personnel-user"
+                                    name="user_id"
+                                    value={personnelData.user_id}
+                                    onChange={(e) => setPersonnelData('user_id', e.target.value)}
+                                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                    required
+                                >
+                                    <option value="">Select an institutional user...</option>
+                                    {(initialProject?.availablePersonnel ?? []).map((u) => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name} ({u.email})
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <p className="text-xs text-slate-500 italic p-2 rounded bg-slate-50 border border-slate-200">
+                                    All eligible institutional users are already assigned to this project.
+                                </p>
+                            )}
+                            <InputError message={personnelErrors.user_id} />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="assign-personnel-role">Project Role *</Label>
+                            <select
+                                id="assign-personnel-role"
+                                name="role"
+                                value={personnelData.role}
+                                onChange={(e) => setPersonnelData('role', e.target.value as 'Project Staff' | 'Project Member')}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                required
+                            >
+                                <option value="Project Staff">Project Staff (can head committees)</option>
+                                <option value="Project Member">Project Member (committee participant)</option>
+                            </select>
+                            <InputError message={personnelErrors.role} />
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsAssignPersonnelModalOpen(false)}
+                                disabled={personnelProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={personnelProcessing}
+                                disabled={personnelProcessing || (initialProject?.availablePersonnel ?? []).length === 0}
+                            >
+                                Assign Personnel
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
 
             </div>
         </AppLayout>

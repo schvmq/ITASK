@@ -12,6 +12,7 @@ class Task extends Model
     use HasFactory;
 
     public const STATUS_TO_DO = 'To Do';
+    public const STATUS_TODO = self::STATUS_TO_DO;
     public const STATUS_IN_PROGRESS = 'In Progress';
     public const STATUS_COMPLETED = 'Completed';
 

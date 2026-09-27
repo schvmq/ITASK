@@ -1,7 +1,12 @@
-import React, { useState, useMemo } from 'react';
-import { Head, router } from '@inertiajs/react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { type ProjectRole } from '@/Config/navigation';
+import { Modal } from '@/Components/Modal';
+import { FormField } from '@/Components/FormField';
+import { Label } from '@/Components/Label';
+import { InputError } from '@/Components/InputError';
+import { Button } from '@/Components/Button';
 import {
     FolderOpen,
     Plus,
@@ -17,6 +22,7 @@ import {
     Info,
     X,
     Filter,
+    FileText,
 } from 'lucide-react';
 import { Skeleton } from '@/Components/ui/skeleton';
 
@@ -25,7 +31,7 @@ import { Skeleton } from '@/Components/ui/skeleton';
 // Brand orange and semantic status colors remain strictly separate.
 // NO purple/indigo is used anywhere.
 
-export type ProjectStatus = 'Planning' | 'In Progress' | 'Completed' | 'On Hold';
+export type ProjectStatus = 'Planning' | 'In Progress' | 'Active' | 'Completed' | 'On Hold' | 'Archived';
 
 interface StatusConfig {
     label: string;
@@ -50,6 +56,13 @@ const STATUS_CONFIGS: Record<ProjectStatus, StatusConfig> = {
         borderClass: 'border-sky-200',
         dotClass: 'bg-sky-500',
     },
+    Active: {
+        label: 'Active',
+        bgClass: 'bg-emerald-50',
+        textClass: 'text-emerald-700',
+        borderClass: 'border-emerald-200',
+        dotClass: 'bg-emerald-500',
+    },
     Completed: {
         label: 'Completed',
         bgClass: 'bg-emerald-50',
@@ -63,6 +76,13 @@ const STATUS_CONFIGS: Record<ProjectStatus, StatusConfig> = {
         textClass: 'text-amber-800',
         borderClass: 'border-amber-200',
         dotClass: 'bg-amber-500',
+    },
+    Archived: {
+        label: 'Archived',
+        bgClass: 'bg-slate-100',
+        textClass: 'text-slate-600',
+        borderClass: 'border-slate-300',
+        dotClass: 'bg-slate-500',
     },
 };
 
@@ -384,8 +404,12 @@ function ProjectsEmptyState({
     );
 }
 
+interface ProjectsIndexProps {
+    projects?: ProjectItem[];
+}
+
 // ─── Main Projects Page Component ─────────────────────────────────────────────
-export default function ProjectsIndex() {
+export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
     // Search and filter state
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -396,17 +420,74 @@ export default function ProjectsIndex() {
         'normal'
     );
 
-    // Modal / Notice feedback state for placeholder actions (Create Project & Card click)
+    // Modal / Notice feedback state
     const [activeNotice, setActiveNotice] = useState<{
         title: string;
         message: string;
     } | null>(null);
 
-    // Client-side filtering logic against sample data
+    // Modal state for project creation
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Inertia form handling for project creation
+    const { data, setData, post, processing, errors, reset, clearErrors } = useForm<{
+        title: string;
+        description: string;
+        start_date: string;
+        end_date: string;
+        approval_document: File | null;
+    }>({
+        title: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        approval_document: null,
+    });
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        setData('approval_document', file);
+    };
+
+    const handleRemoveFile = () => {
+        setData('approval_document', null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleOpenCreateModal = () => {
+        clearErrors();
+        setIsCreateModalOpen(true);
+    };
+
+    const handleCloseCreateModal = () => {
+        setIsCreateModalOpen(false);
+        reset();
+        clearErrors();
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleCreateProjectSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        post('/projects', {
+            forceFormData: true,
+            onSuccess: () => {
+                handleCloseCreateModal();
+            },
+        });
+    };
+
+    // Client-side filtering logic against backend projects or sample demo projects
+    const baseProjects = projects.length > 0 ? projects : SAMPLE_PROJECTS;
+
     const filteredProjects = useMemo(() => {
         if (simulatedState === 'empty') return [];
 
-        return SAMPLE_PROJECTS.filter((project) => {
+        return baseProjects.filter((project) => {
             const matchesSearch =
                 searchTerm.trim() === '' ||
                 project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -420,7 +501,7 @@ export default function ProjectsIndex() {
 
             return matchesSearch && matchesStatus && matchesRole;
         });
-    }, [searchTerm, statusFilter, roleFilter, simulatedState]);
+    }, [baseProjects, searchTerm, statusFilter, roleFilter, simulatedState]);
 
     const isFiltered =
         searchTerm.trim() !== '' || statusFilter !== 'ALL' || roleFilter !== 'ALL';
@@ -431,26 +512,18 @@ export default function ProjectsIndex() {
         setRoleFilter('ALL');
     };
 
-    const handleCreateProjectClick = () => {
-        setActiveNotice({
-            title: 'Create Project (Placeholder)',
-            message:
-                'Project creation workflow and database storage will be implemented in subsequent development steps. The button is currently an established UI placeholder.',
-        });
-    };
-
     const handleProjectCardSelect = (project: ProjectItem) => {
         router.visit(`/projects/${project.id}`);
     };
 
-    // Header Action Button: + Create Project (Placeholder)
+    // Header Action Button: + Create Project
     const createProjectButton = (
         <button
             type="button"
-            onClick={handleCreateProjectClick}
+            onClick={handleOpenCreateModal}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-white shadow-xs transition-all duration-150 cursor-pointer hover:opacity-95 active:scale-98"
             style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
-            title="Create a new CCIS project (Placeholder)"
+            title="Create a new CCIS project"
         >
             <Plus className="w-4 h-4 shrink-0" strokeWidth={2.4} />
             <span>+ Create Project</span>
@@ -531,10 +604,12 @@ export default function ProjectsIndex() {
                                 className="h-8 px-2.5 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] rounded-lg focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] cursor-pointer"
                             >
                                 <option value="ALL">All Statuses</option>
-                                <option value="In Progress">In Progress</option>
                                 <option value="Planning">Planning</option>
+                                <option value="Active">Active</option>
+                                <option value="In Progress">In Progress</option>
                                 <option value="Completed">Completed</option>
                                 <option value="On Hold">On Hold</option>
+                                <option value="Archived">Archived</option>
                             </select>
                         </div>
 
@@ -579,7 +654,7 @@ export default function ProjectsIndex() {
                     <ProjectsEmptyState
                         isFiltered={isFiltered}
                         onResetFilters={handleResetFilters}
-                        onCreateClick={handleCreateProjectClick}
+                        onCreateClick={handleOpenCreateModal}
                     />
                 ) : (
                     <div>
@@ -609,6 +684,136 @@ export default function ProjectsIndex() {
                         </div>
                     </div>
                 )}
+
+                {/* ── Create Project Modal ── */}
+                <Modal
+                    isOpen={isCreateModalOpen}
+                    onClose={handleCloseCreateModal}
+                    title="Create New Project"
+                    description="Initiate a new CCIS project workspace. As the creator, you will automatically be assigned as Project Leader."
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleCreateProjectSubmit} className="space-y-4 pt-1">
+                        <FormField
+                            label="Project Title"
+                            id="create-project-title"
+                            name="title"
+                            value={data.title}
+                            onChange={(e) => setData('title', e.target.value)}
+                            error={errors.title}
+                            required
+                            placeholder="e.g., CCIS General Assembly 2026"
+                            autoFocus
+                        />
+
+                        <div className="space-y-1">
+                            <Label htmlFor="create-project-description">Description</Label>
+                            <textarea
+                                id="create-project-description"
+                                name="description"
+                                rows={3}
+                                value={data.description}
+                                onChange={(e) => setData('description', e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                placeholder="Brief project charter, scope, or background..."
+                            />
+                            <InputError message={errors.description} />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <FormField
+                                label="Start Date"
+                                id="create-project-start-date"
+                                type="date"
+                                value={data.start_date}
+                                onChange={(e) => setData('start_date', e.target.value)}
+                                error={errors.start_date}
+                            />
+
+                            <FormField
+                                label="End Date"
+                                id="create-project-end-date"
+                                type="date"
+                                value={data.end_date}
+                                onChange={(e) => setData('end_date', e.target.value)}
+                                error={errors.end_date}
+                                helperText="Target conclusion date"
+                            />
+                        </div>
+
+                        {/* Approval / Supporting Document Upload */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="create-project-document" required>
+                                Approval / Supporting Document
+                            </Label>
+                            <div className="p-3 border border-dashed border-slate-300 rounded-lg bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                                {data.approval_document ? (
+                                    <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-md border border-slate-200">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <FileText className="w-4 h-4 text-[color:var(--color-brand-action-orange)] shrink-0" />
+                                            <span className="text-xs font-medium text-slate-800 truncate">
+                                                {data.approval_document.name}
+                                            </span>
+                                            <span className="text-[10px] text-slate-400 shrink-0">
+                                                ({(data.approval_document.size / 1024).toFixed(0)} KB)
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveFile}
+                                            className="text-xs text-rose-600 hover:text-rose-700 font-semibold shrink-0 cursor-pointer p-1"
+                                            title="Remove selected file"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-2 text-center">
+                                        <input
+                                            ref={fileInputRef}
+                                            id="create-project-document"
+                                            name="approval_document"
+                                            type="file"
+                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                            onChange={handleFileChange}
+                                            className="hidden"
+                                        />
+                                        <label
+                                            htmlFor="create-project-document"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>Attach Official Document</span>
+                                        </label>
+                                        <p className="text-[11px] text-slate-500 mt-1.5">
+                                            Approved memo, activity design, or letter (PDF, Word, Image · max 10MB)
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <InputError message={errors.approval_document} />
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCloseCreateModal}
+                                disabled={processing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={processing}
+                                disabled={processing}
+                            >
+                                Create Project
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
 
             </div>
         </AppLayout>
