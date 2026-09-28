@@ -174,4 +174,97 @@ class TaskPolicy
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
             ->exists();
     }
+
+    /**
+     * Determine whether the user can upload evidence to the task.
+     * Allowed for:
+     * - Project Leader of the project
+     * - Project Staff assigned to this committee
+     * - Assigned Project Member in this committee
+     */
+    public function uploadEvidence(User $user, Task $task): bool
+    {
+        $project = $task->activity->committee->project;
+
+        // 1. Leader
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
+        // 2. Staff assigned to this committee
+        $isStaff = $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->exists();
+
+        if ($isStaff) {
+            return true;
+        }
+
+        // 3. Assigned Project Member in this committee
+        if ((int) $task->assigned_to === (int) $user->id) {
+            return $task->activity->committee->roleAssignments()
+                ->where('user_id', $user->id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Determine whether the user can view/download task evidence.
+     * Allowed for anyone who can view the task (Leader, Staff, Member in committee).
+     */
+    public function viewEvidence(User $user, Task $task): bool
+    {
+        return $this->view($user, $task);
+    }
+
+    /**
+     * Determine whether the user can delete task evidence.
+     * Allowed for:
+     * - Project Leader of the project
+     * - Project Staff assigned to this committee
+     * - The user who uploaded the evidence (if in this committee)
+     */
+    public function deleteEvidence(User $user, Task $task, ?\App\Models\TaskEvidence $evidence = null): bool
+    {
+        $project = $task->activity->committee->project;
+
+        // 1. Leader
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
+        // 2. Staff assigned to this committee
+        $isStaff = $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->exists();
+
+        if ($isStaff) {
+            return true;
+        }
+
+        // 3. Uploader
+        if ($evidence && (int) $evidence->uploaded_by === (int) $user->id) {
+            return $task->activity->committee->roleAssignments()
+                ->where('user_id', $user->id)
+                ->exists();
+        }
+
+        return false;
+    }
 }
+

@@ -24,6 +24,7 @@ import {
     Plus,
     ListTodo,
     Calendar,
+    Clock,
 } from 'lucide-react';
 
 interface MemberItem {
@@ -375,6 +376,13 @@ export default function CommitteeShow({
         }
     };
 
+    const activitiesAwaitingReview = (committee.activities || []).filter(
+        (act) => act.status === 'Under Review'
+    );
+    const returnedActivities = (committee.activities || []).filter(
+        (act) => act.status === 'Returned' || act.status === 'Returned for Revision'
+    );
+
     return (
         <AppLayout
             title={committee.name}
@@ -721,6 +729,68 @@ export default function CommitteeShow({
                             </Button>
                         )}
                     </div>
+
+                    {/* ── Staff Review Queue (Activities Awaiting Staff Review) ── */}
+                    {activitiesAwaitingReview.length > 0 && (
+                        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                                        Review Queue · Activities Awaiting Staff Review ({activitiesAwaitingReview.length})
+                                    </h4>
+                                </div>
+                                <span className="text-[11px] font-medium text-amber-800">
+                                    Action required: Committee head verification
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {activitiesAwaitingReview.map((act) => (
+                                    <div
+                                        key={act.id}
+                                        className="p-3 bg-white rounded-lg border border-amber-200 shadow-2xs flex flex-col justify-between space-y-2.5"
+                                    >
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-bold text-slate-900 truncate">
+                                                    {act.title}
+                                                </span>
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200 shrink-0">
+                                                    Under Review
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                                                <span>{act.completed_tasks_count} / {act.tasks_count} tasks done</span>
+                                                {act.due_date && <span>Due: {act.due_date}</span>}
+                                            </div>
+                                        </div>
+                                        <div className="pt-2 border-t border-slate-100 flex justify-end">
+                                            <Link
+                                                href={`/projects/${project.id}/committees/${committee.id}/activities/${act.id}`}
+                                                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 rounded-md transition-opacity"
+                                            >
+                                                <span>Review Activity</span>
+                                                <ChevronRight className="w-3.5 h-3.5" />
+                                            </Link>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Returned Activities Notice */}
+                    {returnedActivities.length > 0 && (
+                        <div className="p-3 rounded-lg border border-rose-200 bg-rose-50/70 flex items-center justify-between text-xs text-rose-800">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                                <span>
+                                    <strong>Revision in Progress:</strong> {returnedActivities.length} {returnedActivities.length === 1 ? 'activity has' : 'activities have'} been returned for revision and {returnedActivities.length === 1 ? 'is' : 'are'} being updated by committee members.
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     {(committee.activities && committee.activities.length > 0) ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

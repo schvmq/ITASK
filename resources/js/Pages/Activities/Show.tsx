@@ -14,14 +14,18 @@ import {
     CheckSquare,
     ChevronRight,
     Clock,
+    Download,
     Edit3,
+    FileText,
     Layers,
     ListTodo,
+    Paperclip,
     Plus,
     RotateCcw,
     Send,
     Shield,
     Trash2,
+    Upload,
     User,
     AlertTriangle,
     X,
@@ -42,6 +46,24 @@ export interface ChecklistItemData {
 
 export type TaskStatus = 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned';
 
+export interface TaskEvidenceData {
+    id: string;
+    original_name: string;
+    file_size: number;
+    file_size_formatted: string;
+    mime_type: string;
+    remarks: string | null;
+    uploaded_at: string | null;
+    uploader: {
+        id: number;
+        name: string;
+    } | null;
+    download_url: string;
+    can: {
+        delete: boolean;
+    };
+}
+
 export interface TaskItem {
     id: string;
     title: string;
@@ -53,6 +75,7 @@ export interface TaskItem {
     assignee: AssigneeItem | null;
     is_assigned_to_me?: boolean;
     checklist_items: ChecklistItemData[];
+    evidences?: TaskEvidenceData[];
     can: {
         update: boolean;
         delete: boolean;
@@ -61,6 +84,7 @@ export interface TaskItem {
         submitReview?: boolean;
         review?: boolean;
         resubmit?: boolean;
+        uploadEvidence?: boolean;
     };
 }
 
@@ -156,6 +180,15 @@ export default function ActivityShow({
     const [editingChecklistContent, setEditingChecklistContent] = useState('');
     const [deletingChecklistItem, setDeletingChecklistItem] = useState<ChecklistItemData | null>(null);
 
+    // Evidence interaction state
+    const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+    const [evidenceRemarks, setEvidenceRemarks] = useState('');
+    const [evidenceProcessing, setEvidenceProcessing] = useState(false);
+    const [evidenceError, setEvidenceError] = useState<string | null>(null);
+    const [evidenceSuccess, setEvidenceSuccess] = useState<string | null>(null);
+    const [deletingEvidence, setDeletingEvidence] = useState<{ task: TaskItem; evidence: TaskEvidenceData } | null>(null);
+    const [deletingEvidenceProcessing, setDeletingEvidenceProcessing] = useState(false);
+
     // Sync viewingTask with incoming activity props when tasks change
     useEffect(() => {
         if (viewingTask) {
@@ -165,6 +198,18 @@ export default function ActivityShow({
             }
         }
     }, [activity.tasks]);
+
+    // Reset evidence form state when switching or closing tasks
+    useEffect(() => {
+        setEvidenceFile(null);
+        setEvidenceRemarks('');
+        setEvidenceError(null);
+        setEvidenceSuccess(null);
+        const fileInput = document.getElementById('task-evidence-file-input') as HTMLInputElement | null;
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    }, [viewingTask?.id]);
 
     // Create Task Form
     const {
@@ -581,6 +626,71 @@ export default function ActivityShow({
         );
     };
 
+    const handleUploadEvidence = (e: React.FormEvent, task: TaskItem) => {
+        e.preventDefault();
+        if (!evidenceFile) {
+            setEvidenceError('Please select an evidence file to upload.');
+            return;
+        }
+
+        setEvidenceProcessing(true);
+        setEvidenceError(null);
+        setEvidenceSuccess(null);
+
+        const formData = new FormData();
+        formData.append('file', evidenceFile);
+        if (evidenceRemarks.trim()) {
+            formData.append('remarks', evidenceRemarks.trim());
+        }
+
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/evidence`,
+            formData,
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onSuccess: () => {
+                    setEvidenceFile(null);
+                    setEvidenceRemarks('');
+                    setEvidenceSuccess('Evidence uploaded successfully.');
+                    const fileInput = document.getElementById('task-evidence-file-input') as HTMLInputElement | null;
+                    if (fileInput) {
+                        fileInput.value = '';
+                    }
+                },
+                onError: (errs) => {
+                    const message = errs.file || errs.remarks || Object.values(errs)[0] || 'Failed to upload evidence.';
+                    setEvidenceError(message);
+                },
+                onFinish: () => {
+                    setEvidenceProcessing(false);
+                },
+            }
+        );
+    };
+
+    const handleConfirmDeleteEvidence = () => {
+        if (!deletingEvidence) return;
+        const { task, evidence } = deletingEvidence;
+        setDeletingEvidenceProcessing(true);
+
+        router.delete(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/evidence/${evidence.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setDeletingEvidence(null);
+                },
+                onError: (errs) => {
+                    alert(Object.values(errs)[0] || 'Failed to delete evidence.');
+                },
+                onFinish: () => {
+                    setDeletingEvidenceProcessing(false);
+                },
+            }
+        );
+    };
+
     const handleOpenSubmitModal = () => {
         setSubmitData('submission_notes', activity.submission_notes ?? '');
         clearSubmitErrors();
@@ -667,6 +777,25 @@ export default function ActivityShow({
     const completedTasksCount = activity.tasks.filter((t) => t.status === 'Completed').length;
     const taskProgressPercent =
         activity.tasks.length > 0 ? Math.round((completedTasksCount / activity.tasks.length) * 100) : 0;
+
+    const [taskFilter, setTaskFilter] = useState<'all' | 'under_review' | 'in_progress' | 'returned' | 'completed' | 'my_tasks'>('all');
+
+    const tasksAwaitingReview = activity.tasks.filter((t) => t.status === 'Under Review');
+    const inProgressTasks = activity.tasks.filter((t) => t.status === 'In Progress');
+    const returnedTasks = activity.tasks.filter((t) => t.status === 'Returned');
+    const completedTasks = activity.tasks.filter((t) => t.status === 'Completed');
+    const myTasks = activity.tasks.filter((t) => t.is_assigned_to_me);
+
+    const filteredTasks = activity.tasks.filter((task) => {
+        if (taskFilter === 'under_review') return task.status === 'Under Review';
+        if (taskFilter === 'in_progress') return task.status === 'In Progress';
+        if (taskFilter === 'returned') return task.status === 'Returned';
+        if (taskFilter === 'completed') return task.status === 'Completed';
+        if (taskFilter === 'my_tasks') return Boolean(task.is_assigned_to_me);
+        return true;
+    });
+
+    const allTasksCompleted = activity.tasks.length > 0 && completedTasksCount === activity.tasks.length;
 
     return (
         <AppLayout>
@@ -957,6 +1086,33 @@ export default function ActivityShow({
                     </div>
                 </div>
 
+                {/* ── Ready for Review Submission Callout (for Members) ── */}
+                {allTasksCompleted && activity.status === 'In Progress' && activity.can.submit && (
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+                        <div className="flex items-start gap-2.5">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                                <p className="text-xs font-bold text-emerald-950">
+                                    All {activity.tasks.length} Tasks Completed!
+                                </p>
+                                <p className="text-[11px] text-emerald-800">
+                                    This activity is ready for submission. Submit it to Project Staff for committee-level verification and approval.
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            onClick={handleOpenSubmitModal}
+                            className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                            <Send className="w-3.5 h-3.5 mr-1" />
+                            <span>Submit Activity for Review</span>
+                        </Button>
+                    </div>
+                )}
+
                 {/* ── Tasks Section ── */}
                 <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
@@ -981,9 +1137,211 @@ export default function ActivityShow({
                         )}
                     </div>
 
+                    {/* ── Staff Review Queue (Tasks Awaiting Review) ── */}
+                    {tasksAwaitingReview.length > 0 && (
+                        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                                        Staff Review Queue ({tasksAwaitingReview.length} awaiting review)
+                                    </h4>
+                                </div>
+                                <span className="text-[11px] font-medium text-amber-800">
+                                    {activity.can.review ? 'Action required: Review task deliverables below' : 'Awaiting committee head review'}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {tasksAwaitingReview.map((revTask) => {
+                                    const count = revTask.checklist_items ? revTask.checklist_items.length : 0;
+                                    const done = revTask.checklist_items ? revTask.checklist_items.filter((i) => i.is_completed).length : 0;
+
+                                    return (
+                                        <div
+                                            key={revTask.id}
+                                            className="p-3 bg-white rounded-lg border border-amber-200 shadow-2xs flex flex-col justify-between space-y-2.5"
+                                        >
+                                            <div className="space-y-1">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewingTask(revTask)}
+                                                        className="text-xs font-bold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors text-left line-clamp-1 cursor-pointer"
+                                                    >
+                                                        {revTask.title}
+                                                    </button>
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700 shrink-0">
+                                                        <Shield className="w-2.5 h-2.5 text-purple-600" />
+                                                        <span>Review Required</span>
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                                                    <span className="flex items-center gap-1">
+                                                        <User className="w-3 h-3 text-slate-400" />
+                                                        <span>{revTask.assignee ? revTask.assignee.name : 'Unassigned'}</span>
+                                                    </span>
+                                                    {revTask.due_date && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="w-3 h-3 text-slate-400" />
+                                                            <span>Due: {revTask.due_date}</span>
+                                                        </span>
+                                                    )}
+                                                    <span className="flex items-center gap-1">
+                                                        <CheckSquare className="w-3 h-3 text-slate-400" />
+                                                        <span>Checklist: {done}/{count}</span>
+                                                    </span>
+                                                    {revTask.evidences && revTask.evidences.length > 0 && (
+                                                        <span className="flex items-center gap-1 font-semibold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
+                                                            <Paperclip className="w-2.5 h-2.5 text-orange-600" />
+                                                            <span>MOV: {revTask.evidences.length}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewingTask(revTask)}
+                                                    className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                                                >
+                                                    View Details
+                                                </button>
+
+                                                {revTask.can.review && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="text-rose-700 border-rose-300 hover:bg-rose-50 text-[11px] h-7 px-2"
+                                                            onClick={() => handleOpenReturnTask(revTask)}
+                                                            disabled={taskActionProcessing}
+                                                        >
+                                                            <AlertTriangle className="w-3 h-3 mr-1 text-rose-600" />
+                                                            <span>Return</span>
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="primary"
+                                                            size="sm"
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] h-7 px-2"
+                                                            onClick={() => handleOpenApproveTask(revTask)}
+                                                            disabled={taskActionProcessing}
+                                                        >
+                                                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                            <span>Approve</span>
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Task Filter Tabs ── */}
+                    {activity.tasks.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1 pb-1 border-b border-slate-100 text-xs">
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('all')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                    taskFilter === 'all'
+                                        ? 'bg-slate-900 text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                All ({activity.tasks.length})
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('under_review')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                                    taskFilter === 'under_review'
+                                        ? 'bg-amber-600 text-white shadow-2xs'
+                                        : tasksAwaitingReview.length > 0
+                                        ? 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <span>Needs Review</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                    taskFilter === 'under_review' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                    {tasksAwaitingReview.length}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('in_progress')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                    taskFilter === 'in_progress'
+                                        ? 'bg-blue-600 text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                In Progress ({inProgressTasks.length})
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('returned')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                                    taskFilter === 'returned'
+                                        ? 'bg-rose-600 text-white shadow-2xs'
+                                        : returnedTasks.length > 0
+                                        ? 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <span>Returned</span>
+                                {returnedTasks.length > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        taskFilter === 'returned' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+                                    }`}>
+                                        {returnedTasks.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('completed')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                    taskFilter === 'completed'
+                                        ? 'bg-emerald-600 text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                Completed ({completedTasks.length})
+                            </button>
+
+                            {myTasks.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setTaskFilter('my_tasks')}
+                                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                        taskFilter === 'my_tasks'
+                                            ? 'bg-slate-800 text-white shadow-2xs'
+                                            : 'text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    My Tasks ({myTasks.length})
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {activity.tasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                            {activity.tasks.map((task) => {
+                        filteredTasks.length > 0 ? (
+                            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                                {filteredTasks.map((task) => {
                                 const checklistCount = task.checklist_items ? task.checklist_items.length : 0;
                                 const checklistCompleted = task.checklist_items
                                     ? task.checklist_items.filter((i) => i.is_completed).length
@@ -1073,6 +1431,19 @@ export default function ActivityShow({
                                                         Checklist ({checklistCompleted}/{checklistCount})
                                                     </span>
                                                 </button>
+                                                {task.evidences && task.evidences.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewingTask(task)}
+                                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded hover:bg-orange-100 transition-colors cursor-pointer"
+                                                        title="Supporting Evidence / MOV uploaded"
+                                                    >
+                                                        <Paperclip className="w-3 h-3 text-orange-600" />
+                                                        <span>
+                                                            Evidence ({task.evidences.length})
+                                                        </span>
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
 
@@ -1185,6 +1556,20 @@ export default function ActivityShow({
                                 );
                             })}
                         </div>
+                        ) : (
+                            <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                                <p className="text-xs text-slate-500">
+                                    No tasks found matching the &ldquo;{taskFilter.replace('_', ' ')}&rdquo; filter.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setTaskFilter('all')}
+                                    className="mt-2 text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline cursor-pointer"
+                                >
+                                    Clear filter
+                                </button>
+                            </div>
+                        )
                     ) : (
                         <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50">
                             <ListTodo className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -1610,6 +1995,164 @@ export default function ActivityShow({
                                         </form>
                                     )}
                                 </div>
+                            </div>
+
+                            {/* Evidence / MOV (Optional) Section */}
+                            <div className="space-y-3 pt-3 border-t border-slate-100">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                            <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+                                            <span>Evidence / MOV (Optional)</span>
+                                        </h4>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                            Optional supporting evidence for this task.
+                                        </p>
+                                    </div>
+                                    {viewingTask.evidences && viewingTask.evidences.length > 0 && (
+                                        <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                                            {viewingTask.evidences.length} {viewingTask.evidences.length === 1 ? 'file' : 'files'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Evidence List */}
+                                {viewingTask.evidences && viewingTask.evidences.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {viewingTask.evidences.map((ev) => (
+                                            <div
+                                                key={ev.id}
+                                                className="p-3 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors flex items-start justify-between gap-3"
+                                            >
+                                                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                                    <div className="p-2 rounded-md bg-orange-50 text-[color:var(--color-brand-action-orange)] shrink-0 mt-0.5">
+                                                        <FileText className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <a
+                                                                href={ev.download_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-xs font-semibold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate max-w-xs sm:max-w-md cursor-pointer"
+                                                                title={ev.original_name}
+                                                            >
+                                                                {ev.original_name}
+                                                            </a>
+                                                            <span className="text-[10px] font-medium text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                                                {ev.file_size_formatted}
+                                                            </span>
+                                                        </div>
+                                                        {ev.remarks && (
+                                                            <p className="text-[11px] text-slate-600 italic">
+                                                                "{ev.remarks}"
+                                                            </p>
+                                                        )}
+                                                        <div className="flex items-center gap-3 text-[10px] text-slate-400 flex-wrap">
+                                                            {ev.uploader && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <User className="w-3 h-3" />
+                                                                    <span>{ev.uploader.name}</span>
+                                                                </span>
+                                                            )}
+                                                            {ev.uploaded_at && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    <span>{ev.uploaded_at}</span>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                                                    <a
+                                                        href={ev.download_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors cursor-pointer"
+                                                        title="Download / View evidence file"
+                                                    >
+                                                        <Download className="w-3 h-3" />
+                                                        <span>Download</span>
+                                                    </a>
+                                                    {ev.can.delete && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeletingEvidence({ task: viewingTask, evidence: ev })}
+                                                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                                            title="Delete evidence"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="p-4 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50 text-xs text-slate-500">
+                                        No evidence uploaded yet.
+                                    </div>
+                                )}
+
+                                {/* Upload Evidence Form (if authorized) */}
+                                {viewingTask.can.uploadEvidence && (
+                                    <form
+                                        onSubmit={(e) => handleUploadEvidence(e, viewingTask)}
+                                        className="pt-2 border-t border-slate-100 space-y-2"
+                                    >
+                                        <div className="space-y-1">
+                                            <label className="block text-[11px] font-semibold text-slate-700">
+                                                Upload Supporting Evidence (Optional)
+                                            </label>
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                                <input
+                                                    id="task-evidence-file-input"
+                                                    type="file"
+                                                    onChange={(e) => {
+                                                        setEvidenceFile(e.target.files?.[0] ?? null);
+                                                        setEvidenceError(null);
+                                                    }}
+                                                    className="text-xs file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-[color:var(--color-brand-action-orange)] hover:file:bg-orange-100 text-slate-500 cursor-pointer"
+                                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xls,.xlsx,.zip"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={evidenceRemarks}
+                                                    onChange={(e) => setEvidenceRemarks(e.target.value)}
+                                                    placeholder="Remarks or notes (optional)"
+                                                    maxLength={500}
+                                                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
+                                                />
+                                                <Button
+                                                    type="submit"
+                                                    variant="primary"
+                                                    size="sm"
+                                                    disabled={evidenceProcessing || !evidenceFile}
+                                                    isLoading={evidenceProcessing}
+                                                    className="shrink-0"
+                                                >
+                                                    <Upload className="w-3.5 h-3.5 mr-1" />
+                                                    <span>Upload</span>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400">
+                                            Allowed formats: PDF, Word, Excel, PNG, JPG, TXT, ZIP (max 10MB).
+                                        </p>
+                                        {evidenceSuccess && (
+                                            <p className="text-[11px] text-emerald-600 font-medium">
+                                                {evidenceSuccess}
+                                            </p>
+                                        )}
+                                        {evidenceError && (
+                                            <p className="text-[11px] text-rose-600 font-medium">
+                                                {evidenceError}
+                                            </p>
+                                        )}
+                                    </form>
+                                )}
                             </div>
 
                             {/* Modal Footer */}
@@ -2374,6 +2917,43 @@ export default function ActivityShow({
                             </Button>
                         </div>
                     </form>
+                </Modal>
+
+                {/* Delete Evidence Confirmation Modal */}
+                <Modal
+                    isOpen={deletingEvidence !== null}
+                    onClose={() => !deletingEvidenceProcessing && setDeletingEvidence(null)}
+                    title="Delete Supporting Evidence"
+                    description={`Are you sure you want to delete the file "${deletingEvidence?.evidence.original_name}"? This action cannot be undone.`}
+                    maxWidth="sm"
+                >
+                    <div className="space-y-4 pt-1">
+                        <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-800">
+                            <p>
+                                Deleting this file will permanently remove the uploaded evidence from this task.
+                            </p>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setDeletingEvidence(null)}
+                                disabled={deletingEvidenceProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="danger"
+                                isLoading={deletingEvidenceProcessing}
+                                onClick={handleConfirmDeleteEvidence}
+                            >
+                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                <span>Delete File</span>
+                            </Button>
+                        </div>
+                    </div>
                 </Modal>
             </div>
         </AppLayout>

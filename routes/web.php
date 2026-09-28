@@ -111,6 +111,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist', [ChecklistItemController::class, 'store'])->name('projects.committees.activities.tasks.checklist.store');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist/{checklist_item}', [ChecklistItemController::class, 'update'])->name('projects.committees.activities.tasks.checklist.update');
     Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist/{checklist_item}', [ChecklistItemController::class, 'destroy'])->name('projects.committees.activities.tasks.checklist.destroy');
+
+    // Task Evidence / MOV
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence', [\App\Http\Controllers\TaskEvidenceController::class, 'store'])->name('projects.committees.activities.tasks.evidence.store');
+    Route::get('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence/{evidence}/download', [\App\Http\Controllers\TaskEvidenceController::class, 'download'])->name('projects.committees.activities.tasks.evidence.download');
+    Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence/{evidence}', [\App\Http\Controllers\TaskEvidenceController::class, 'destroy'])->name('projects.committees.activities.tasks.evidence.destroy');
 });
 
 // Logout

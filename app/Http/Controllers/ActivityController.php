@@ -73,6 +73,7 @@ class ActivityController extends Controller
             'committee.staffAssignment.user',
             'tasks.assignee',
             'tasks.checklistItems',
+            'tasks.evidences.uploader',
         ]);
 
         $user = Auth::user();
@@ -141,11 +142,35 @@ class ActivityController extends Controller
                     'is_completed' => $item->is_completed,
                     'order'        => $item->order,
                 ])->values()->all(),
+                'evidences' => $task->evidences->map(fn ($ev) => [
+                    'id'                  => (string) $ev->id,
+                    'original_name'       => $ev->original_name,
+                    'file_size'           => $ev->file_size,
+                    'file_size_formatted' => $this->formatFileSize($ev->file_size),
+                    'mime_type'           => $ev->mime_type,
+                    'remarks'             => $ev->remarks,
+                    'uploaded_at'         => $ev->created_at?->format('M d, Y, g:i A'),
+                    'uploader'            => $ev->uploader ? [
+                        'id'   => $ev->uploader->id,
+                        'name' => $ev->uploader->name,
+                    ] : null,
+                    'download_url'        => route('projects.committees.activities.tasks.evidence.download', [
+                        'project'   => $project->id,
+                        'committee' => $committee->id,
+                        'activity'  => $activity->id,
+                        'task'      => $task->id,
+                        'evidence'  => $ev->id,
+                    ]),
+                    'can' => [
+                        'delete' => $user ? Gate::forUser($user)->allows('deleteEvidence', [$task, $ev]) : false,
+                    ],
+                ])->values()->all(),
                 'can' => [
                     'update'          => $user ? Gate::forUser($user)->allows('update', $task) : false,
                     'delete'          => $user ? Gate::forUser($user)->allows('delete', $task) : false,
                     'updateStatus'    => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
                     'manageChecklist' => $user ? Gate::forUser($user)->allows('create', [ChecklistItem::class, $task]) : false,
+                    'uploadEvidence'  => $user ? Gate::forUser($user)->allows('uploadEvidence', $task) : false,
                     'submitReview'    => $user ? Gate::forUser($user)->allows('submitReview', $task) && $task->requires_review && in_array($task->status, [Task::STATUS_TO_DO, Task::STATUS_IN_PROGRESS], true) : false,
                     'review'          => $user ? Gate::forUser($user)->allows('review', $task) && $task->status === Task::STATUS_UNDER_REVIEW : false,
                     'resubmit'        => $user ? Gate::forUser($user)->allows('resubmit', $task) && $task->requires_review && $task->status === Task::STATUS_RETURNED : false,
@@ -312,5 +337,19 @@ class ActivityController extends Controller
     public function returnForRevision(ReviewActivityRequest $request, Project $project, Committee $committee, Activity $activity): RedirectResponse
     {
         return $this->review($request, $project, $committee, $activity);
+    }
+
+    /**
+     * Format raw bytes into human-readable representation.
+     */
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes >= 1048576) {
+            return round($bytes / 1048576, 2) . ' MB';
+        }
+        if ($bytes >= 1024) {
+            return round($bytes / 1024, 1) . ' KB';
+        }
+        return $bytes . ' B';
     }
 }
