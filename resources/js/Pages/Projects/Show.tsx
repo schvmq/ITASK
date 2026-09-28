@@ -275,6 +275,8 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
     const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
     const [archiveProcessing, setArchiveProcessing] = useState(false);
     const [isCreateCommitteeModalOpen, setIsCreateCommitteeModalOpen] = useState(false);
+    const [isEditCommitteeModalOpen, setIsEditCommitteeModalOpen] = useState(false);
+    const [editingCommittee, setEditingCommittee] = useState<CommitteeItem | null>(null);
     const [isAssignPersonnelModalOpen, setIsAssignPersonnelModalOpen] = useState(false);
 
     // Edit Project form state
@@ -302,6 +304,21 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
         errors: committeeErrors,
         reset: resetCommitteeForm,
         clearErrors: clearCommitteeErrors,
+    } = useForm({
+        name: '',
+        description: '',
+        user_id: '',
+    });
+
+    // Edit Committee form state
+    const {
+        data: editCommitteeData,
+        setData: setEditCommitteeData,
+        patch: submitEditCommittee,
+        processing: editCommitteeProcessing,
+        errors: editCommitteeErrors,
+        reset: resetEditCommitteeForm,
+        clearErrors: clearEditCommitteeErrors,
     } = useForm({
         name: '',
         description: '',
@@ -397,6 +414,33 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                 resetCommitteeForm();
             },
         });
+    };
+
+    const handleOpenEditCommittee = (committee: CommitteeItem) => {
+        setEditingCommittee(committee);
+        setEditCommitteeData({
+            name: committee.name,
+            description: committee.description ?? '',
+            user_id: committee.head?.id ? String(committee.head.id) : '',
+        });
+        clearEditCommitteeErrors();
+        setIsEditCommitteeModalOpen(true);
+    };
+
+    const handleEditCommitteeSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!initialProject || !editingCommittee) return;
+
+        submitEditCommittee(
+            `/projects/${initialProject.id}/committees/${editingCommittee.id}`,
+            {
+                onSuccess: () => {
+                    setIsEditCommitteeModalOpen(false);
+                    setEditingCommittee(null);
+                    resetEditCommitteeForm();
+                },
+            }
+        );
     };
 
     const handleOpenAssignPersonnel = () => {
@@ -1314,14 +1358,25 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                                 </div>
                                             </div>
 
-                                            <div className="pt-2 border-t border-slate-100">
+                                            <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
                                                 <Link
                                                     href={`/projects/${project.id}/committees/${committee.id}`}
-                                                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
+                                                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
                                                 >
                                                     <span>View Committee</span>
                                                     <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                                                 </Link>
+                                                {isLeader && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenEditCommittee(committee)}
+                                                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors cursor-pointer"
+                                                        title="Edit Committee"
+                                                    >
+                                                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                                                        <span>Edit</span>
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -1857,7 +1912,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                         </div>
 
                         <div className="space-y-1">
-                            <Label htmlFor="create-committee-staff">Committee Head (Project Staff) *</Label>
+                            <Label htmlFor="create-committee-staff">Committee Head (Project Staff - Optional)</Label>
                             {(initialProject?.projectStaff ?? []).length > 0 ? (
                                 <select
                                     id="create-committee-staff"
@@ -1865,9 +1920,8 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                     value={committeeData.user_id}
                                     onChange={(e) => setCommitteeData('user_id', e.target.value)}
                                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
-                                    required
                                 >
-                                    <option value="">Select a Project Staff member...</option>
+                                    <option value="">-- Optional / Assign Later --</option>
                                     {(initialProject?.projectStaff ?? []).map((staff) => (
                                         <option key={staff.id} value={staff.id}>
                                             {staff.name} ({staff.email})
@@ -1875,21 +1929,10 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                     ))}
                                 </select>
                             ) : (
-                                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-2">
+                                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
                                     <p>
-                                        No <strong>Project Staff</strong> have been assigned to this project yet. A committee requires a designated Project Staff member as its head.
+                                        No <strong>Project Staff</strong> have been assigned to this project yet. You can create this committee now and assign a committee head later.
                                     </p>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsCreateCommitteeModalOpen(false);
-                                            handleOpenAssignPersonnel();
-                                        }}
-                                        className="text-amber-900 font-semibold underline hover:text-amber-950 inline-flex items-center gap-1"
-                                    >
-                                        <UserPlus className="w-3.5 h-3.5" />
-                                        <span>Assign Project Staff first</span>
-                                    </button>
                                 </div>
                             )}
                             <InputError message={committeeErrors.user_id} />
@@ -1908,9 +1951,90 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                 type="submit"
                                 variant="primary"
                                 isLoading={committeeProcessing}
-                                disabled={committeeProcessing || (initialProject?.projectStaff ?? []).length === 0}
+                                disabled={committeeProcessing}
                             >
                                 Create Committee
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* ── Edit Committee Modal ── */}
+                <Modal
+                    isOpen={isEditCommitteeModalOpen}
+                    onClose={() => !editCommitteeProcessing && setIsEditCommitteeModalOpen(false)}
+                    title="Edit Committee"
+                    description="Update committee name, charter description, or designated Project Staff head."
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleEditCommitteeSubmit} className="space-y-4 pt-1">
+                        <FormField
+                            label="Committee Name"
+                            id="edit-committee-name"
+                            name="name"
+                            value={editCommitteeData.name}
+                            onChange={(e) => setEditCommitteeData('name', e.target.value)}
+                            error={editCommitteeErrors.name}
+                            required
+                            placeholder="e.g., Logistics & Procurement Committee"
+                            autoFocus
+                        />
+
+                        <div className="space-y-1">
+                            <Label htmlFor="edit-committee-description">Description (Optional)</Label>
+                            <textarea
+                                id="edit-committee-description"
+                                name="description"
+                                rows={3}
+                                value={editCommitteeData.description}
+                                onChange={(e) => setEditCommitteeData('description', e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                placeholder="Mandate, responsibilities, or scope of this committee..."
+                            />
+                            <InputError message={editCommitteeErrors.description} />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="edit-committee-staff">Committee Head (Project Staff - Optional)</Label>
+                            {(initialProject?.projectStaff ?? []).length > 0 ? (
+                                <select
+                                    id="edit-committee-staff"
+                                    name="user_id"
+                                    value={editCommitteeData.user_id}
+                                    onChange={(e) => setEditCommitteeData('user_id', e.target.value)}
+                                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                >
+                                    <option value="">-- Optional / Unassigned --</option>
+                                    {(initialProject?.projectStaff ?? []).map((staff) => (
+                                        <option key={staff.id} value={staff.id}>
+                                            {staff.name} ({staff.email})
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                                    <p>No Project Staff assigned yet to this project.</p>
+                                </div>
+                            )}
+                            <InputError message={editCommitteeErrors.user_id} />
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsEditCommitteeModalOpen(false)}
+                                disabled={editCommitteeProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={editCommitteeProcessing}
+                                disabled={editCommitteeProcessing}
+                            >
+                                Save Changes
                             </Button>
                         </div>
                     </form>

@@ -79,6 +79,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees', [CommitteeController::class, 'store'])->name('projects.committees.store');
     Route::get('/projects/{project}/committees/{committee}', [CommitteeController::class, 'show'])->name('projects.committees.show');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}', [CommitteeController::class, 'update'])->name('projects.committees.update');
+    Route::post('/projects/{project}/committees/{committee}/staff', [CommitteeController::class, 'assignStaff'])->name('projects.committees.staff.store');
     Route::delete('/projects/{project}/committees/{committee}', [CommitteeController::class, 'destroy'])->name('projects.committees.destroy');
 
     // Committee Members

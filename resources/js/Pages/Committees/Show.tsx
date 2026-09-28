@@ -77,6 +77,7 @@ export interface CommitteeShowProps {
         id: string;
         title: string;
         status: string;
+        role?: string;
     };
     committee: CommitteeData;
     availableMembers: MemberItem[];
@@ -237,7 +238,7 @@ export default function CommitteeShow({
             subtitle={`Committee within ${project.title}`}
             currentProject={{
                 title: project.title,
-                role: 'Project Leader',
+                role: project.role ?? 'Project Member',
                 status: project.status,
             }}
         >
@@ -333,8 +334,19 @@ export default function CommitteeShow({
                                     <div className="flex items-center justify-between">
                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-[color:var(--color-brand-action-orange)] border border-orange-200">
                                             <Shield className="w-3 h-3" />
-                                            <span>Project Staff · Head</span>
+                                            <span>Project Staff · Committee Head</span>
                                         </span>
+                                        {committee.can.update && (
+                                            <button
+                                                type="button"
+                                                onClick={handleOpenEditModal}
+                                                className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-white border border-orange-200 hover:bg-orange-50 transition-colors cursor-pointer"
+                                                title="Change Assigned Project Staff"
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                                <span>Change Staff</span>
+                                            </button>
+                                        )}
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-[color:var(--color-text-main)]">
@@ -349,14 +361,28 @@ export default function CommitteeShow({
                                     </p>
                                 </div>
                             ) : (
-                                <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center">
-                                    <AlertTriangle className="w-5 h-5 text-amber-500 mx-auto mb-1.5" />
-                                    <p className="text-xs font-semibold text-slate-800">
-                                        No Committee Head Designated
-                                    </p>
-                                    <p className="text-[11px] text-slate-500 mt-1">
-                                        A Project Staff member must be assigned to head this committee.
-                                    </p>
+                                <div className="p-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 text-center space-y-2.5">
+                                    <AlertTriangle className="w-6 h-6 text-amber-500 mx-auto" />
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-800">
+                                            No Staff Head Assigned
+                                        </p>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                            This committee currently has no designated Project Staff head.
+                                        </p>
+                                    </div>
+                                    {committee.can.update && (
+                                        <div className="pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={handleOpenEditModal}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                                            >
+                                                <UserPlus className="w-3.5 h-3.5" />
+                                                <span>Assign Staff</span>
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -393,10 +419,10 @@ export default function CommitteeShow({
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                                 <div>
                                     <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
-                                        Assigned Project Members ({committee.members.length})
+                                        Committee Members ({committee.members.length})
                                     </h3>
                                     <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                        Working members assigned to perform future committee activities and tasks
+                                        Working members assigned to perform committee activities and tasks
                                     </p>
                                 </div>
 
@@ -460,7 +486,7 @@ export default function CommitteeShow({
                                 <div className="py-12 px-4 text-center rounded-xl border border-dashed border-slate-300 bg-slate-50/50">
                                     <Users className="w-8 h-8 text-slate-400 mx-auto mb-2" />
                                     <h4 className="text-xs font-bold text-slate-800">
-                                        No Project Members Assigned Yet
+                                        No Project Members assigned yet.
                                     </h4>
                                     <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
                                         Assign Project Members from the project personnel pool to begin staffing this committee.
@@ -472,7 +498,7 @@ export default function CommitteeShow({
                                             className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
                                         >
                                             <UserPlus className="w-3.5 h-3.5" />
-                                            <span>Assign First Member</span>
+                                            <span>Assign Member</span>
                                         </button>
                                     )}
                                 </div>
@@ -677,23 +703,28 @@ export default function CommitteeShow({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label htmlFor="edit-committee-staff" required>
-                                Committee Head (Project Staff)
+                            <Label htmlFor="edit-committee-staff">
+                                Committee Head (Project Staff - Optional)
                             </Label>
-                            <select
-                                id="edit-committee-staff"
-                                value={editData.user_id}
-                                onChange={(e) => setEditData('user_id', e.target.value)}
-                                className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
-                                required
-                            >
-                                <option value="">-- Select Project Staff --</option>
-                                {availableStaff.map((staff) => (
-                                    <option key={staff.id} value={staff.id}>
-                                        {staff.name} ({staff.email})
-                                    </option>
-                                ))}
-                            </select>
+                            {availableStaff.length > 0 ? (
+                                <select
+                                    id="edit-committee-staff"
+                                    value={editData.user_id}
+                                    onChange={(e) => setEditData('user_id', e.target.value)}
+                                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                >
+                                    <option value="">-- Unassigned (No Staff Head) --</option>
+                                    {availableStaff.map((staff) => (
+                                        <option key={staff.id} value={staff.id}>
+                                            {staff.name} ({staff.email})
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                                    <p>No Project Staff assigned to this project yet.</p>
+                                </div>
+                            )}
                             <InputError message={editErrors.user_id} />
                         </div>
 

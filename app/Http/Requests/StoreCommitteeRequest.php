@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Committee;
 use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\User;
@@ -37,10 +38,14 @@ class StoreCommitteeRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'user_id' => [
-                'required',
+                'nullable',
                 'integer',
                 'exists:users,id',
                 function ($attribute, $value, $fail) use ($projectId) {
+                    if (! $value) {
+                        return;
+                    }
+
                     $user = User::find($value);
                     if (! $user || ! $user->hasVerifiedEmail()) {
                         $fail('The selected staff member must have a verified institutional email address.');
@@ -70,7 +75,6 @@ class StoreCommitteeRequest extends FormRequest
         return [
             'name.required' => 'The committee name is required.',
             'name.max' => 'The committee name cannot exceed 255 characters.',
-            'user_id.required' => 'A Project Staff member must be selected to head the committee.',
             'user_id.exists' => 'The selected staff member does not exist.',
         ];
     }
