@@ -51,4 +51,13 @@ class ProjectPolicy
     {
         return $this->view($user, $project);
     }
+
+    /**
+     * Determine whether the user can upload an additional approval document to the project.
+     * Allowed only for: Project Leader.
+     */
+    public function uploadDocument(User $user, Project $project): bool
+    {
+        return $this->update($user, $project);
+    }
 }

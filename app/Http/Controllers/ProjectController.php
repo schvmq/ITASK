@@ -114,7 +114,7 @@ class ProjectController extends Controller
             throw $e;
         }
 
-        return redirect()->route('projects.show', $project);
+        return redirect()->route('projects.show', $project)->with('status', 'Project created successfully.');
     }
 
     /**
@@ -158,8 +158,9 @@ class ProjectController extends Controller
             'created_at' => $projectModel->created_at?->toISOString(),
             'role' => $userRole ?? ProjectRoleAssignment::ROLE_PROJECT_LEADER,
             'can' => [
-                'update' => Auth::check() ? Auth::user()->can('update', $projectModel) : false,
-                'archive' => Auth::check() ? Auth::user()->can('archive', $projectModel) : false,
+                'update'         => Auth::check() ? Auth::user()->can('update', $projectModel) : false,
+                'archive'        => Auth::check() ? Auth::user()->can('archive', $projectModel) : false,
+                'uploadDocument' => Auth::check() ? Auth::user()->can('uploadDocument', $projectModel) : false,
             ],
             'creator' => $projectModel->creator ? [
                 'id' => $projectModel->creator->id,
@@ -322,9 +323,60 @@ class ProjectController extends Controller
     }
 
     /**
-     * Download the specified project approval document securely.
+     * Upload an additional approval/supporting document to an existing project.
+     * Only the Project Leader is authorized to do this.
      */
-    public function downloadApprovalDocument(Project $project, ProjectApprovalDocument $document): StreamedResponse
+    public function uploadDocument(Request $request, Project $project): RedirectResponse
+    {
+        Gate::authorize('uploadDocument', $project);
+
+        $request->validate([
+            'approval_document' => [
+                'required',
+                'file',
+                'mimes:pdf,doc,docx,jpg,jpeg,png',
+                'max:10240', // 10 MB maximum
+            ],
+        ], [
+            'approval_document.required' => 'Please select an approval document to upload.',
+            'approval_document.file'     => 'The uploaded item must be a valid file.',
+            'approval_document.mimes'    => 'The document must be a file of type: PDF, DOC, DOCX, JPG, JPEG, or PNG.',
+            'approval_document.max'      => 'The document must not exceed 10 MB in size.',
+        ]);
+
+        $file = $request->file('approval_document');
+        $storedFilePath = null;
+
+        try {
+            DB::transaction(function () use ($project, $request, $file, &$storedFilePath) {
+                $directory = "project_approvals/{$project->id}";
+                $storedFilePath = $file->store($directory, 'local');
+
+                ProjectApprovalDocument::create([
+                    'project_id'    => $project->id,
+                    'uploaded_by'   => $request->user()->id,
+                    'original_name' => $file->getClientOriginalName(),
+                    'file_path'     => $storedFilePath,
+                    'file_size'     => $file->getSize(),
+                    'mime_type'     => $file->getClientMimeType() ?: ($file->getMimeType() ?: 'application/octet-stream'),
+                ]);
+            });
+        } catch (Throwable $e) {
+            if ($storedFilePath && Storage::disk('local')->exists($storedFilePath)) {
+                Storage::disk('local')->delete($storedFilePath);
+            }
+
+            throw $e;
+        }
+
+        return redirect()->route('projects.show', $project)
+            ->with('status', 'Document uploaded successfully.');
+    }
+
+    /**
+     * Download or view the specified project approval document securely.
+     */
+    public function downloadApprovalDocument(Request $request, Project $project, ProjectApprovalDocument $document): \Symfony\Component\HttpFoundation\Response
     {
         // 1. Authorize user against the project (Leader, Staff, Member allowed; unassigned rejected with 403)
         Gate::authorize('downloadDocument', $project);
@@ -339,7 +391,13 @@ class ProjectController extends Controller
             abort(404, 'File not found on storage.');
         }
 
-        // 4. Return streaming download response with original filename
+        // 4. Return inline stream or download response
+        if ($request->boolean('inline') || $request->query('disposition') === 'inline') {
+            return Storage::disk('local')->response($document->file_path, $document->original_name, [
+                'Content-Disposition' => 'inline; filename="' . addslashes($document->original_name) . '"',
+            ]);
+        }
+
         return Storage::disk('local')->download($document->file_path, $document->original_name);
     }
 }

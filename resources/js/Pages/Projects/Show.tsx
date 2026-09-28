@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { type ProjectRole } from '@/Config/navigation';
@@ -11,6 +11,7 @@ import {
     FolderOpen,
     Calendar,
     Users,
+    User,
     CheckCircle2,
     Clock,
     ArrowLeft,
@@ -129,6 +130,7 @@ export interface ProjectData {
     can?: {
         update?: boolean;
         archive?: boolean;
+        uploadDocument?: boolean;
     };
     creator?: {
         id: number;
@@ -156,24 +158,6 @@ export interface ProjectShowProps {
 
 type TabKey = 'overview' | 'committees' | 'activities' | 'tasks' | 'timeline';
 
-interface CommitteePreview {
-    id: string;
-    name: string;
-    progress: number;
-    membersCount: number;
-    activitiesCount: number;
-    leadName: string;
-}
-
-interface ActivityItem {
-    id: string;
-    title: string;
-    committee: string;
-    actor: string;
-    timeAgo: string;
-    type: 'update' | 'task' | 'review';
-}
-
 interface ProjectDocument {
     id: string;
     title: string;
@@ -183,106 +167,6 @@ interface ProjectDocument {
     size: string;
     downloadUrl?: string;
 }
-
-// ─── Mock Project Data (Single Representative Project) ────────────────────────
-// Presentation-only mock data adhering to the ITASK CCIS project management domain.
-const MOCK_PROJECT = {
-    id: 'proj-1',
-    title: 'CCIS General Assembly 2026',
-    description:
-        'Coordination of the 2026 CCIS General Assembly and related committee activities.',
-    status: 'In Progress',
-    role: 'Project Leader' as ProjectRole,
-    progress: 68,
-    deadline: 'October 18, 2026',
-    startDate: 'September 01, 2026',
-    summary: {
-        committees: 4,
-        activities: 12,
-        tasks: 24,
-    },
-};
-
-const MOCK_COMMITTEES: CommitteePreview[] = [
-    {
-        id: 'comm-1',
-        name: 'Program & Events Committee',
-        progress: 68,
-        membersCount: 6,
-        activitiesCount: 4,
-        leadName: 'Prof. Althea Ramos (Project Staff)',
-    },
-    {
-        id: 'comm-2',
-        name: 'Technical Committee',
-        progress: 42,
-        membersCount: 5,
-        activitiesCount: 4,
-        leadName: 'Engr. David Santos (Project Staff)',
-    },
-    {
-        id: 'comm-3',
-        name: 'Documentation Committee',
-        progress: 75,
-        membersCount: 4,
-        activitiesCount: 4,
-        leadName: 'Ms. Katrina Gomez (Project Staff)',
-    },
-];
-
-const MOCK_ACTIVITIES: ActivityItem[] = [
-    {
-        id: 'act-1',
-        title: 'Project Staff updated Program Flow',
-        committee: 'Program & Events Committee',
-        actor: 'Prof. Althea Ramos',
-        timeAgo: '2 hours ago',
-        type: 'update',
-    },
-    {
-        id: 'act-2',
-        title: 'Project Member completed assigned task',
-        committee: 'Technical Committee',
-        actor: 'Juan Dela Cruz',
-        timeAgo: '5 hours ago',
-        type: 'task',
-    },
-    {
-        id: 'act-3',
-        title: 'Project Staff reviewed submitted activity',
-        committee: 'Documentation Committee',
-        actor: 'Ms. Katrina Gomez',
-        timeAgo: 'Yesterday',
-        type: 'review',
-    },
-];
-
-const MOCK_DOCUMENTS: ProjectDocument[] = [
-    {
-        id: 'doc-1',
-        title: 'Project Approval Document',
-        type: 'PDF Document',
-        status: 'Approved',
-        updatedAt: 'October 02, 2026',
-        size: '1.8 MB',
-    },
-    {
-        id: 'doc-2',
-        title: 'Approved Activity Design',
-        type: 'PDF Document',
-        status: 'Approved',
-        updatedAt: 'October 05, 2026',
-        size: '2.4 MB',
-    },
-    {
-        id: 'doc-3',
-        title: 'Project Memo',
-        type: 'PDF Document',
-        status: 'Verified',
-        updatedAt: 'October 08, 2026',
-        size: '540 KB',
-    },
-];
 
 // ─── Status Badge Component ──────────────────────────────────────────────────
 function ProjectStatusBadge({ status }: { status: string }) {
@@ -364,6 +248,17 @@ function formatFileSize(bytes: number): string {
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
     if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
     return bytes + ' B';
+}
+
+function getInitials(name: string): string {
+    if (!name) return 'PL';
+    return name
+        .split(' ')
+        .filter(Boolean)
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
 }
 
 // ─── Main Project Detail Page Shell ───────────────────────────────────────────
@@ -455,12 +350,12 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
 
     const handleEditSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!initialProject) {
-            setIsEditModalOpen(false);
+        if (!initialProject || editProcessing) {
             return;
         }
 
         submitEdit(`/projects/${initialProject.id}`, {
+            preserveScroll: true,
             onSuccess: () => {
                 setIsEditModalOpen(false);
             },
@@ -468,8 +363,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
     };
 
     const handleArchiveConfirm = () => {
-        if (!initialProject) {
-            setIsArchiveModalOpen(false);
+        if (!initialProject || archiveProcessing) {
             return;
         }
 
@@ -478,6 +372,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
             `/projects/${initialProject.id}/archive`,
             {},
             {
+                preserveScroll: true,
                 onFinish: () => setArchiveProcessing(false),
                 onSuccess: () => {
                     setIsArchiveModalOpen(false);
@@ -531,51 +426,136 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
         );
     };
 
-    const displayCommittees: CommitteeItem[] = (initialProject?.committees && initialProject.committees.length > 0)
-        ? initialProject.committees
-        : (initialProject ? [] : MOCK_COMMITTEES.map((c) => ({ ...c, description: null })));
+    // Document upload state
+    const [isUploadDocumentModalOpen, setIsUploadDocumentModalOpen] = useState(false);
+    const docFileInputRef = useRef<HTMLInputElement>(null);
 
-    const project = initialProject
-        ? {
-              id: String(initialProject.id),
-              title: initialProject.title,
-              description: initialProject.description || 'No project description provided.',
-              status: initialProject.status,
-              role: (initialProject.role ?? 'Project Leader') as ProjectRole,
-              progress: 0,
-              deadline: initialProject.end_date ?? 'No deadline specified',
-              startDate: initialProject.start_date ?? 'Not set',
-              leaderName: initialProject.leader ? initialProject.leader.name : (initialProject.creator ? initialProject.creator.name : 'Unassigned'),
-              leaderEmail: initialProject.leader?.email ?? initialProject.creator?.email,
-              summary: {
-                  committees: initialProject.committees?.length ?? 0,
-                  activities: initialProject.activities?.length ?? 0,
-                  tasks: initialProject.tasks?.length ?? 0,
-              },
-          }
-        : {
-              ...MOCK_PROJECT,
-              leaderName: 'Prof. Althea Ramos',
-              leaderEmail: 'aramos@carsu.edu.ph',
-          };
+    const {
+        data: docData,
+        setData: setDocData,
+        post: submitDocument,
+        processing: docProcessing,
+        errors: docErrors,
+        reset: resetDocForm,
+        clearErrors: clearDocErrors,
+    } = useForm<{ approval_document: File | null }>({
+        approval_document: null,
+    });
 
-    const displayDocuments: ProjectDocument[] = (initialProject?.documents && initialProject.documents.length > 0)
-        ? initialProject.documents.map((d) => ({
-              id: d.id,
-              title: d.original_name,
-              type: d.mime_type.includes('pdf')
-                  ? 'PDF Document'
-                  : (d.mime_type.includes('image') || d.mime_type.includes('png') || d.mime_type.includes('jpeg')
-                      ? 'Image File'
-                      : (d.mime_type.includes('word') || d.mime_type.includes('officedocument')
-                          ? 'Word Document'
-                          : 'Official Document')),
-              status: 'Approved' as const,
-              updatedAt: d.uploaded_at ?? 'Uploaded upon creation',
-              size: formatFileSize(d.file_size),
-              downloadUrl: d.download_url,
-          }))
-        : MOCK_DOCUMENTS;
+    const handleOpenUploadDocumentModal = () => {
+        resetDocForm();
+        clearDocErrors();
+        if (docFileInputRef.current) docFileInputRef.current.value = '';
+        setIsUploadDocumentModalOpen(true);
+    };
+
+    const handleCloseUploadDocumentModal = () => {
+        if (docProcessing) return;
+        setIsUploadDocumentModalOpen(false);
+        resetDocForm();
+        clearDocErrors();
+        if (docFileInputRef.current) docFileInputRef.current.value = '';
+    };
+
+    const handleDocFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        setDocData('approval_document', file);
+    };
+
+    const handleRemoveDocFile = () => {
+        if (docProcessing) return;
+        setDocData('approval_document', null);
+        if (docFileInputRef.current) docFileInputRef.current.value = '';
+    };
+
+    const handleUploadDocumentSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!initialProject || !docData.approval_document || docProcessing) return;
+
+        submitDocument(`/projects/${initialProject.id}/documents`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsUploadDocumentModalOpen(false);
+                resetDocForm();
+                if (docFileInputRef.current) docFileInputRef.current.value = '';
+            },
+        });
+    };
+
+    // Not-found / unauthorized state when project could not be loaded
+    if (!initialProject) {
+        return (
+            <AppLayout title="Project Not Found" subtitle="Project Workspace">
+                <Head title="Project Not Found — ITASK" />
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                    <div className="w-14 h-14 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-4">
+                        <AlertCircle className="w-7 h-7" />
+                    </div>
+                    <h2 className="text-lg font-bold text-[color:var(--color-text-main)]">Project Not Found</h2>
+                    <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-2 mb-6 leading-relaxed">
+                        This project could not be found or you do not have permission to view it.
+                    </p>
+                    <Link
+                        href="/projects"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white shadow-xs transition-colors"
+                        style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        Back to Projects
+                    </Link>
+                </div>
+            </AppLayout>
+        );
+    }
+
+    // ─── Data derivations (initialProject is guaranteed non-null here) ───────────────
+
+    const displayCommittees: CommitteeItem[] = initialProject.committees ?? [];
+
+    const leaderUser = initialProject.leader ?? null;
+    const hasLeader = Boolean(leaderUser && leaderUser.name);
+    const leaderName = hasLeader ? leaderUser!.name : 'No Project Leader assigned';
+    const leaderEmail = hasLeader ? leaderUser!.email : null;
+
+    const project = {
+        id: String(initialProject.id),
+        title: initialProject.title,
+        description: initialProject.description?.trim() || null,
+        status: initialProject.status,
+        role: (initialProject.role ?? 'Project Leader') as ProjectRole,
+        progress: 0,
+        deadline: initialProject.end_date ?? 'No deadline specified',
+        startDate: initialProject.start_date ?? 'Not set',
+        leader: leaderUser,
+        hasLeader,
+        leaderName,
+        leaderEmail,
+        creator: initialProject.creator ?? null,
+        summary: {
+            committees: initialProject.committees?.length ?? 0,
+            activities: initialProject.activities?.length ?? 0,
+            tasks: initialProject.tasks?.length ?? 0,
+        },
+    };
+
+    const displayDocuments: ProjectDocument[] = (initialProject.documents ?? []).map((d) => ({
+        id: d.id,
+        title: d.original_name,
+        type: d.mime_type.includes('pdf')
+            ? 'PDF Document'
+            : (d.mime_type.includes('image') || d.mime_type.includes('png') || d.mime_type.includes('jpeg')
+                ? 'Image File'
+                : (d.mime_type.includes('word') || d.mime_type.includes('officedocument')
+                    ? 'Word Document'
+                    : 'Official Document')),
+        status: 'Approved' as const,
+        updatedAt: d.uploaded_at ?? 'Uploaded upon creation',
+        size: formatFileSize(d.file_size),
+        downloadUrl: d.download_url,
+    }));
+
+    const recentActivities = (initialProject.activities ?? []).slice(0, 5);
 
     // Navigation Tabs Definition
     const tabs: { key: TabKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -644,31 +624,21 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             <div className="flex flex-wrap items-center gap-2">
                                 <ProjectStatusBadge status={project.status} />
                                 <ProjectRoleBadge role={project.role} />
-                                {project.startDate && project.startDate !== 'Not set' && (
-                                    <span className="text-xs text-[color:var(--color-text-muted)] flex items-center gap-1 font-medium">
-                                        <Calendar className="w-3.5 h-3.5 text-[color:var(--color-text-subtle)]" />
-                                        <span>Start: {project.startDate}</span>
-                                    </span>
-                                )}
-                                <span className="text-xs text-[color:var(--color-text-muted)] flex items-center gap-1 font-medium">
-                                    <Clock className="w-3.5 h-3.5 text-[color:var(--color-text-subtle)]" />
-                                    <span>Deadline: {project.deadline}</span>
-                                </span>
-                                {project.leaderName && (
-                                    <span className="text-xs text-[color:var(--color-text-muted)] flex items-center gap-1 font-medium">
-                                        <Users className="w-3.5 h-3.5 text-[color:var(--color-text-subtle)]" />
-                                        <span>Leader: <strong className="text-[color:var(--color-text-main)] font-semibold">{project.leaderName}</strong></span>
-                                    </span>
-                                )}
                             </div>
 
                             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--color-text-main)] leading-snug">
                                 {project.title}
                             </h1>
 
-                            <p className="text-xs sm:text-sm text-[color:var(--color-text-muted)] leading-relaxed">
-                                {project.description}
-                            </p>
+                            {project.description ? (
+                                <p className="text-xs sm:text-sm text-[color:var(--color-text-muted)] leading-relaxed">
+                                    {project.description}
+                                </p>
+                            ) : (
+                                <p className="text-xs sm:text-sm text-slate-400 italic">
+                                    No project description provided.
+                                </p>
+                            )}
                         </div>
 
                         {/* Right: Project Actions Area */}
@@ -723,6 +693,86 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             >
                                 <MoreHorizontal className="w-4 h-4" />
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Key Project Information & Leadership Grid */}
+                    <div className="mt-5 pt-4 border-t border-[color:var(--color-border-light)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {/* 1. Project Leader */}
+                        <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+                                project.hasLeader
+                                    ? 'bg-orange-100 text-[color:var(--color-brand-action-orange)] border border-orange-200'
+                                    : 'bg-slate-100 text-slate-400 border border-slate-200'
+                            }`}>
+                                {project.hasLeader ? getInitials(project.leaderName) : <User className="w-4 h-4" />}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
+                                    Project Leader
+                                </p>
+                                <p className={`text-xs font-bold truncate ${
+                                    project.hasLeader
+                                        ? 'text-[color:var(--color-text-main)]'
+                                        : 'text-slate-400 italic'
+                                }`} title={project.leaderName}>
+                                    {project.leaderName}
+                                </p>
+                                {project.leaderEmail ? (
+                                    <p className="text-[11px] text-[color:var(--color-text-subtle)] truncate" title={project.leaderEmail}>
+                                        {project.leaderEmail}
+                                    </p>
+                                ) : (
+                                    <p className="text-[10px] text-slate-400 italic">
+                                        {project.hasLeader ? 'Institutional Personnel' : 'Role assignment pending'}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 2. Project Status */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
+                                <Shield className="w-4 h-4 text-slate-500" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
+                                    Project Status
+                                </p>
+                                <div className="mt-0.5">
+                                    <ProjectStatusBadge status={project.status} />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. Start Date */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 text-slate-500">
+                                <Calendar className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
+                                    Start Date
+                                </p>
+                                <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate mt-0.5">
+                                    {project.startDate !== 'Not set' ? project.startDate : <span className="text-slate-400 italic font-normal">Not set</span>}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* 4. Target Deadline */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 text-slate-500">
+                                <Clock className="w-4 h-4" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
+                                    Target Deadline
+                                </p>
+                                <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate mt-0.5">
+                                    {project.deadline !== 'No deadline specified' ? project.deadline : <span className="text-slate-400 italic font-normal">No deadline set</span>}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -877,7 +927,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                     Deadline
                                 </p>
                                 <p className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] mt-1 leading-snug">
-                                    {project.deadline}
+                                    {project.deadline !== 'No deadline specified' ? project.deadline : <span className="text-slate-400 italic font-normal">Not set</span>}
                                 </p>
                                 <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
                                     Target conclusion
@@ -909,6 +959,9 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                     <h4 className="text-xs font-bold text-slate-900">Project</h4>
                                     <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
                                         Governing project charter, objectives, and leadership oversight.
+                                    </p>
+                                    <p className="text-[10px] text-emerald-800 font-semibold mt-1.5 truncate">
+                                        Led by: {project.leaderName}
                                     </p>
                                 </div>
 
@@ -1035,39 +1088,52 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
                                 <div className="mb-4">
                                     <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                        Recent Activity
+                                        Recent Activities
                                     </h3>
                                     <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                        Latest activity across committee workflows
+                                        Latest activities across committee workflows
                                     </p>
                                 </div>
 
                                 <div className="space-y-4">
-                                    {MOCK_ACTIVITIES.map((activity, index) => (
-                                        <div key={activity.id} className="relative flex items-start gap-3">
-                                            {/* Step dot and line */}
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 flex items-center justify-center text-[color:var(--color-brand-action-orange)] shrink-0">
-                                                    <Clock className="w-3.5 h-3.5" />
+                                    {recentActivities.length > 0 ? (
+                                        recentActivities.map((activity, index) => (
+                                            <div key={activity.id} className="relative flex items-start gap-3">
+                                                {/* Step dot and line */}
+                                                <div className="flex flex-col items-center">
+                                                    <div className="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 flex items-center justify-center text-[color:var(--color-brand-action-orange)] shrink-0">
+                                                        <Clock className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    {index < recentActivities.length - 1 && (
+                                                        <div className="w-px h-8 bg-slate-200 mt-1" />
+                                                    )}
                                                 </div>
-                                                {index < MOCK_ACTIVITIES.length - 1 && (
-                                                    <div className="w-px h-8 bg-slate-200 mt-1" />
-                                                )}
-                                            </div>
 
-                                            <div className="flex-1 min-w-0 pt-0.5">
-                                                <p className="text-xs font-semibold text-[color:var(--color-text-main)] leading-snug">
-                                                    {activity.title}
-                                                </p>
-                                                <p className="text-[11px] text-[color:var(--color-text-muted)] truncate mt-0.5">
-                                                    {activity.actor} · {activity.committee}
-                                                </p>
-                                                <p className="text-[10px] text-[color:var(--color-text-subtle)] mt-0.5">
-                                                    {activity.timeAgo}
-                                                </p>
+                                                <div className="flex-1 min-w-0 pt-0.5">
+                                                    <p className="text-xs font-semibold text-[color:var(--color-text-main)] leading-snug">
+                                                        {activity.title}
+                                                    </p>
+                                                    <p className="text-[11px] text-[color:var(--color-text-muted)] truncate mt-0.5">
+                                                        {activity.committee?.name ?? 'Project Activity'}
+                                                        {activity.creator ? ` · ${activity.creator.name}` : ''}
+                                                    </p>
+                                                    {activity.status && (
+                                                        <p className="text-[10px] text-[color:var(--color-text-subtle)] mt-0.5">
+                                                            Status: {activity.status}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-6 text-center">
+                                            <ListTodo className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+                                            <p className="text-xs font-semibold text-slate-500">No activities yet</p>
+                                            <p className="text-[11px] text-slate-400 mt-1">
+                                                Committee activities will appear here once created.
+                                            </p>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1077,73 +1143,101 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                                 <div>
                                     <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                        Project Supporting & Approval Documents
+                                        Project Approval Documents
                                     </h3>
                                     <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                        Official project memo, activity designs, and dean approvals
+                                        Official project memos, activity designs, and dean approval letters
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleActionClick('Upload Supporting Document')}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] hover:bg-slate-100 transition-colors cursor-pointer self-start sm:self-auto"
-                                >
-                                    <span>+ Attach Document</span>
-                                </button>
+                                {(initialProject.can?.uploadDocument) && (
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenUploadDocumentModal}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 transition-opacity cursor-pointer shadow-xs self-start sm:self-auto"
+                                    >
+                                        <FileText className="w-3.5 h-3.5" />
+                                        <span>+ Attach Document</span>
+                                    </button>
+                                )}
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                                {displayDocuments.map((doc) => (
-                                    <div
-                                        key={doc.id}
-                                        onClick={() => {
-                                            if (doc.downloadUrl) {
-                                                window.location.href = doc.downloadUrl;
-                                            } else {
-                                                handleActionClick(`Document "${doc.title}" is securely stored on server.`);
-                                            }
-                                        }}
-                                        role="button"
-                                        tabIndex={0}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                if (doc.downloadUrl) {
-                                                    window.location.href = doc.downloadUrl;
-                                                } else {
-                                                    handleActionClick(`Document "${doc.title}" is securely stored on server.`);
-                                                }
-                                            }
-                                        }}
-                                        className="p-3.5 rounded-lg border border-[color:var(--color-border-light)] hover:border-[color:var(--color-brand-action-orange)] transition-colors bg-white cursor-pointer group flex items-start gap-3"
-                                    >
-                                        <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-[color:var(--color-brand-action-orange)] shrink-0 group-hover:bg-orange-100 transition-colors">
-                                            <FileText className="w-4 h-4" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between gap-1">
-                                                <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate group-hover:text-[color:var(--color-brand-action-orange)] transition-colors">
-                                                    {doc.title}
-                                                </p>
-                                                {doc.downloadUrl && (
-                                                    <span className="text-[color:var(--color-brand-action-orange)] shrink-0 p-0.5 rounded hover:bg-orange-50 transition-colors" title="Download Document">
-                                                        <Download className="w-3.5 h-3.5" />
-                                                    </span>
-                                                )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                                {displayDocuments.length > 0 ? (
+                                    displayDocuments.map((doc) => (
+                                        <div
+                                            key={doc.id}
+                                            className="p-3.5 rounded-lg border border-[color:var(--color-border-light)] bg-white flex flex-col gap-3"
+                                        >
+                                            {/* Document header */}
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-orange-50 border border-orange-200 flex items-center justify-center text-[color:var(--color-brand-action-orange)] shrink-0">
+                                                    <FileText className="w-4 h-4" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate" title={doc.title}>
+                                                        {doc.title}
+                                                    </p>
+                                                    <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
+                                                        {doc.type} · {doc.size}
+                                                    </p>
+                                                    <div className="flex items-center gap-1.5 mt-1.5">
+                                                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            {doc.status}
+                                                        </span>
+                                                        <span className="text-[10px] text-[color:var(--color-text-subtle)]">
+                                                            {doc.updatedAt}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
-                                                {doc.type} · {doc.size}
-                                            </p>
-                                            <div className="flex items-center gap-1.5 mt-2">
-                                                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                    {doc.status}
-                                                </span>
-                                                <span className="text-[10px] text-[color:var(--color-text-subtle)]">
-                                                    {doc.updatedAt}
-                                                </span>
-                                            </div>
+
+                                            {/* Document actions */}
+                                            {doc.downloadUrl && (
+                                                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                                                    {/* View — opens in new tab if browser can display */}
+                                                    <a
+                                                        href={`${doc.downloadUrl}?inline=1`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-[color:var(--color-text-main)] bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors"
+                                                        title="Open document in browser"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                        View
+                                                    </a>
+                                                    {/* Download — forces file download */}
+                                                    <a
+                                                        href={doc.downloadUrl}
+                                                        download={doc.title}
+                                                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold text-[color:var(--color-brand-action-orange)] bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors"
+                                                        title="Download document"
+                                                    >
+                                                        <Download className="w-3 h-3" />
+                                                        Download
+                                                    </a>
+                                                </div>
+                                            )}
                                         </div>
+                                    ))
+                                ) : (
+                                    <div className="col-span-3 py-8 text-center rounded-lg border border-dashed border-slate-200">
+                                        <FileText className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+                                        <p className="text-xs font-semibold text-slate-500">No documents attached</p>
+                                        <p className="text-[11px] text-slate-400 mt-1 max-w-xs mx-auto">
+                                            Approval documents — such as the official project memo or dean approval letter — will appear here.
+                                        </p>
+                                        {(initialProject.can?.uploadDocument) && (
+                                            <button
+                                                type="button"
+                                                onClick={handleOpenUploadDocumentModal}
+                                                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                                            >
+                                                <FileText className="w-3.5 h-3.5" />
+                                                Attach First Document
+                                            </button>
+                                        )}
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </div>
 
@@ -1889,6 +1983,89 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                 disabled={personnelProcessing || (initialProject?.availablePersonnel ?? []).length === 0}
                             >
                                 Assign Personnel
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* ── Upload Approval Document Modal ── */}
+                <Modal
+                    isOpen={isUploadDocumentModalOpen}
+                    onClose={handleCloseUploadDocumentModal}
+                    title="Upload Approval Document"
+                    description="Upload an official project memo, activity design, or dean approval letter for this project."
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleUploadDocumentSubmit} className="space-y-4 pt-1">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="upload-approval-document" required>
+                                Select Document File
+                            </Label>
+                            <div className="p-3 border border-dashed border-slate-300 rounded-lg bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                                {docData.approval_document ? (
+                                    <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-md border border-slate-200">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <FileText className="w-4 h-4 text-[color:var(--color-brand-action-orange)] shrink-0" />
+                                            <span className="text-xs font-medium text-slate-800 truncate">
+                                                {docData.approval_document.name}
+                                            </span>
+                                            <span className="text-[10px] text-slate-400 shrink-0">
+                                                ({(docData.approval_document.size / 1024).toFixed(0)} KB)
+                                            </span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveDocFile}
+                                            disabled={docProcessing}
+                                            className="text-xs text-rose-600 hover:text-rose-700 font-semibold shrink-0 cursor-pointer p-1"
+                                            title="Remove selected file"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-2 text-center">
+                                        <input
+                                            ref={docFileInputRef}
+                                            id="upload-approval-document"
+                                            name="approval_document"
+                                            type="file"
+                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                            onChange={handleDocFileChange}
+                                            className="hidden"
+                                        />
+                                        <label
+                                            htmlFor="upload-approval-document"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                                        >
+                                            <FileText className="w-3.5 h-3.5" />
+                                            <span>Select Document</span>
+                                        </label>
+                                        <p className="text-[11px] text-slate-500 mt-1.5">
+                                            Supported: PDF, DOC, DOCX, JPG, JPEG, PNG (max 10MB)
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <InputError message={docErrors.approval_document} />
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCloseUploadDocumentModal}
+                                disabled={docProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={docProcessing}
+                                disabled={docProcessing || !docData.approval_document}
+                            >
+                                Upload Document
                             </Button>
                         </div>
                     </form>

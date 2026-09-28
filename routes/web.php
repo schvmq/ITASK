@@ -69,6 +69,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::match(['put', 'patch'], '/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::post('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::get('/projects/{project}/documents/{document}', [ProjectController::class, 'downloadApprovalDocument'])->name('projects.documents.download');
+    Route::post('/projects/{project}/documents', [ProjectController::class, 'uploadDocument'])->name('projects.documents.store');
 
     // Project Personnel / Roles
     Route::post('/projects/{project}/personnel', [ProjectPersonnelController::class, 'store'])->name('projects.personnel.store');

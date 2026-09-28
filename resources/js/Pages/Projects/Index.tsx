@@ -112,7 +112,7 @@ const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
     },
 };
 
-// ─── Project Item Data Model (Placeholder / Frontend Shell) ───────────────────
+// ─── Project Item Data Model ────────────────────────────────────────────────
 export interface ProjectItem {
     id: string;
     title: string;
@@ -121,61 +121,10 @@ export interface ProjectItem {
     role: ProjectRole;
     progress: number;
     deadline: string;
+    startDate?: string | null;
     committeesCount: number;
     tasksCount: number;
 }
-
-// Realistic CCIS mock projects for frontend shell presentation
-const SAMPLE_PROJECTS: ProjectItem[] = [
-    {
-        id: 'proj-1',
-        title: 'CCIS General Assembly 2026',
-        description:
-            'Annual college assembly welcoming new and returning CCIS students, faculty introductions, and program orientation.',
-        status: 'In Progress',
-        role: 'Project Leader',
-        progress: 68,
-        deadline: 'October 18, 2026',
-        committeesCount: 4,
-        tasksCount: 24,
-    },
-    {
-        id: 'proj-2',
-        title: 'CCIS Technology Week',
-        description:
-            'Multi-day series of tech talks, programming hackathons, and industry showcase for computing students.',
-        status: 'Planning',
-        role: 'Project Staff',
-        progress: 25,
-        deadline: 'November 24, 2026',
-        committeesCount: 5,
-        tasksCount: 18,
-    },
-    {
-        id: 'proj-3',
-        title: 'CCIS Research Colloquium 2026',
-        description:
-            'Presentation of undergraduate capstone and faculty research papers with peer review and evaluations.',
-        status: 'Completed',
-        role: 'Project Member',
-        progress: 100,
-        deadline: 'September 15, 2026',
-        committeesCount: 3,
-        tasksCount: 16,
-    },
-    {
-        id: 'proj-4',
-        title: 'Accreditation Documentation Drive',
-        description:
-            'Curating and preparing CCIS academic and operational records for Level III accreditation survey.',
-        status: 'On Hold',
-        role: 'Project Staff',
-        progress: 42,
-        deadline: 'December 12, 2026',
-        committeesCount: 2,
-        tasksCount: 9,
-    },
-];
 
 // ─── Status Badge Component ──────────────────────────────────────────────────
 function StatusBadge({ status }: { status: ProjectStatus }) {
@@ -405,20 +354,15 @@ function ProjectsEmptyState({
 }
 
 interface ProjectsIndexProps {
-    projects?: ProjectItem[];
+    projects: ProjectItem[];
 }
 
 // ─── Main Projects Page Component ─────────────────────────────────────────────
-export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
+export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
     // Search and filter state
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [roleFilter, setRoleFilter] = useState<string>('ALL');
-
-    // Interactive Demo / Testing state toggles (allows reviewing all states on demand)
-    const [simulatedState, setSimulatedState] = useState<'normal' | 'loading' | 'error' | 'empty'>(
-        'normal'
-    );
 
     // Modal / Notice feedback state
     const [activeNotice, setActiveNotice] = useState<{
@@ -451,6 +395,7 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
     };
 
     const handleRemoveFile = () => {
+        if (processing) return;
         setData('approval_document', null);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
@@ -463,6 +408,7 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
     };
 
     const handleCloseCreateModal = () => {
+        if (processing) return;
         setIsCreateModalOpen(false);
         reset();
         clearErrors();
@@ -473,6 +419,7 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
 
     const handleCreateProjectSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (processing) return;
         post('/projects', {
             forceFormData: true,
             onSuccess: () => {
@@ -481,13 +428,9 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
         });
     };
 
-    // Client-side filtering logic against backend projects or sample demo projects
-    const baseProjects = projects.length > 0 ? projects : SAMPLE_PROJECTS;
-
+    // Client-side filtering of real backend projects
     const filteredProjects = useMemo(() => {
-        if (simulatedState === 'empty') return [];
-
-        return baseProjects.filter((project) => {
+        return projects.filter((project) => {
             const matchesSearch =
                 searchTerm.trim() === '' ||
                 project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -501,7 +444,7 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
 
             return matchesSearch && matchesStatus && matchesRole;
         });
-    }, [baseProjects, searchTerm, statusFilter, roleFilter, simulatedState]);
+    }, [projects, searchTerm, statusFilter, roleFilter]);
 
     const isFiltered =
         searchTerm.trim() !== '' || statusFilter !== 'ALL' || roleFilter !== 'ALL';
@@ -645,12 +588,8 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
                     </div>
                 </div>
 
-                {/* ── Content Area: Dynamic based on simulated state or filters ── */}
-                {simulatedState === 'loading' ? (
-                    <ProjectsLoadingSkeleton />
-                ) : simulatedState === 'error' ? (
-                    <ProjectsErrorState onRetry={() => setSimulatedState('normal')} />
-                ) : filteredProjects.length === 0 ? (
+                {/* ── Content Area: Dynamic based on filters ── */}
+                {filteredProjects.length === 0 ? (
                     <ProjectsEmptyState
                         isFiltered={isFiltered}
                         onResetFilters={handleResetFilters}
@@ -658,7 +597,7 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
                     />
                 ) : (
                     <div>
-                        {/* Projects counter & context summary */}
+                        {/* Projects counter */}
                         <div className="flex items-center justify-between mb-4 px-1">
                             <p className="text-xs text-[color:var(--color-text-muted)]">
                                 Showing{' '}
@@ -668,7 +607,7 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
                                 {filteredProjects.length === 1 ? 'project' : 'projects'}
                             </p>
                             <p className="text-[11px] text-[color:var(--color-text-subtle)]">
-                                Click any project card to preview context
+                                Click any project to open its workspace
                             </p>
                         </div>
 
@@ -688,7 +627,7 @@ export default function ProjectsIndex({ projects = [] }: ProjectsIndexProps) {
                 {/* ── Create Project Modal ── */}
                 <Modal
                     isOpen={isCreateModalOpen}
-                    onClose={handleCloseCreateModal}
+                    onClose={() => !processing && handleCloseCreateModal()}
                     title="Create New Project"
                     description="Initiate a new CCIS project workspace. As the creator, you will automatically be assigned as Project Leader."
                     maxWidth="md"

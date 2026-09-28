@@ -22,6 +22,7 @@ import {
     AvatarFallback,
     AvatarImage,
 } from '@/Components/ui/avatar';
+import { Alert } from '@/Components/Alert';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -312,8 +313,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     currentProject,
     children,
 }) => {
-    const { auth, url } = usePage<PageProps & { url: string }>().props;
+    const { auth, url, flash } = usePage<PageProps & { url: string }>().props;
     const [isMobileOpen, setIsMobileOpen] = useState(false);
+    const [dismissedFlash, setDismissedFlash] = useState<string | null>(null);
 
     const user = auth?.user
         ? { name: auth.user.name, email: auth.user.email }
@@ -546,8 +548,26 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 )}
 
                 {/* ── Main content ────────────────────────────────────────── */}
-                <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-screen-xl">
-                    {children}
+                <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-screen-xl space-y-4">
+                    {/* Global Flash Alerts (Success / Status / Error) */}
+                    {(flash?.success || flash?.status) && dismissedFlash !== (flash.success || flash.status) && (
+                        <Alert
+                            variant="success"
+                            onClose={() => setDismissedFlash(flash.success || flash.status || null)}
+                        >
+                            {flash.success || flash.status}
+                        </Alert>
+                    )}
+                    {flash?.error && dismissedFlash !== flash.error && (
+                        <Alert
+                            variant="danger"
+                            onClose={() => setDismissedFlash(flash.error || null)}
+                        >
+                            {flash.error}
+                        </Alert>
+                    )}
+
+                    <div>{children}</div>
                 </main>
             </div>
         </div>
