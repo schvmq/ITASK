@@ -2,6 +2,8 @@
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../views';
+@source '../js';
 @source '../**/*.blade.php';
 @source '../**/*.tsx';
 @source '../**/*.ts';
@@ -34,6 +36,99 @@
     --color-text-main: #111827;
     --color-text-muted: #6B7280;
     --color-text-subtle: #9CA3AF;
+
+    /* ITASK Brand Palette */
+    --color-brand-dark-green: #003300;
+    --color-brand-orange: #E8752F;
+    --color-brand-action-orange: #F68233;
+    --color-brand-active-warm-orange: #FFF1E8;
+    --color-brand-project-darker-orange: #D9692B;
+
+    /* Shadcn Semantic Colors linked to ITASK Tokens */
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+    --background: var(--color-surface);
+    --foreground: var(--color-text-main);
+
+    --card: var(--color-surface);
+    --card-foreground: var(--color-text-main);
+
+    --popover: var(--color-surface);
+    --popover-foreground: var(--color-text-main);
+
+    --primary: var(--color-primary);
+    --primary-foreground: #FFFFFF;
+
+    --secondary: var(--color-secondary);
+    --secondary-foreground: #FFFFFF;
+
+    --muted: var(--color-surface-muted);
+    --muted-foreground: var(--color-text-muted);
+
+    --accent: var(--color-brand-active-warm-orange);
+    --accent-foreground: var(--color-primary-active);
+
+    --destructive: #EF4444;
+    --destructive-foreground: #FFFFFF;
+
+    --border: var(--color-border-light);
+    --input: var(--color-border-light);
+    --ring: var(--color-primary);
+
+    --radius: 0.5rem;
+}
+
+.dark {
+    --background: #111827;
+    --foreground: #F9FAFB;
+
+    --card: #1F2937;
+    --card-foreground: #F9FAFB;
+
+    --popover: #1F2937;
+    --popover-foreground: #F9FAFB;
+
+    --primary: var(--color-primary);
+    --primary-foreground: #FFFFFF;
+
+    --secondary: #004D00;
+    --secondary-foreground: #FFFFFF;
+
+    --muted: #1F2937;
+    --muted-foreground: #9CA3AF;
+
+    --accent: #2D1E16;
+    --accent-foreground: #FED7AA;
+
+    --destructive: #7F1D1D;
+    --destructive-foreground: #FEE2E2;
+
+    --border: #374151;
+    --input: #374151;
+    --ring: var(--color-primary);
 }
 
 @layer base {

@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CommitteeController;
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectPersonnelController;
 use App\Models\User;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
@@ -28,9 +31,10 @@ Route::get('/register', function () {
 Route::post('/register', [AuthController::class, 'register'])->name('register');
 
 // Email Verification Notice
-Route::get('/verify-email', function () {
+Route::get('/verify-email', function (Request $request) {
     return Inertia::render('Auth/VerifyEmail', [
         'email' => Auth::user()?->email,
+        'status' => $request->session()->get('status'),
     ]);
 })->middleware('auth')->name('verification.notice');
 
@@ -58,6 +62,43 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
         return Inertia::render('Welcome');
     })->name('dashboard');
+
+    Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
+    Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
+    Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    Route::match(['put', 'patch'], '/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
+    Route::post('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
+    Route::get('/projects/{project}/documents/{document}', [ProjectController::class, 'downloadApprovalDocument'])->name('projects.documents.download');
+    Route::post('/projects/{project}/documents', [ProjectController::class, 'uploadDocument'])->name('projects.documents.store');
+
+    // Project Personnel / Roles
+    Route::post('/projects/{project}/personnel', [ProjectPersonnelController::class, 'store'])->name('projects.personnel.store');
+    Route::delete('/projects/{project}/personnel/{user}', [ProjectPersonnelController::class, 'destroy'])->name('projects.personnel.destroy');
+
+    // Committees
+    Route::post('/projects/{project}/committees', [CommitteeController::class, 'store'])->name('projects.committees.store');
+    Route::get('/projects/{project}/committees/{committee}', [CommitteeController::class, 'show'])->name('projects.committees.show');
+    Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}', [CommitteeController::class, 'update'])->name('projects.committees.update');
+    Route::delete('/projects/{project}/committees/{committee}', [CommitteeController::class, 'destroy'])->name('projects.committees.destroy');
+
+    // Committee Members
+    Route::post('/projects/{project}/committees/{committee}/members', [CommitteeController::class, 'assignMember'])->name('projects.committees.members.store');
+    Route::delete('/projects/{project}/committees/{committee}/members/{user}', [CommitteeController::class, 'removeMember'])->name('projects.committees.members.destroy');
+
+    // Activities
+    Route::post('/projects/{project}/committees/{committee}/activities', [\App\Http\Controllers\ActivityController::class, 'store'])->name('projects.committees.activities.store');
+    Route::get('/projects/{project}/committees/{committee}/activities/{activity}', [\App\Http\Controllers\ActivityController::class, 'show'])->name('projects.committees.activities.show');
+    Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}', [\App\Http\Controllers\ActivityController::class, 'update'])->name('projects.committees.activities.update');
+    Route::delete('/projects/{project}/committees/{committee}/activities/{activity}', [\App\Http\Controllers\ActivityController::class, 'destroy'])->name('projects.committees.activities.destroy');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/submit', [\App\Http\Controllers\ActivityController::class, 'submit'])->name('projects.committees.activities.submit');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/review', [\App\Http\Controllers\ActivityController::class, 'review'])->name('projects.committees.activities.review');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/complete', [\App\Http\Controllers\ActivityController::class, 'markCompleted'])->name('projects.committees.activities.complete');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/return', [\App\Http\Controllers\ActivityController::class, 'returnForRevision'])->name('projects.committees.activities.return');
+
+    // Tasks
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');
+    Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('projects.committees.activities.tasks.update');
+    Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('projects.committees.activities.tasks.destroy');
 });
 
 // Logout

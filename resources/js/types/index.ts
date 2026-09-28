@@ -13,6 +13,7 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
     };
     errors?: Record<string, string>;
     flash?: {
+        status?: string;
         success?: string;
         error?: string;
         info?: string;
