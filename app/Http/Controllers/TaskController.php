@@ -10,7 +10,11 @@ use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Activity;
 use App\Models\Committee;
 use App\Models\Project;
+use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
+use App\Notifications\TaskAssignedNotification;
+use App\Notifications\TaskReviewedNotification;
+use App\Notifications\TaskSubmittedForReviewNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 
@@ -33,7 +37,7 @@ class TaskController extends Controller
         // 2. Authorize
         Gate::authorize('create', [Task::class, $activity]);
 
-        $activity->tasks()->create([
+        $task = $activity->tasks()->create([
             'title' => $request->validated('title'),
             'description' => $request->validated('description'),
             'due_date' => $request->validated('due_date'),
@@ -41,6 +45,11 @@ class TaskController extends Controller
             'assigned_to' => $request->validated('assigned_to'),
             'requires_review' => $request->boolean('requires_review', false),
         ]);
+
+        // Notify assigned member if assigned upon creation
+        if ($task->assigned_to && $task->assignee) {
+            $task->assignee->notify(new TaskAssignedNotification($task, $activity, $committee, $project));
+        }
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
@@ -70,7 +79,16 @@ class TaskController extends Controller
         // 2. Authorize
         Gate::authorize('update', $task);
 
+        $oldAssigneeId = $task->assigned_to;
         $task->update($request->validated());
+
+        // Notify newly assigned member if assignment changed
+        if ($request->has('assigned_to')) {
+            $newAssigneeId = $task->assigned_to;
+            if ($newAssigneeId && (int) $newAssigneeId !== (int) $oldAssigneeId && $task->assignee) {
+                $task->assignee->notify(new TaskAssignedNotification($task, $activity, $committee, $project));
+            }
+        }
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
@@ -134,6 +152,26 @@ class TaskController extends Controller
             'status' => Task::STATUS_UNDER_REVIEW,
         ]);
 
+        // Notify committee staff reviewer(s)
+        $staffUsers = $committee->roleAssignments()
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->with('user')
+            ->get()
+            ->pluck('user')
+            ->filter();
+
+        foreach ($staffUsers as $staff) {
+            if ($staff->id !== $request->user()->id) {
+                $staff->notify(new TaskSubmittedForReviewNotification(
+                    $task,
+                    $activity,
+                    $committee,
+                    $project,
+                    $request->user()
+                ));
+            }
+        }
+
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
             'committee' => $committee->id,
@@ -166,6 +204,19 @@ class TaskController extends Controller
             'status' => Task::STATUS_COMPLETED,
         ]);
 
+        // Notify assigned member
+        if ($task->assigned_to && $task->assignee && $task->assignee->id !== $request->user()->id) {
+            $task->assignee->notify(new TaskReviewedNotification(
+                $task,
+                $activity,
+                $committee,
+                $project,
+                $request->user(),
+                Task::STATUS_COMPLETED,
+                null
+            ));
+        }
+
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
             'committee' => $committee->id,
@@ -194,9 +245,24 @@ class TaskController extends Controller
         // 2. Authorize
         Gate::authorize('review', $task);
 
+        $feedback = $request->validated('review_feedback');
+
         $task->update([
             'status' => Task::STATUS_RETURNED,
         ]);
+
+        // Notify assigned member with review feedback
+        if ($task->assigned_to && $task->assignee && $task->assignee->id !== $request->user()->id) {
+            $task->assignee->notify(new TaskReviewedNotification(
+                $task,
+                $activity,
+                $committee,
+                $project,
+                $request->user(),
+                Task::STATUS_RETURNED,
+                $feedback
+            ));
+        }
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
