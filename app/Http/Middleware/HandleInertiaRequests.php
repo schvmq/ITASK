@@ -50,6 +50,23 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success') ?: $request->session()->get('status'),
                 'error' => $request->session()->get('error'),
             ],
+            'notifications' => [
+                'unread_count' => $request->user()?->unreadNotifications()->count() ?? 0,
+                'recent' => $request->user() ? $request->user()->notifications()
+                    ->latest()
+                    ->take(5)
+                    ->get()
+                    ->map(function ($notif) {
+                        return [
+                            'id' => $notif->id,
+                            'type' => $notif->type,
+                            'data' => $notif->data,
+                            'read_at' => $notif->read_at?->toISOString(),
+                            'created_at' => $notif->created_at?->toISOString(),
+                            'created_at_human' => $notif->created_at?->diffForHumans(),
+                        ];
+                    }) : [],
+            ],
         ];
     }
 }

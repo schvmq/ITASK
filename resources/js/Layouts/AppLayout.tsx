@@ -23,6 +23,7 @@ import {
     AvatarImage,
 } from '@/Components/ui/avatar';
 import { Alert } from '@/Components/Alert';
+import { NotificationDropdown } from '@/Components/NotificationDropdown';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -410,26 +411,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                             <TooltipContent className="text-xs">Search coming soon</TooltipContent>
                         </Tooltip>
 
-                        {/* Notification bell placeholder */}
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button
-                                    type="button"
-                                    className="relative p-2 rounded-lg text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-surface-muted)] transition-colors cursor-not-allowed"
-                                    disabled
-                                    aria-label="Notifications (coming soon)"
-                                >
-                                    <Bell className="w-4.5 h-4.5" />
-                                    {/* Dot indicator placeholder */}
-                                    <span
-                                        className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-white"
-                                        style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
-                                        aria-hidden="true"
-                                    />
-                                </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs">Notifications coming soon</TooltipContent>
-                        </Tooltip>
+                        {/* Notification Bell Dropdown */}
+                        <NotificationDropdown />
 
                         <Separator orientation="vertical" className="h-6 mx-1" />
 
