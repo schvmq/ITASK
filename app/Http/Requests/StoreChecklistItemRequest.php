@@ -3,12 +3,13 @@
 namespace App\Http\Requests;
 
 use App\Models\Activity;
+use App\Models\ChecklistItem;
 use App\Models\Committee;
 use App\Models\Project;
+use App\Models\Task;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class UpdateActivityRequest extends FormRequest
+class StoreChecklistItemRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -30,13 +31,19 @@ class UpdateActivityRequest extends FormRequest
             $activity = Activity::find($activity);
         }
 
-        if (! $project || ! $committee || ! $activity ||
+        $task = $this->route('task');
+        if (! $task instanceof Task) {
+            $task = Task::find($task);
+        }
+
+        if (! $project || ! $committee || ! $activity || ! $task ||
+            (int) $task->activity_id !== (int) $activity->id ||
             (int) $activity->committee_id !== (int) $committee->id ||
             (int) $committee->project_id !== (int) $project->id) {
             abort(404);
         }
 
-        return $this->user()?->can('update', $activity) ?? false;
+        return $this->user()?->can('create', [ChecklistItem::class, $task]) ?? false;
     }
 
     /**
@@ -47,11 +54,9 @@ class UpdateActivityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title'       => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'start_date'  => ['nullable', 'date'],
-            'due_date'    => ['nullable', 'date', 'after_or_equal:start_date'],
-            'status'      => ['required', 'string', Rule::in(Activity::STATUSES)],
+            'content'      => ['required', 'string', 'max:500'],
+            'is_completed' => ['sometimes', 'boolean'],
+            'order'        => ['sometimes', 'integer', 'min:0'],
         ];
     }
 
@@ -63,13 +68,9 @@ class UpdateActivityRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.required'            => 'The activity title is required.',
-            'title.max'                 => 'The activity title cannot exceed 255 characters.',
-            'start_date.date'           => 'The start date must be a valid date.',
-            'due_date.date'             => 'The deadline must be a valid date.',
-            'due_date.after_or_equal'   => 'The deadline must not be earlier than the start date.',
-            'status.required'           => 'The activity status is required.',
-            'status.in'                 => 'The selected activity status is invalid.',
+            'content.required' => 'The checklist item content is required.',
+            'content.max'      => 'Checklist item content cannot exceed 500 characters.',
+            'is_completed.boolean' => 'The completion state must be true or false.',
         ];
     }
 }

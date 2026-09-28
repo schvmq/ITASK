@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\CommitteeController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPersonnelController;
@@ -100,6 +101,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('projects.committees.activities.tasks.update');
     Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('projects.committees.activities.tasks.destroy');
+
+    // Checklist Items
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist', [ChecklistItemController::class, 'store'])->name('projects.committees.activities.tasks.checklist.store');
+    Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist/{checklist_item}', [ChecklistItemController::class, 'update'])->name('projects.committees.activities.tasks.checklist.update');
+    Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist/{checklist_item}', [ChecklistItemController::class, 'destroy'])->name('projects.committees.activities.tasks.checklist.destroy');
 });
 
 // Logout

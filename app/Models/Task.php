@@ -14,11 +14,15 @@ class Task extends Model
     public const STATUS_TO_DO = 'To Do';
     public const STATUS_TODO = self::STATUS_TO_DO;
     public const STATUS_IN_PROGRESS = 'In Progress';
+    public const STATUS_UNDER_REVIEW = 'Under Review';
+    public const STATUS_RETURNED = 'Returned';
     public const STATUS_COMPLETED = 'Completed';
 
     public const STATUSES = [
         self::STATUS_TO_DO,
         self::STATUS_IN_PROGRESS,
+        self::STATUS_UNDER_REVIEW,
+        self::STATUS_RETURNED,
         self::STATUS_COMPLETED,
     ];
 
@@ -29,14 +33,12 @@ class Task extends Model
         'description',
         'status',
         'due_date',
-        'checklist',
     ];
 
     protected function casts(): array
     {
         return [
             'due_date' => 'date',
-            'checklist' => 'array',
         ];
     }
 
@@ -48,6 +50,11 @@ class Task extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function checklistItems(): HasMany
+    {
+        return $this->hasMany(ChecklistItem::class)->orderBy('order')->orderBy('id');
     }
 
     public function evidences(): HasMany

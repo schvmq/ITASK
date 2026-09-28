@@ -33,12 +33,13 @@ class ActivityController extends Controller
         Gate::authorize('create', [Activity::class, $committee]);
 
         $activity = $committee->activities()->create([
-            'project_id' => $project->id,
-            'created_by' => Auth::id(),
-            'title' => $request->validated('title'),
+            'project_id'  => $project->id,
+            'created_by'  => Auth::id(),
+            'title'       => $request->validated('title'),
             'description' => $request->validated('description'),
-            'due_date' => $request->validated('due_date'),
-            'status' => $request->validated('status', Activity::STATUS_TO_DO),
+            'start_date'  => $request->validated('start_date'),
+            'due_date'    => $request->validated('due_date'),
+            'status'      => $request->validated('status', Activity::STATUS_TO_DO),
         ]);
 
         return redirect()->route('projects.committees.activities.show', [
@@ -70,6 +71,7 @@ class ActivityController extends Controller
             'reviewer',
             'committee.staffAssignment.user',
             'tasks.assignee',
+            'tasks.checklistItems',
         ]);
 
         $user = Auth::user();
@@ -88,12 +90,14 @@ class ActivityController extends Controller
             ->all();
 
         $activityData = [
-            'id' => (string) $activity->id,
-            'title' => $activity->title,
-            'description' => $activity->description,
-            'status' => $activity->status,
-            'due_date' => $activity->due_date?->format('M d, Y'),
-            'due_date_raw' => $activity->due_date?->format('Y-m-d'),
+            'id'              => (string) $activity->id,
+            'title'           => $activity->title,
+            'description'     => $activity->description,
+            'status'          => $activity->status,
+            'start_date'      => $activity->start_date?->format('M d, Y'),
+            'start_date_raw'  => $activity->start_date?->format('Y-m-d'),
+            'due_date'        => $activity->due_date?->format('M d, Y'),
+            'due_date_raw'    => $activity->due_date?->format('Y-m-d'),
             'submission_notes' => $activity->submission_notes,
             'review_feedback' => $activity->review_feedback,
             'reviewed_at' => $activity->reviewed_at?->format('M d, Y, g:i A'),
@@ -117,21 +121,27 @@ class ActivityController extends Controller
                 'review' => $user ? Gate::forUser($user)->allows('review', $activity) && $activity->status === Activity::STATUS_UNDER_REVIEW : false,
             ],
             'tasks' => $activity->tasks->map(fn ($task) => [
-                'id' => (string) $task->id,
-                'title' => $task->title,
-                'description' => $task->description,
-                'status' => $task->status,
-                'due_date' => $task->due_date?->format('M d, Y'),
-                'due_date_raw' => $task->due_date?->format('Y-m-d'),
+                'id'              => (string) $task->id,
+                'title'           => $task->title,
+                'description'     => $task->description,
+                'status'          => $task->status,
+                'due_date'        => $task->due_date?->format('M d, Y'),
+                'due_date_raw'    => $task->due_date?->format('Y-m-d'),
                 'is_assigned_to_me' => $user ? (int) $task->assigned_to === (int) $user->id : false,
-                'assignee' => $task->assignee ? [
-                    'id' => $task->assignee->id,
-                    'name' => $task->assignee->name,
+                'assignee'        => $task->assignee ? [
+                    'id'    => $task->assignee->id,
+                    'name'  => $task->assignee->name,
                     'email' => $task->assignee->email,
                 ] : null,
+                'checklist_items' => $task->checklistItems->map(fn ($item) => [
+                    'id'           => (string) $item->id,
+                    'content'      => $item->content,
+                    'is_completed' => $item->is_completed,
+                    'order'        => $item->order,
+                ])->values()->all(),
                 'can' => [
-                    'update' => $user ? Gate::forUser($user)->allows('update', $task) : false,
-                    'delete' => $user ? Gate::forUser($user)->allows('delete', $task) : false,
+                    'update'       => $user ? Gate::forUser($user)->allows('update', $task) : false,
+                    'delete'       => $user ? Gate::forUser($user)->allows('delete', $task) : false,
                     'updateStatus' => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
                 ],
             ])->values()->all(),

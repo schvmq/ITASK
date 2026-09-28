@@ -39,10 +39,25 @@ class ActivityPolicy
 
     /**
      * Determine whether the user can create an activity within the committee.
-     * Allowed only for the Project Staff who heads this committee.
+     * Allowed for:
+     * - Project Leader of the parent project (project-level authority)
+     * - Project Staff assigned to this specific committee
      */
     public function create(User $user, Committee $committee): bool
     {
+        $project = $committee->project;
+
+        // Project Leader can create activities in any committee within their project
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
+        // Project Staff assigned to this specific committee
         return $committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
@@ -51,10 +66,23 @@ class ActivityPolicy
 
     /**
      * Determine whether the user can update the activity.
-     * Allowed only for the Project Staff who heads this committee.
+     * Allowed for:
+     * - Project Leader of the parent project
+     * - Project Staff assigned to this committee
      */
     public function update(User $user, Activity $activity): bool
     {
+        $project = $activity->committee->project;
+
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
         return $activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
@@ -63,10 +91,23 @@ class ActivityPolicy
 
     /**
      * Determine whether the user can delete the activity.
-     * Allowed only for the Project Staff who heads this committee.
+     * Allowed for:
+     * - Project Leader of the parent project
+     * - Project Staff assigned to this committee
      */
     public function delete(User $user, Activity $activity): bool
     {
+        $project = $activity->committee->project;
+
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
         return $activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)

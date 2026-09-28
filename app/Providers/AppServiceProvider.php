@@ -3,10 +3,12 @@
 namespace App\Providers;
 
 use App\Models\Activity;
+use App\Models\ChecklistItem;
 use App\Models\Committee;
 use App\Models\Project;
 use App\Models\Task;
 use App\Policies\ActivityPolicy;
+use App\Policies\ChecklistItemPolicy;
 use App\Policies\CommitteePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
@@ -32,5 +34,6 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Committee::class, CommitteePolicy::class);
         Gate::policy(Activity::class, ActivityPolicy::class);
         Gate::policy(Task::class, TaskPolicy::class);
+        Gate::policy(ChecklistItem::class, ChecklistItemPolicy::class);
     }
 }

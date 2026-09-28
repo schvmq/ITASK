@@ -50,13 +50,18 @@ class UpdateTaskRequest extends FormRequest
             return false;
         }
 
+        $isLeader = $task->activity->committee->project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
         $isStaff = $task->activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
 
-        // If not Staff, user is assigned member and forbidden from management fields
-        if (! $isStaff) {
+        // If not Staff/Leader, user is assigned member and forbidden from management fields
+        if (! $isLeader && ! $isStaff) {
             if ($this->hasAny(['title', 'description', 'due_date', 'assigned_to'])) {
                 return false;
             }
@@ -81,12 +86,20 @@ class UpdateTaskRequest extends FormRequest
         $projectId = $task instanceof Task ? $task->activity?->project_id : null;
         $user = $this->user();
 
+        $isLeader = null;
+        if ($task && $user) {
+            $isLeader = $task->activity->committee->project->roleAssignments()
+                ->where('user_id', $user->id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                ->exists();
+        }
+
         $isStaff = $task && $user && $task->activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
 
-        if (! $isStaff) {
+        if (! $isLeader && ! $isStaff) {
             return [
                 'status' => ['required', 'string', Rule::in(Task::STATUSES)],
             ];
