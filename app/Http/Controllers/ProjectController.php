@@ -142,9 +142,20 @@ class ProjectController extends Controller
             Gate::authorize('view', $projectModel);
         }
 
-        $userRole = (Auth::check() && $projectModel)
-            ? $projectModel->roleAssignments()->where('user_id', Auth::id())->value('role')
+        $userAssignment = (Auth::check() && $projectModel)
+            ? $projectModel->roleAssignments()
+                ->where('user_id', Auth::id())
+                ->with('committee')
+                ->first()
             : null;
+
+        $userRole = $userAssignment?->role
+            ?? ($projectModel && $projectModel->created_by === Auth::id() ? ProjectRoleAssignment::ROLE_PROJECT_LEADER : null);
+
+        $userCommittee = $userAssignment?->committee ? [
+            'id' => (string) $userAssignment->committee->id,
+            'name' => $userAssignment->committee->name,
+        ] : null;
 
         $projectData = $projectModel ? [
             'id' => (string) $projectModel->id,
@@ -156,11 +167,13 @@ class ProjectController extends Controller
             'start_date_raw' => $projectModel->start_date?->format('Y-m-d'),
             'end_date_raw' => $projectModel->end_date?->format('Y-m-d'),
             'created_at' => $projectModel->created_at?->toISOString(),
-            'role' => $userRole ?? ProjectRoleAssignment::ROLE_PROJECT_LEADER,
+            'role' => $userRole,
+            'userCommittee' => $userCommittee,
             'can' => [
-                'update'         => Auth::check() ? Auth::user()->can('update', $projectModel) : false,
-                'archive'        => Auth::check() ? Auth::user()->can('archive', $projectModel) : false,
-                'uploadDocument' => Auth::check() ? Auth::user()->can('uploadDocument', $projectModel) : false,
+                'update'          => Auth::check() ? Auth::user()->can('update', $projectModel) : false,
+                'archive'         => Auth::check() ? Auth::user()->can('archive', $projectModel) : false,
+                'uploadDocument'  => Auth::check() ? Auth::user()->can('uploadDocument', $projectModel) : false,
+                'createCommittee' => Auth::check() ? Auth::user()->can('create', [\App\Models\Committee::class, $projectModel]) : false,
             ],
             'creator' => $projectModel->creator ? [
                 'id' => $projectModel->creator->id,
@@ -173,6 +186,8 @@ class ProjectController extends Controller
                 'email' => $projectModel->leaderAssignment->user->email,
             ] : null,
             'committees' => $projectModel->committees->map(function ($committee) {
+                $canView = Auth::check() ? Auth::user()->can('view', $committee) : false;
+
                 return [
                     'id' => (string) $committee->id,
                     'name' => $committee->name,
@@ -180,19 +195,26 @@ class ProjectController extends Controller
                     'progress' => 0,
                     'membersCount' => $committee->memberAssignments->count(),
                     'activitiesCount' => $committee->activities->count(),
-                    'leadName' => $committee->staffAssignment?->user?->name
-                        ? $committee->staffAssignment->user->name . ' (Project Staff)'
-                        : 'Unassigned Staff',
-                    'head' => $committee->staffAssignment?->user ? [
+                    'leadName' => $canView
+                        ? ($committee->staffAssignment?->user?->name
+                            ? $committee->staffAssignment->user->name . ' (Project Staff)'
+                            : 'Unassigned Staff')
+                        : null,
+                    'head' => ($canView && $committee->staffAssignment?->user) ? [
                         'id' => $committee->staffAssignment->user->id,
                         'name' => $committee->staffAssignment->user->name,
                         'email' => $committee->staffAssignment->user->email,
                     ] : null,
-                    'members' => $committee->memberAssignments->map(fn ($assignment) => [
+                    'members' => $canView ? $committee->memberAssignments->map(fn ($assignment) => [
                         'id' => $assignment->user->id,
                         'name' => $assignment->user->name,
                         'email' => $assignment->user->email,
-                    ])->values()->all(),
+                    ])->values()->all() : [],
+                    'can' => [
+                        'view' => $canView,
+                        'update' => Auth::check() ? Auth::user()->can('update', $committee) : false,
+                        'delete' => Auth::check() ? Auth::user()->can('delete', $committee) : false,
+                    ],
                 ];
             })->values()->all(),
             'activities' => $projectModel->activities->map(function ($act) {

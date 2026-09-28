@@ -10,3 +10,4 @@ export * from './Badge';
 export * from './Card';
 export * from './LoadingState';
 export * from './EmptyState';
+export * from './ProjectRoleBadge';

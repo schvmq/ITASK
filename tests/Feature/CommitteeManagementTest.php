@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class CommitteeManagementTest extends TestCase
@@ -445,6 +446,10 @@ class CommitteeManagementTest extends TestCase
 
         $response = $this->actingAs($staff)->get(route('projects.committees.show', [$project, $committee]));
         $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Committees/Show')
+            ->where('project.role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+        );
     }
 
     public function test_project_member_assigned_to_the_committee_can_view_the_committee(): void
@@ -460,6 +465,10 @@ class CommitteeManagementTest extends TestCase
 
         $response = $this->actingAs($member)->get(route('projects.committees.show', [$project, $committee]));
         $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Committees/Show')
+            ->where('project.role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+        );
     }
 
     public function test_project_member_assigned_to_another_committee_cannot_access_unauthorized_committee_data(): void

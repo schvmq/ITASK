@@ -7,6 +7,7 @@ import { FormField } from '@/Components/FormField';
 import { Label } from '@/Components/Label';
 import { InputError } from '@/Components/InputError';
 import { Button } from '@/Components/Button';
+import { ProjectRoleBadge } from '@/Components/ProjectRoleBadge';
 import {
     FolderOpen,
     Calendar,
@@ -34,6 +35,7 @@ import {
     Archive,
     Download,
     UserPlus,
+    Lock,
 } from 'lucide-react';
 
 // ─── Types & Definitions ──────────────────────────────────────────────────────
@@ -66,6 +68,11 @@ export interface CommitteeItem {
         name: string;
         email: string;
     }>;
+    can?: {
+        view?: boolean;
+        update?: boolean;
+        delete?: boolean;
+    };
 }
 
 export interface PersonnelItem {
@@ -126,11 +133,16 @@ export interface ProjectData {
     start_date_raw?: string | null;
     end_date_raw?: string | null;
     created_at?: string | null;
-    role?: ProjectRole;
+    role?: ProjectRole | string | null;
+    userCommittee?: {
+        id: string;
+        name: string;
+    } | null;
     can?: {
         update?: boolean;
         archive?: boolean;
         uploadDocument?: boolean;
+        createCommittee?: boolean;
     };
     creator?: {
         id: number;
@@ -198,15 +210,7 @@ function ProjectStatusBadge({ status }: { status: string }) {
     );
 }
 
-// ─── Role Badge Component ────────────────────────────────────────────────────
-function ProjectRoleBadge({ role }: { role: ProjectRole }) {
-    return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wide uppercase border bg-emerald-50/80 text-[color:var(--color-brand-dark-green)] border-emerald-300/60">
-            <Shield className="w-3 h-3 text-[color:var(--color-brand-dark-green)]" />
-            <span>{role}</span>
-        </span>
-    );
-}
+
 
 function ActivityStatusBadge({ status }: { status: string }) {
     const config: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -266,9 +270,14 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
     const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
     // Role-aware authorization (Project Leader only for edit and archive)
-    const isLeader = initialProject
-        ? (initialProject.can?.update ?? initialProject.role === 'Project Leader')
-        : true;
+    const isLeader = Boolean(
+        initialProject?.can?.update ?? (initialProject?.role === 'Project Leader')
+    );
+
+    // Backend-driven create committee authorization
+    const canCreateCommittee = initialProject
+        ? (initialProject.can?.createCommittee ?? isLeader)
+        : false;
 
     // Modals state
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -404,14 +413,22 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
         setIsCreateCommitteeModalOpen(true);
     };
 
+    const handleCloseCreateCommitteeModal = () => {
+        if (committeeProcessing) return;
+        setIsCreateCommitteeModalOpen(false);
+        resetCommitteeForm();
+        clearCommitteeErrors();
+    };
+
     const handleCreateCommitteeSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!initialProject) return;
+        if (!initialProject || committeeProcessing) return;
 
         submitCommittee(`/projects/${initialProject.id}/committees`, {
             onSuccess: () => {
                 setIsCreateCommitteeModalOpen(false);
                 resetCommitteeForm();
+                clearCommitteeErrors();
             },
         });
     };
@@ -427,9 +444,17 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
         setIsEditCommitteeModalOpen(true);
     };
 
+    const handleCloseEditCommitteeModal = () => {
+        if (editCommitteeProcessing) return;
+        setIsEditCommitteeModalOpen(false);
+        setEditingCommittee(null);
+        resetEditCommitteeForm();
+        clearEditCommitteeErrors();
+    };
+
     const handleEditCommitteeSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!initialProject || !editingCommittee) return;
+        if (!initialProject || !editingCommittee || editCommitteeProcessing) return;
 
         submitEditCommittee(
             `/projects/${initialProject.id}/committees/${editingCommittee.id}`,
@@ -438,6 +463,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                     setIsEditCommitteeModalOpen(false);
                     setEditingCommittee(null);
                     resetEditCommitteeForm();
+                    clearEditCommitteeErrors();
                 },
             }
         );
@@ -567,7 +593,8 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
         title: initialProject.title,
         description: initialProject.description?.trim() || null,
         status: initialProject.status,
-        role: (initialProject.role ?? 'Project Leader') as ProjectRole,
+        role: initialProject.role ?? null,
+        userCommittee: initialProject.userCommittee ?? null,
         progress: 0,
         deadline: initialProject.end_date ?? 'No deadline specified',
         startDate: initialProject.start_date ?? 'Not set',
@@ -616,7 +643,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
             subtitle="Project Workspace & Hierarchy Overview"
             currentProject={{
                 title: project.title,
-                role: project.role,
+                role: project.role ?? undefined,
                 status: project.status,
             }}
         >
@@ -668,6 +695,11 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             <div className="flex flex-wrap items-center gap-2">
                                 <ProjectStatusBadge status={project.status} />
                                 <ProjectRoleBadge role={project.role} />
+                                {project.userCommittee && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium border bg-slate-50 text-slate-700 border-slate-200">
+                                        <span>Assigned to: {project.userCommittee.name}</span>
+                                    </span>
+                                )}
                             </div>
 
                             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--color-text-main)] leading-snug">
@@ -1080,49 +1112,87 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
 
                                 <div className="space-y-4">
                                     {displayCommittees.length > 0 ? (
-                                        displayCommittees.map((committee) => (
-                                            <Link
-                                                key={committee.id}
-                                                href={`/projects/${project.id}/committees/${committee.id}`}
-                                                className="block p-4 rounded-lg border border-[color:var(--color-border-light)] hover:border-slate-300 transition-colors bg-white space-y-2.5"
-                                            >
-                                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-                                                    <div>
-                                                        <h4 className="text-xs font-bold text-[color:var(--color-text-main)] hover:text-[color:var(--color-brand-action-orange)] transition-colors">
-                                                            {committee.name}
-                                                        </h4>
-                                                        <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
-                                                            Led by {committee.leadName}
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-[11px] font-semibold text-[color:var(--color-text-muted)]">
-                                                            {committee.membersCount} members
-                                                        </span>
-                                                        <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)] min-w-[36px] text-right">
-                                                            {committee.progress}%
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                        displayCommittees.map((committee) => {
+                                            const canViewCommittee = committee.can ? committee.can.view : true;
 
-                                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded-full transition-all duration-300"
-                                                        style={{
-                                                            width: `${committee.progress}%`,
-                                                            backgroundColor: 'var(--color-brand-dark-green)',
-                                                        }}
-                                                    />
+                                            return canViewCommittee ? (
+                                                <Link
+                                                    key={committee.id}
+                                                    href={`/projects/${project.id}/committees/${committee.id}`}
+                                                    className="block p-4 rounded-lg border border-[color:var(--color-border-light)] hover:border-slate-300 transition-colors bg-white space-y-2.5"
+                                                >
+                                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                                                        <div>
+                                                            <h4 className="text-xs font-bold text-[color:var(--color-text-main)] hover:text-[color:var(--color-brand-action-orange)] transition-colors">
+                                                                {committee.name}
+                                                            </h4>
+                                                            <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
+                                                                {committee.head ? `Led by ${committee.head.name}` : 'Unassigned Staff Head'}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-[11px] font-semibold text-[color:var(--color-text-muted)]">
+                                                                {committee.membersCount} {committee.membersCount === 1 ? 'member' : 'members'}
+                                                            </span>
+                                                            <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)] min-w-[36px] text-right">
+                                                                {committee.progress}%
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full transition-all duration-300"
+                                                            style={{
+                                                                width: `${committee.progress}%`,
+                                                                backgroundColor: 'var(--color-brand-dark-green)',
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </Link>
+                                            ) : (
+                                                <div
+                                                    key={committee.id}
+                                                    className="block p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1.5"
+                                                >
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <h4 className="text-xs font-bold text-slate-700">
+                                                                {committee.name}
+                                                            </h4>
+                                                            <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded font-medium">
+                                                                <Lock className="w-2.5 h-2.5 text-slate-400" />
+                                                                <span>Restricted</span>
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[11px] text-slate-400 font-medium">
+                                                            Assigned members only
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-500">
+                                                        Workspace access and details are restricted to assigned committee personnel.
+                                                    </p>
                                                 </div>
-                                            </Link>
-                                        ))
+                                            );
+                                        })
                                     ) : (
                                         <div className="p-6 rounded-lg border border-dashed border-slate-200 text-center">
                                             <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                                             <p className="text-xs font-semibold text-slate-600">No committees established yet</p>
                                             <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
-                                                Functional committees and assigned working groups will appear here once created.
+                                                {canCreateCommittee
+                                                    ? 'Functional committees and assigned working groups will appear here once created.'
+                                                    : 'This project currently has no committees established.'}
                                             </p>
+                                            {canCreateCommittee && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOpenCreateCommittee}
+                                                    className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                                                >
+                                                    <span>+ Create Committee</span>
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -1301,8 +1371,8 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                         Form functional committees, designate staff leads, and assign working groups
                                     </p>
                                 </div>
-                                {isLeader && (
-                                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                                <div className="flex items-center gap-2 self-start sm:self-auto">
+                                    {isLeader && (
                                         <button
                                             type="button"
                                             onClick={handleOpenAssignPersonnel}
@@ -1311,6 +1381,8 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                             <UserPlus className="w-3.5 h-3.5 text-slate-500" />
                                             <span>Assign Personnel</span>
                                         </button>
+                                    )}
+                                    {canCreateCommittee && (
                                         <button
                                             type="button"
                                             onClick={handleOpenCreateCommittee}
@@ -1318,68 +1390,115 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                         >
                                             <span>+ Add Committee</span>
                                         </button>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
 
                             {displayCommittees.length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {displayCommittees.map((committee) => (
-                                        <div
-                                            key={committee.id}
-                                            className="p-5 rounded-xl border border-[color:var(--color-border-light)] bg-white space-y-3.5 shadow-xs hover:border-slate-300 transition-colors flex flex-col justify-between"
-                                        >
-                                            <div className="space-y-2.5">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                                                        Committee
-                                                    </span>
-                                                    <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)]">
-                                                        {committee.progress}%
-                                                    </span>
-                                                </div>
-                                                <h4 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                                    {committee.name}
-                                                </h4>
-                                                {committee.description && (
-                                                    <p className="text-xs text-slate-500 line-clamp-2">
-                                                        {committee.description}
-                                                    </p>
-                                                )}
-                                                <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[color:var(--color-text-subtle)] text-[11px]">Head:</span>
-                                                        <span className="font-semibold text-slate-800">{committee.leadName}</span>
-                                                    </div>
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[color:var(--color-text-subtle)] text-[11px]">Members:</span>
-                                                        <span className="font-semibold text-slate-800">{committee.membersCount} members</span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                    {displayCommittees.map((committee) => {
+                                        const canViewCommittee = committee.can ? committee.can.view : true;
+                                        const canUpdateCommittee = canViewCommittee && (committee.can ? committee.can.update : isLeader);
 
-                                            <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                                                <Link
-                                                    href={`/projects/${project.id}/committees/${committee.id}`}
-                                                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
-                                                >
-                                                    <span>View Committee</span>
-                                                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                                                </Link>
-                                                {isLeader && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleOpenEditCommittee(committee)}
-                                                        className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors cursor-pointer"
-                                                        title="Edit Committee"
-                                                    >
-                                                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
-                                                        <span>Edit</span>
-                                                    </button>
-                                                )}
+                                        return (
+                                            <div
+                                                key={committee.id}
+                                                className={`p-5 rounded-xl border ${canViewCommittee ? 'border-[color:var(--color-border-light)] bg-white hover:border-slate-300' : 'border-slate-200 bg-slate-50/70'} space-y-3.5 shadow-xs transition-colors flex flex-col justify-between`}
+                                            >
+                                                <div className="space-y-2.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                                            Committee
+                                                        </span>
+                                                        {canViewCommittee ? (
+                                                            <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)]">
+                                                                {committee.progress}%
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded">
+                                                                <Lock className="w-2.5 h-2.5 text-slate-400" />
+                                                                <span>Restricted</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-[color:var(--color-text-main)]">
+                                                        {committee.name}
+                                                    </h4>
+                                                    {canViewCommittee ? (
+                                                        committee.description ? (
+                                                            <p className="text-xs text-slate-500 line-clamp-2">
+                                                                {committee.description}
+                                                            </p>
+                                                        ) : (
+                                                            <p className="text-xs text-slate-400 italic">
+                                                                No description provided
+                                                            </p>
+                                                        )
+                                                    ) : (
+                                                        <p className="text-xs text-slate-500 leading-relaxed">
+                                                            This committee workspace is restricted. Access is limited to assigned committee personnel and project leadership.
+                                                        </p>
+                                                    )}
+                                                    {canViewCommittee && (
+                                                        <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[color:var(--color-text-subtle)] text-[11px]">Head:</span>
+                                                                <span className="font-semibold text-slate-800">
+                                                                    {committee.head ? (
+                                                                        <span className="inline-flex items-center gap-1">
+                                                                            <Shield className="w-3 h-3 text-orange-500" />
+                                                                            <span>{committee.head.name}</span>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-slate-400 font-normal italic">Unassigned Staff</span>
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[color:var(--color-text-subtle)] text-[11px]">Members:</span>
+                                                                <span className="font-semibold text-slate-800">
+                                                                    {committee.membersCount} {committee.membersCount === 1 ? 'member' : 'members'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                                                    {canViewCommittee ? (
+                                                        <>
+                                                            <Link
+                                                                href={`/projects/${project.id}/committees/${committee.id}`}
+                                                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors"
+                                                            >
+                                                                <span>View Committee</span>
+                                                                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                                                            </Link>
+                                                            {canUpdateCommittee && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleOpenEditCommittee(committee)}
+                                                                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition-colors cursor-pointer"
+                                                                    title="Edit Committee"
+                                                                >
+                                                                    <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                                                                    <span>Edit</span>
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <span
+                                                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed select-none"
+                                                            title="Access restricted to assigned committee members and Project Leader"
+                                                        >
+                                                            <Lock className="w-3 h-3 text-slate-400" />
+                                                            <span>Restricted Access</span>
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             ) : (
                                 <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50">
@@ -1388,9 +1507,11 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                         No Committees Established
                                     </h4>
                                     <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                                        Organize your project into functional committees. Each committee is headed by a designated Project Staff member and supported by Project Members.
+                                        {isLeader
+                                            ? 'Organize your project into functional committees. Each committee is headed by a designated Project Staff member and supported by Project Members.'
+                                            : 'This project currently has no committees established. Functional committees will be created and organized by the Project Leader.'}
                                     </p>
-                                    {isLeader && (
+                                    {canCreateCommittee && (
                                         <div className="mt-4 flex items-center justify-center gap-2">
                                             <button
                                                 type="button"
@@ -1458,9 +1579,14 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                             </div>
                                         ))}
                                         {(initialProject?.projectStaff ?? []).length === 0 && (
-                                            <p className="text-xs text-slate-400 italic py-2 text-center">
-                                                No Project Staff assigned yet. Assign staff to designate committee heads.
-                                            </p>
+                                            <div className="p-3 rounded-lg border border-dashed border-slate-200 bg-white/70 text-center space-y-1">
+                                                <p className="text-xs font-semibold text-slate-600">No Project Staff Assigned</p>
+                                                <p className="text-[11px] text-slate-400">
+                                                    {isLeader
+                                                        ? 'Assign Project Staff to designate eligible committee heads.'
+                                                        : 'No Project Staff have been assigned to this project yet.'}
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -1494,9 +1620,14 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                             </div>
                                         ))}
                                         {(initialProject?.projectMembers ?? []).length === 0 && (
-                                            <p className="text-xs text-slate-400 italic py-2 text-center">
-                                                No Project Members assigned yet. Assign members to participate in committees.
-                                            </p>
+                                            <div className="p-3 rounded-lg border border-dashed border-slate-200 bg-white/70 text-center space-y-1">
+                                                <p className="text-xs font-semibold text-slate-600">No Project Members Assigned</p>
+                                                <p className="text-[11px] text-slate-400">
+                                                    {isLeader
+                                                        ? 'Assign Project Members to participate in committee working groups.'
+                                                        : 'No Project Members have been assigned to this project yet.'}
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -1879,7 +2010,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                 {/* ── Create Committee Modal ── */}
                 <Modal
                     isOpen={isCreateCommitteeModalOpen}
-                    onClose={() => !committeeProcessing && setIsCreateCommitteeModalOpen(false)}
+                    onClose={handleCloseCreateCommitteeModal}
                     title="Create Committee"
                     description="Establish a functional committee under this project and designate an assigned Project Staff member as head."
                     maxWidth="md"
@@ -1893,6 +2024,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             onChange={(e) => setCommitteeData('name', e.target.value)}
                             error={committeeErrors.name}
                             required
+                            maxLength={255}
                             placeholder="e.g., Logistics & Procurement Committee"
                             autoFocus
                         />
@@ -1929,9 +2061,13 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                     ))}
                                 </select>
                             ) : (
-                                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
-                                    <p>
-                                        No <strong>Project Staff</strong> have been assigned to this project yet. You can create this committee now and assign a committee head later.
+                                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
+                                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                                        <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <span>No Eligible Project Staff Available</span>
+                                    </div>
+                                    <p className="leading-relaxed">
+                                        No eligible Project Staff are currently available for assignment. You can create this committee now and designate a Project Staff head later once staff members are added to the project.
                                     </p>
                                 </div>
                             )}
@@ -1942,7 +2078,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setIsCreateCommitteeModalOpen(false)}
+                                onClick={handleCloseCreateCommitteeModal}
                                 disabled={committeeProcessing}
                             >
                                 Cancel
@@ -1962,7 +2098,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                 {/* ── Edit Committee Modal ── */}
                 <Modal
                     isOpen={isEditCommitteeModalOpen}
-                    onClose={() => !editCommitteeProcessing && setIsEditCommitteeModalOpen(false)}
+                    onClose={handleCloseEditCommitteeModal}
                     title="Edit Committee"
                     description="Update committee name, charter description, or designated Project Staff head."
                     maxWidth="md"
@@ -1976,6 +2112,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             onChange={(e) => setEditCommitteeData('name', e.target.value)}
                             error={editCommitteeErrors.name}
                             required
+                            maxLength={255}
                             placeholder="e.g., Logistics & Procurement Committee"
                             autoFocus
                         />
@@ -2012,8 +2149,14 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                     ))}
                                 </select>
                             ) : (
-                                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
-                                    <p>No Project Staff assigned yet to this project.</p>
+                                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
+                                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                                        <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <span>No Eligible Project Staff Available</span>
+                                    </div>
+                                    <p className="leading-relaxed">
+                                        No eligible Project Staff are currently available for assignment in this project. Assign Project Staff in the project roster to designate a committee head.
+                                    </p>
                                 </div>
                             )}
                             <InputError message={editCommitteeErrors.user_id} />
@@ -2023,7 +2166,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setIsEditCommitteeModalOpen(false)}
+                                onClick={handleCloseEditCommitteeModal}
                                 disabled={editCommitteeProcessing}
                             >
                                 Cancel
@@ -2068,9 +2211,15 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                                     ))}
                                 </select>
                             ) : (
-                                <p className="text-xs text-slate-500 italic p-2 rounded bg-slate-50 border border-slate-200">
-                                    All eligible institutional users are already assigned to this project.
-                                </p>
+                                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+                                    <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                                        <Info className="w-4 h-4 text-slate-500 shrink-0" />
+                                        <span>No Eligible Personnel Available</span>
+                                    </div>
+                                    <p className="leading-relaxed">
+                                        All eligible institutional users are already assigned to this project, or no verified users are available.
+                                    </p>
+                                </div>
                             )}
                             <InputError message={personnelErrors.user_id} />
                         </div>

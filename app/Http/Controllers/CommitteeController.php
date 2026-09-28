@@ -81,6 +81,9 @@ class CommitteeController extends Controller
                     $q->whereNull('committee_id')
                         ->orWhere('committee_id', '!=', $committee->id);
                 })
+                ->whereHas('user', function ($q) {
+                    $q->whereNotNull('email_verified_at');
+                })
                 ->with('user')
                 ->get()
                 ->map(fn ($assignment) => [
@@ -99,12 +102,14 @@ class CommitteeController extends Controller
                 ->whereHas('user', function ($q) {
                     $q->whereNotNull('email_verified_at');
                 })
-                ->with('user')
+                ->with(['user', 'committee'])
                 ->get()
                 ->map(fn ($assignment) => [
                     'id' => $assignment->user->id,
                     'name' => $assignment->user->name,
                     'email' => $assignment->user->email,
+                    'committee_id' => $assignment->committee_id ? (string) $assignment->committee_id : null,
+                    'committee_name' => $assignment->committee?->name,
                 ])
                 ->values()
                 ->all()
@@ -161,7 +166,7 @@ class CommitteeController extends Controller
                 'id' => (string) $project->id,
                 'title' => $project->title,
                 'status' => $project->status,
-                'role' => $userRole ?? 'Project Member',
+                'role' => $userRole,
             ],
             'committee' => $committeeData,
             'availableMembers' => $availableMembers,

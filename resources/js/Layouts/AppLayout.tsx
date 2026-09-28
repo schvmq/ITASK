@@ -155,19 +155,8 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogout }: SidebarContentProps) {
-    // Determine active project display:
-    // 1. Explicit currentProject passed in props
-    // 2. Or fallback when inside /projects/{project} route
-    // 3. Otherwise (/dashboard, /projects, etc.) remains null (No project selected)
-    const isInsideProjectRoute =
-        currentPage.startsWith('/projects/') && currentPage.replace(/\/+$/, '') !== '/projects';
-
-    const activeProject =
-        currentProject !== undefined
-            ? currentProject
-            : isInsideProjectRoute
-            ? { title: 'CCIS General Assembly 2026', role: 'Project Leader', status: 'In Progress' }
-            : null;
+    // Determine active project display from explicitly passed currentProject prop
+    const activeProject = currentProject ?? null;
 
     return (
         <div className="flex flex-col h-full">
@@ -247,7 +236,7 @@ function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogou
                             </p>
                             <p className="text-[10px] text-orange-200/50 leading-snug">
                                 {activeProject
-                                    ? `${activeProject.role || 'Member'} · ${activeProject.status || 'Active'}`
+                                    ? `${activeProject.role || 'No project role'}${activeProject.status ? ` · ${activeProject.status}` : ''}`
                                     : 'Select from Projects'}
                             </p>
                         </div>
