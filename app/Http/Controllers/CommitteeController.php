@@ -146,6 +146,8 @@ class CommitteeController extends Controller
                 'title' => $act->title,
                 'description' => $act->description,
                 'status' => $act->status,
+                'start_date' => $act->start_date?->format('M d, Y'),
+                'start_date_raw' => $act->start_date?->format('Y-m-d'),
                 'due_date' => $act->due_date?->format('M d, Y'),
                 'due_date_raw' => $act->due_date?->format('Y-m-d'),
                 'tasks_count' => $act->tasks->count(),

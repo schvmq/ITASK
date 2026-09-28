@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { Modal } from '@/Components/Modal';
@@ -9,19 +9,22 @@ import { Button } from '@/Components/Button';
 import {
     ArrowLeft,
     Calendar,
+    Check,
     CheckCircle2,
+    CheckSquare,
     ChevronRight,
     Clock,
     Edit3,
     Layers,
     ListTodo,
     Plus,
+    RotateCcw,
     Send,
     Shield,
     Trash2,
     User,
     AlertTriangle,
-    RotateCcw,
+    X,
 } from 'lucide-react';
 
 interface AssigneeItem {
@@ -30,19 +33,30 @@ interface AssigneeItem {
     email: string;
 }
 
+export interface ChecklistItemData {
+    id: string;
+    content: string;
+    is_completed: boolean;
+    order: number;
+}
+
+export type TaskStatus = 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned';
+
 export interface TaskItem {
     id: string;
     title: string;
     description: string | null;
-    status: 'To Do' | 'In Progress' | 'Completed';
+    status: TaskStatus;
     due_date: string | null;
     due_date_raw: string | null;
     assignee: AssigneeItem | null;
     is_assigned_to_me?: boolean;
+    checklist_items: ChecklistItemData[];
     can: {
         update: boolean;
         delete: boolean;
         updateStatus?: boolean;
+        manageChecklist?: boolean;
     };
 }
 
@@ -50,7 +64,9 @@ export interface ActivityData {
     id: string;
     title: string;
     description: string | null;
-    status: 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned for Revision';
+    status: 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned' | 'Returned for Revision';
+    start_date: string | null;
+    start_date_raw: string | null;
     due_date: string | null;
     due_date_raw: string | null;
     submission_notes?: string | null;
@@ -110,6 +126,7 @@ export default function ActivityShow({
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
     const [deletingTask, setDeletingTask] = useState<TaskItem | null>(null);
+    const [viewingTask, setViewingTask] = useState<TaskItem | null>(null);
     const [isEditActivityModalOpen, setIsEditActivityModalOpen] = useState(false);
     const [isDeleteActivityModalOpen, setIsDeleteActivityModalOpen] = useState(false);
     const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -117,6 +134,24 @@ export default function ActivityShow({
     const [isReviewReturnModalOpen, setIsReviewReturnModalOpen] = useState(false);
     const [actionProcessing, setActionProcessing] = useState(false);
     const [statusUpdatingTaskId, setStatusUpdatingTaskId] = useState<string | null>(null);
+
+    // Checklist interaction state
+    const [newChecklistContent, setNewChecklistContent] = useState('');
+    const [checklistProcessing, setChecklistProcessing] = useState(false);
+    const [checklistError, setChecklistError] = useState<string | null>(null);
+    const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+    const [editingChecklistContent, setEditingChecklistContent] = useState('');
+    const [deletingChecklistItem, setDeletingChecklistItem] = useState<ChecklistItemData | null>(null);
+
+    // Sync viewingTask with incoming activity props when tasks change
+    useEffect(() => {
+        if (viewingTask) {
+            const fresh = activity.tasks.find((t) => String(t.id) === String(viewingTask.id));
+            if (fresh) {
+                setViewingTask(fresh);
+            }
+        }
+    }, [activity.tasks]);
 
     // Create Task Form
     const {
@@ -131,7 +166,7 @@ export default function ActivityShow({
         title: '',
         description: '',
         due_date: '',
-        status: 'To Do' as 'To Do' | 'In Progress' | 'Completed',
+        status: 'To Do' as TaskStatus,
         assigned_to: '',
     });
 
@@ -147,7 +182,7 @@ export default function ActivityShow({
         title: '',
         description: '',
         due_date: '',
-        status: 'To Do' as 'To Do' | 'In Progress' | 'Completed',
+        status: 'To Do' as TaskStatus,
         assigned_to: '',
     });
 
@@ -162,6 +197,7 @@ export default function ActivityShow({
     } = useForm({
         title: activity.title,
         description: activity.description ?? '',
+        start_date: activity.start_date_raw ?? '',
         due_date: activity.due_date_raw ?? '',
         status: activity.status,
     });
@@ -271,6 +307,7 @@ export default function ActivityShow({
         setEditActivityData({
             title: activity.title,
             description: activity.description ?? '',
+            start_date: activity.start_date_raw ?? '',
             due_date: activity.due_date_raw ?? '',
             status: activity.status,
         });
@@ -298,6 +335,98 @@ export default function ActivityShow({
                 onSuccess: () => {
                     setIsDeleteActivityModalOpen(false);
                 },
+            }
+        );
+    };
+
+    // Checklist handlers
+    const handleToggleChecklist = (task: TaskItem, item: ChecklistItemData) => {
+        if (!task.can.manageChecklist) return;
+
+        setChecklistProcessing(true);
+        router.patch(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
+            { is_completed: !item.is_completed },
+            {
+                preserveScroll: true,
+                onFinish: () => setChecklistProcessing(false),
+            }
+        );
+    };
+
+    const handleAddChecklistItem = (e: React.FormEvent, task: TaskItem) => {
+        e.preventDefault();
+        const content = newChecklistContent.trim();
+        if (!content) {
+            setChecklistError('The checklist item content is required.');
+            return;
+        }
+        if (content.length > 500) {
+            setChecklistError('Checklist item content cannot exceed 500 characters.');
+            return;
+        }
+
+        setChecklistError(null);
+        setChecklistProcessing(true);
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist`,
+            {
+                content,
+                is_completed: false,
+                order: task.checklist_items ? task.checklist_items.length : 0,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setNewChecklistContent('');
+                },
+                onError: (err) => {
+                    if (err.content) setChecklistError(err.content);
+                },
+                onFinish: () => setChecklistProcessing(false),
+            }
+        );
+    };
+
+    const handleSaveEditChecklist = (task: TaskItem, item: ChecklistItemData) => {
+        const content = editingChecklistContent.trim();
+        if (!content) {
+            setChecklistError('The checklist item content is required.');
+            return;
+        }
+        if (content === item.content) {
+            setEditingChecklistId(null);
+            return;
+        }
+
+        setChecklistError(null);
+        setChecklistProcessing(true);
+        router.patch(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
+            { content },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditingChecklistId(null);
+                },
+                onError: (err) => {
+                    if (err.content) setChecklistError(err.content);
+                },
+                onFinish: () => setChecklistProcessing(false),
+            }
+        );
+    };
+
+    const handleDeleteChecklist = (task: TaskItem, item: ChecklistItemData) => {
+        setChecklistProcessing(true);
+        router.delete(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setDeletingChecklistItem(null);
+                },
+                onFinish: () => setChecklistProcessing(false),
             }
         );
     };
@@ -360,6 +489,7 @@ export default function ActivityShow({
                 return 'bg-blue-50 text-blue-700 border-blue-200';
             case 'Under Review':
                 return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'Returned':
             case 'Returned for Revision':
                 return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'To Do':
@@ -374,6 +504,10 @@ export default function ActivityShow({
                 return 'bg-emerald-50 text-emerald-700 border-emerald-200';
             case 'In Progress':
                 return 'bg-blue-50 text-blue-700 border-blue-200';
+            case 'Under Review':
+                return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'Returned':
+                return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'To Do':
             default:
                 return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -420,7 +554,7 @@ export default function ActivityShow({
                 {/* ── Workflow Status Banners ── */}
 
                 {/* 1. Returned for Revision Banner */}
-                {activity.status === 'Returned for Revision' && (
+                {(activity.status === 'Returned' || activity.status === 'Returned for Revision') && (
                     <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -556,6 +690,12 @@ export default function ActivityShow({
                             </h1>
 
                             <div className="flex items-center gap-4 text-xs text-[color:var(--color-text-subtle)] flex-wrap pt-1">
+                                {activity.start_date && (
+                                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                        <span>Start: {activity.start_date}</span>
+                                    </span>
+                                )}
                                 {activity.due_date && (
                                     <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
                                         <Calendar className="w-3.5 h-3.5 text-slate-500" />
@@ -693,90 +833,120 @@ export default function ActivityShow({
 
                     {activity.tasks.length > 0 ? (
                         <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                            {activity.tasks.map((task) => (
-                                <div
-                                    key={task.id}
-                                    className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/70 transition-colors"
-                                >
-                                    <div className="space-y-1.5 max-w-xl">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            {/* Status Badge or Member Status Dropdown */}
-                                            {task.can.updateStatus ? (
-                                                <select
-                                                    value={task.status}
-                                                    onChange={(e) =>
-                                                        handleTaskStatusChange(task, e.target.value as TaskItem['status'])
-                                                    }
-                                                    disabled={statusUpdatingTaskId === task.id}
-                                                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors ${getTaskStatusBadge(
-                                                        task.status
-                                                    )}`}
-                                                    title="Click to update task status"
-                                                >
-                                                    <option value="To Do">To Do</option>
-                                                    <option value="In Progress">In Progress</option>
-                                                    <option value="Completed">Completed</option>
-                                                </select>
-                                            ) : (
-                                                <span
-                                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getTaskStatusBadge(
-                                                        task.status
-                                                    )}`}
-                                                >
-                                                    {task.status}
-                                                </span>
-                                            )}
-                                            <h4 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                                {task.title}
-                                            </h4>
-                                        </div>
-                                        {task.description && (
-                                            <p className="text-xs text-slate-500 line-clamp-2">
-                                                {task.description}
-                                            </p>
-                                        )}
-                                        <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-0.5">
-                                            {task.due_date && (
-                                                <span className="flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3 text-slate-400" />
-                                                    <span>Due: {task.due_date}</span>
-                                                </span>
-                                            )}
-                                            <span className="flex items-center gap-1">
-                                                <User className="w-3 h-3 text-slate-400" />
-                                                <span>
-                                                    {task.assignee ? task.assignee.name : 'Unassigned'}
-                                                    {task.is_assigned_to_me ? ' (You)' : ''}
-                                                </span>
-                                            </span>
-                                        </div>
-                                    </div>
+                            {activity.tasks.map((task) => {
+                                const checklistCount = task.checklist_items ? task.checklist_items.length : 0;
+                                const checklistCompleted = task.checklist_items
+                                    ? task.checklist_items.filter((i) => i.is_completed).length
+                                    : 0;
 
-                                    {/* Task Management Actions for Project Staff */}
-                                    <div className="flex items-center gap-1.5 self-start sm:self-center shrink-0">
-                                        {task.can.update && (
+                                return (
+                                    <div
+                                        key={task.id}
+                                        className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/70 transition-colors"
+                                    >
+                                        <div className="space-y-1.5 max-w-xl">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {/* Status Badge or Member Status Dropdown */}
+                                                {task.can.updateStatus ? (
+                                                    <select
+                                                        value={task.status}
+                                                        onChange={(e) =>
+                                                            handleTaskStatusChange(task, e.target.value as TaskStatus)
+                                                        }
+                                                        disabled={statusUpdatingTaskId === task.id}
+                                                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors ${getTaskStatusBadge(
+                                                            task.status
+                                                        )}`}
+                                                        title="Click to update task status"
+                                                    >
+                                                        <option value="To Do">To Do</option>
+                                                        <option value="In Progress">In Progress</option>
+                                                        <option value="Under Review">Under Review</option>
+                                                        <option value="Completed">Completed</option>
+                                                        <option value="Returned">Returned</option>
+                                                    </select>
+                                                ) : (
+                                                    <span
+                                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getTaskStatusBadge(
+                                                            task.status
+                                                        )}`}
+                                                    >
+                                                        {task.status}
+                                                    </span>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewingTask(task)}
+                                                    className="text-sm font-bold text-[color:var(--color-text-main)] hover:text-[color:var(--color-brand-action-orange)] transition-colors text-left cursor-pointer"
+                                                >
+                                                    {task.title}
+                                                </button>
+                                            </div>
+                                            {task.description && (
+                                                <p className="text-xs text-slate-500 line-clamp-2">
+                                                    {task.description}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-0.5 flex-wrap">
+                                                {task.due_date && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="w-3 h-3 text-slate-400" />
+                                                        <span>Due: {task.due_date}</span>
+                                                    </span>
+                                                )}
+                                                <span className="flex items-center gap-1">
+                                                    <User className="w-3 h-3 text-slate-400" />
+                                                    <span>
+                                                        {task.assignee ? task.assignee.name : 'Unassigned'}
+                                                        {task.is_assigned_to_me ? ' (You)' : ''}
+                                                    </span>
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewingTask(task)}
+                                                    className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                                >
+                                                    <CheckSquare className="w-3 h-3 text-slate-400" />
+                                                    <span>
+                                                        Checklist ({checklistCompleted}/{checklistCount})
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Task Management Actions */}
+                                        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
                                             <button
                                                 type="button"
-                                                onClick={() => handleOpenEditTask(task)}
-                                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                                title="Edit Task"
+                                                onClick={() => setViewingTask(task)}
+                                                className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
                                             >
-                                                <Edit3 className="w-4 h-4" />
+                                                Details & Checklist
                                             </button>
-                                        )}
-                                        {task.can.delete && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setDeletingTask(task)}
-                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                                title="Delete Task"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
+                                            {task.can.update && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenEditTask(task)}
+                                                    className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                                    title="Edit Task"
+                                                >
+                                                    <Edit3 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            {task.can.delete && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeletingTask(task)}
+                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                    title="Delete Task"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50">
@@ -802,11 +972,334 @@ export default function ActivityShow({
                     )}
                 </div>
 
+                {/* ── Task Details & Checklist Modal ── */}
+                <Modal
+                    isOpen={viewingTask !== null}
+                    onClose={() => {
+                        setViewingTask(null);
+                        setEditingChecklistId(null);
+                        setChecklistError(null);
+                    }}
+                    title={viewingTask?.title ?? 'Task Details'}
+                    description={`Activity: ${activity.title} • Committee: ${committee.name}`}
+                    maxWidth="lg"
+                >
+                    {viewingTask && (
+                        <div className="space-y-5 pt-1">
+                            {/* Meta Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                        Status
+                                    </span>
+                                    {viewingTask.can.updateStatus ? (
+                                        <select
+                                            value={viewingTask.status}
+                                            onChange={(e) =>
+                                                handleTaskStatusChange(viewingTask, e.target.value as TaskStatus)
+                                            }
+                                            disabled={statusUpdatingTaskId === viewingTask.id}
+                                            className={`text-xs font-semibold px-2.5 py-1 rounded-md border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors ${getTaskStatusBadge(
+                                                viewingTask.status
+                                            )}`}
+                                        >
+                                            <option value="To Do">To Do</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Under Review">Under Review</option>
+                                            <option value="Completed">Completed</option>
+                                            <option value="Returned">Returned</option>
+                                        </select>
+                                    ) : (
+                                        <span
+                                            className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-md border ${getTaskStatusBadge(
+                                                viewingTask.status
+                                            )}`}
+                                        >
+                                            {viewingTask.status}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                        Assignee
+                                    </span>
+                                    <span className="text-xs font-medium text-slate-800 flex items-center gap-1.5">
+                                        <User className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>
+                                            {viewingTask.assignee ? viewingTask.assignee.name : 'Unassigned'}
+                                            {viewingTask.is_assigned_to_me ? ' (You)' : ''}
+                                        </span>
+                                    </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                        Target Due Date
+                                    </span>
+                                    <span className="text-xs font-medium text-slate-800 flex items-center gap-1.5">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                        <span>{viewingTask.due_date ?? 'No deadline set'}</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Task Description */}
+                            {viewingTask.description && (
+                                <div className="space-y-1">
+                                    <span className="text-xs font-semibold text-slate-700">Description</span>
+                                    <p className="text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 leading-relaxed whitespace-pre-line">
+                                        {viewingTask.description}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Checklist Section */}
+                            <div className="space-y-3 pt-3 border-t border-slate-200">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                            <CheckSquare className="w-4 h-4 text-[color:var(--color-brand-action-orange)]" />
+                                            <span>Task Checklist</span>
+                                        </h4>
+                                        <p className="text-[11px] text-slate-500">
+                                            Actionable items and deliverables to complete for this task
+                                        </p>
+                                    </div>
+                                    {/* Progress indicator */}
+                                    <div className="text-left sm:text-right">
+                                        <span className="text-xs font-bold text-slate-800">
+                                            {viewingTask.checklist_items?.filter((i) => i.is_completed).length ?? 0} /{' '}
+                                            {viewingTask.checklist_items?.length ?? 0} completed
+                                        </span>
+                                        <div className="w-32 h-1.5 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                                            <div
+                                                className="h-full bg-[color:var(--color-brand-dark-green)] transition-all duration-300 rounded-full"
+                                                style={{
+                                                    width: `${
+                                                        viewingTask.checklist_items &&
+                                                        viewingTask.checklist_items.length > 0
+                                                            ? Math.round(
+                                                                  (viewingTask.checklist_items.filter(
+                                                                      (i) => i.is_completed
+                                                                  ).length /
+                                                                      viewingTask.checklist_items.length) *
+                                                                      100
+                                                              )
+                                                            : 0
+                                                    }%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Items List */}
+                                <div className="space-y-2">
+                                    {viewingTask.checklist_items && viewingTask.checklist_items.length > 0 ? (
+                                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                            {viewingTask.checklist_items.map((item) => (
+                                                <div
+                                                    key={item.id}
+                                                    className={`p-3 flex items-start justify-between gap-3 transition-colors ${
+                                                        item.is_completed ? 'bg-slate-50/70' : 'hover:bg-slate-50/40'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                                        <button
+                                                            type="button"
+                                                            disabled={
+                                                                !viewingTask.can.manageChecklist || checklistProcessing
+                                                            }
+                                                            onClick={() => handleToggleChecklist(viewingTask, item)}
+                                                            className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                                                                item.is_completed
+                                                                    ? 'bg-[color:var(--color-brand-action-orange)] border-[color:var(--color-brand-action-orange)] text-white'
+                                                                    : 'border-slate-300 hover:border-slate-400 bg-white'
+                                                            } ${
+                                                                viewingTask.can.manageChecklist
+                                                                    ? 'cursor-pointer'
+                                                                    : 'cursor-not-allowed opacity-75'
+                                                            }`}
+                                                            title={
+                                                                viewingTask.can.manageChecklist
+                                                                    ? item.is_completed
+                                                                        ? 'Mark incomplete'
+                                                                        : 'Mark complete'
+                                                                    : 'Only Project Staff or Leader can toggle checklist items'
+                                                            }
+                                                        >
+                                                            {item.is_completed && (
+                                                                <Check className="w-3 h-3 stroke-[3]" />
+                                                            )}
+                                                        </button>
+
+                                                        {editingChecklistId === item.id ? (
+                                                            <div className="flex-1 space-y-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={editingChecklistContent}
+                                                                    onChange={(e) =>
+                                                                        setEditingChecklistContent(e.target.value)
+                                                                    }
+                                                                    className="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                                    autoFocus
+                                                                    maxLength={500}
+                                                                />
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            handleSaveEditChecklist(viewingTask, item)
+                                                                        }
+                                                                        disabled={checklistProcessing}
+                                                                        className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 transition-opacity"
+                                                                    >
+                                                                        Save
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEditingChecklistId(null)}
+                                                                        className="px-2 py-0.5 rounded text-[11px] text-slate-600 hover:bg-slate-100 transition-colors"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span
+                                                                className={`text-xs leading-relaxed break-words flex-1 ${
+                                                                    item.is_completed
+                                                                        ? 'line-through text-slate-400'
+                                                                        : 'text-slate-700'
+                                                                }`}
+                                                            >
+                                                                {item.content}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {viewingTask.can.manageChecklist &&
+                                                        editingChecklistId !== item.id && (
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingChecklistId(item.id);
+                                                                        setEditingChecklistContent(item.content);
+                                                                    }}
+                                                                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                                                    title="Edit item"
+                                                                >
+                                                                    <Edit3 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleDeleteChecklist(viewingTask, item)
+                                                                    }
+                                                                    disabled={checklistProcessing}
+                                                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                                                    title="Delete item"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50 text-xs text-slate-500">
+                                            No checklist items created for this task yet.
+                                        </div>
+                                    )}
+
+                                    {/* Add Checklist Item Form */}
+                                    {viewingTask.can.manageChecklist && (
+                                        <form
+                                            onSubmit={(e) => handleAddChecklistItem(e, viewingTask)}
+                                            className="pt-2"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newChecklistContent}
+                                                    onChange={(e) => setNewChecklistContent(e.target.value)}
+                                                    placeholder="Add a new checklist item..."
+                                                    maxLength={500}
+                                                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
+                                                />
+                                                <Button
+                                                    type="submit"
+                                                    variant="primary"
+                                                    size="sm"
+                                                    disabled={checklistProcessing || !newChecklistContent.trim()}
+                                                    isLoading={checklistProcessing}
+                                                >
+                                                    <Plus className="w-3.5 h-3.5 mr-1" />
+                                                    <span>Add Item</span>
+                                                </Button>
+                                            </div>
+                                            {checklistError && (
+                                                <p className="text-[11px] text-rose-600 mt-1 font-medium">
+                                                    {checklistError}
+                                                </p>
+                                            )}
+                                        </form>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <div>
+                                    {viewingTask.can.delete && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeletingTask(viewingTask);
+                                                setViewingTask(null);
+                                            }}
+                                            className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 cursor-pointer"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span>Delete Task</span>
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {viewingTask.can.update && viewingTask.can.delete && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                                handleOpenEditTask(viewingTask);
+                                                setViewingTask(null);
+                                            }}
+                                        >
+                                            <Edit3 className="w-3.5 h-3.5 mr-1" />
+                                            <span>Edit Task</span>
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => setViewingTask(null)}
+                                    >
+                                        Close
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </Modal>
+
                 {/* ── Submit for Review Modal ── */}
                 <Modal
                     isOpen={isSubmitModalOpen}
                     onClose={() => !submitProcessing && setIsSubmitModalOpen(false)}
-                    title={activity.status === 'Returned for Revision' ? 'Resubmit Activity for Review' : 'Submit Activity for Review'}
+                    title={activity.status === 'Returned for Revision' || activity.status === 'Returned' ? 'Resubmit Activity for Review' : 'Submit Activity for Review'}
                     description={`Submit "${activity.title}" to Project Staff for verification and approval.`}
                     maxWidth="md"
                 >
@@ -1000,14 +1493,16 @@ export default function ActivityShow({
                                     onChange={(e) =>
                                         setTaskData(
                                             'status',
-                                            e.target.value as TaskItem['status']
+                                            e.target.value as TaskStatus
                                         )
                                     }
                                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
                                 >
                                     <option value="To Do">To Do</option>
                                     <option value="In Progress">In Progress</option>
+                                    <option value="Under Review">Under Review</option>
                                     <option value="Completed">Completed</option>
+                                    <option value="Returned">Returned</option>
                                 </select>
                                 <InputError message={taskErrors.status} />
                             </div>
@@ -1104,14 +1599,16 @@ export default function ActivityShow({
                                     onChange={(e) =>
                                         setEditTaskData(
                                             'status',
-                                            e.target.value as TaskItem['status']
+                                            e.target.value as TaskStatus
                                         )
                                     }
                                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
                                 >
                                     <option value="To Do">To Do</option>
                                     <option value="In Progress">In Progress</option>
+                                    <option value="Under Review">Under Review</option>
                                     <option value="Completed">Completed</option>
+                                    <option value="Returned">Returned</option>
                                 </select>
                                 <InputError message={editTaskErrors.status} />
                             </div>
@@ -1225,36 +1722,45 @@ export default function ActivityShow({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
-                                label="Target Due Date"
+                                label="Start Date (Optional)"
+                                id="edit-activity-start-date"
+                                type="date"
+                                value={editActivityData.start_date}
+                                onChange={(e) => setEditActivityData('start_date', e.target.value)}
+                                error={editActivityErrors.start_date}
+                            />
+
+                            <FormField
+                                label="Target Due Date (Optional)"
                                 id="edit-activity-due-date"
                                 type="date"
                                 value={editActivityData.due_date}
                                 onChange={(e) => setEditActivityData('due_date', e.target.value)}
                                 error={editActivityErrors.due_date}
                             />
+                        </div>
 
-                            <div className="space-y-1">
-                                <Label htmlFor="edit-activity-status">Status</Label>
-                                <select
-                                    id="edit-activity-status"
-                                    name="status"
-                                    value={editActivityData.status}
-                                    onChange={(e) =>
-                                        setEditActivityData(
-                                            'status',
-                                            e.target.value as ActivityData['status']
-                                        )
-                                    }
-                                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
-                                >
-                                    <option value="To Do">To Do</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Under Review">Under Review</option>
-                                    <option value="Returned for Revision">Returned for Revision</option>
-                                    <option value="Completed">Completed</option>
-                                </select>
-                                <InputError message={editActivityErrors.status} />
-                            </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="edit-activity-status">Status</Label>
+                            <select
+                                id="edit-activity-status"
+                                name="status"
+                                value={editActivityData.status}
+                                onChange={(e) =>
+                                    setEditActivityData(
+                                        'status',
+                                        e.target.value as ActivityData['status']
+                                    )
+                                }
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                            >
+                                <option value="To Do">To Do</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Under Review">Under Review</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Returned">Returned</option>
+                            </select>
+                            <InputError message={editActivityErrors.status} />
                         </div>
 
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">

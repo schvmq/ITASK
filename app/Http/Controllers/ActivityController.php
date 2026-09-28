@@ -7,6 +7,7 @@ use App\Http\Requests\StoreActivityRequest;
 use App\Http\Requests\SubmitActivityRequest;
 use App\Http\Requests\UpdateActivityRequest;
 use App\Models\Activity;
+use App\Models\ChecklistItem;
 use App\Models\Committee;
 use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
@@ -140,9 +141,10 @@ class ActivityController extends Controller
                     'order'        => $item->order,
                 ])->values()->all(),
                 'can' => [
-                    'update'       => $user ? Gate::forUser($user)->allows('update', $task) : false,
-                    'delete'       => $user ? Gate::forUser($user)->allows('delete', $task) : false,
-                    'updateStatus' => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
+                    'update'          => $user ? Gate::forUser($user)->allows('update', $task) : false,
+                    'delete'          => $user ? Gate::forUser($user)->allows('delete', $task) : false,
+                    'updateStatus'    => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
+                    'manageChecklist' => $user ? Gate::forUser($user)->allows('create', [ChecklistItem::class, $task]) : false,
                 ],
             ])->values()->all(),
         ];

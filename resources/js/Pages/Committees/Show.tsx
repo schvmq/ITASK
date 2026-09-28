@@ -46,6 +46,8 @@ export interface CommitteeActivityItem {
     title: string;
     description: string | null;
     status: string;
+    start_date?: string | null;
+    start_date_raw?: string | null;
     due_date: string | null;
     due_date_raw: string | null;
     tasks_count: number;
@@ -173,6 +175,7 @@ export default function CommitteeShow({
     } = useForm({
         title: '',
         description: '',
+        start_date: '',
         due_date: '',
     });
 
@@ -363,6 +366,7 @@ export default function CommitteeShow({
                 return 'bg-blue-50 text-blue-700 border-blue-200';
             case 'Under Review':
                 return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'Returned':
             case 'Returned for Revision':
                 return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'To Do':
@@ -746,11 +750,14 @@ export default function CommitteeShow({
                                                 {act.description}
                                             </p>
                                         )}
-                                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-1">
                                             <span>
                                                 {act.tasks_count} tasks ({act.completed_tasks_count} done)
                                             </span>
-                                            {act.due_date && <span>Due: {act.due_date}</span>}
+                                            <div className="flex items-center gap-2">
+                                                {act.start_date && <span>Start: {act.start_date}</span>}
+                                                {act.due_date && <span>Due: {act.due_date}</span>}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -1213,14 +1220,24 @@ export default function CommitteeShow({
                             <InputError message={activityErrors.description} />
                         </div>
 
-                        <FormField
-                            label="Target Due Date (Optional)"
-                            id="create-activity-due-date"
-                            type="date"
-                            value={activityData.due_date}
-                            onChange={(e) => setActivityData('due_date', e.target.value)}
-                            error={activityErrors.due_date}
-                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <FormField
+                                label="Start Date (Optional)"
+                                id="create-activity-start-date"
+                                type="date"
+                                value={activityData.start_date}
+                                onChange={(e) => setActivityData('start_date', e.target.value)}
+                                error={activityErrors.start_date}
+                            />
+                            <FormField
+                                label="Target Due Date (Optional)"
+                                id="create-activity-due-date"
+                                type="date"
+                                value={activityData.due_date}
+                                onChange={(e) => setActivityData('due_date', e.target.value)}
+                                error={activityErrors.due_date}
+                            />
+                        </div>
 
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                             <Button
