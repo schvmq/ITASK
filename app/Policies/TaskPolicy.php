@@ -130,4 +130,48 @@ class TaskPolicy
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
     }
+
+    /**
+     * Determine whether the user can submit the task for staff review.
+     * Allowed only for the assigned Project Member in this committee.
+     */
+    public function submitReview(User $user, Task $task): bool
+    {
+        if ((int) $task->assigned_to !== (int) $user->id) {
+            return false;
+        }
+
+        return $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+            ->exists();
+    }
+
+    /**
+     * Determine whether the user can review (approve or return) the task.
+     * Allowed only for Project Staff assigned to this specific committee.
+     */
+    public function review(User $user, Task $task): bool
+    {
+        return $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->exists();
+    }
+
+    /**
+     * Determine whether the user can resubmit a returned task.
+     * Allowed only for the assigned Project Member in this committee.
+     */
+    public function resubmit(User $user, Task $task): bool
+    {
+        if ((int) $task->assigned_to !== (int) $user->id) {
+            return false;
+        }
+
+        return $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+            ->exists();
+    }
 }

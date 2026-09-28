@@ -57,6 +57,7 @@ class StoreTaskRequest extends FormRequest
             'description' => ['nullable', 'string'],
             'due_date' => ['nullable', 'date'],
             'status' => ['sometimes', 'string', Rule::in(Task::STATUSES)],
+            'requires_review' => ['nullable', 'boolean'],
             'assigned_to' => [
                 'nullable',
                 'integer',
@@ -99,6 +100,7 @@ class StoreTaskRequest extends FormRequest
             'due_date.date' => 'The due date must be a valid date.',
             'status.in' => 'The selected task status is invalid.',
             'assigned_to.exists' => 'The selected user was not found.',
+            'requires_review.boolean' => 'The requires review field must be true or false.',
         ];
     }
 }

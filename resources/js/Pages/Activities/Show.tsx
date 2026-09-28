@@ -47,6 +47,7 @@ export interface TaskItem {
     title: string;
     description: string | null;
     status: TaskStatus;
+    requires_review?: boolean;
     due_date: string | null;
     due_date_raw: string | null;
     assignee: AssigneeItem | null;
@@ -57,6 +58,9 @@ export interface TaskItem {
         delete: boolean;
         updateStatus?: boolean;
         manageChecklist?: boolean;
+        submitReview?: boolean;
+        review?: boolean;
+        resubmit?: boolean;
     };
 }
 

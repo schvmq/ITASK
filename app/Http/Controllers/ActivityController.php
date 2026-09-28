@@ -126,6 +126,7 @@ class ActivityController extends Controller
                 'title'           => $task->title,
                 'description'     => $task->description,
                 'status'          => $task->status,
+                'requires_review' => (bool) $task->requires_review,
                 'due_date'        => $task->due_date?->format('M d, Y'),
                 'due_date_raw'    => $task->due_date?->format('Y-m-d'),
                 'is_assigned_to_me' => $user ? (int) $task->assigned_to === (int) $user->id : false,
@@ -145,6 +146,9 @@ class ActivityController extends Controller
                     'delete'          => $user ? Gate::forUser($user)->allows('delete', $task) : false,
                     'updateStatus'    => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
                     'manageChecklist' => $user ? Gate::forUser($user)->allows('create', [ChecklistItem::class, $task]) : false,
+                    'submitReview'    => $user ? Gate::forUser($user)->allows('submitReview', $task) && $task->requires_review && in_array($task->status, [Task::STATUS_TO_DO, Task::STATUS_IN_PROGRESS], true) : false,
+                    'review'          => $user ? Gate::forUser($user)->allows('review', $task) && $task->status === Task::STATUS_UNDER_REVIEW : false,
+                    'resubmit'        => $user ? Gate::forUser($user)->allows('resubmit', $task) && $task->requires_review && $task->status === Task::STATUS_RETURNED : false,
                 ],
             ])->values()->all(),
         ];

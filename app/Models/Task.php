@@ -33,12 +33,14 @@ class Task extends Model
         'description',
         'status',
         'due_date',
+        'requires_review',
     ];
 
     protected function casts(): array
     {
         return [
             'due_date' => 'date',
+            'requires_review' => 'boolean',
         ];
     }
 

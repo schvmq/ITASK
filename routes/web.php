@@ -101,6 +101,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('projects.committees.activities.tasks.update');
     Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('projects.committees.activities.tasks.destroy');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/submit', [\App\Http\Controllers\TaskController::class, 'submit'])->name('projects.committees.activities.tasks.submit');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/approve', [\App\Http\Controllers\TaskController::class, 'approve'])->name('projects.committees.activities.tasks.approve');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/complete', [\App\Http\Controllers\TaskController::class, 'approve'])->name('projects.committees.activities.tasks.complete');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/return', [\App\Http\Controllers\TaskController::class, 'returnForRevision'])->name('projects.committees.activities.tasks.return');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/resubmit', [\App\Http\Controllers\TaskController::class, 'resubmit'])->name('projects.committees.activities.tasks.resubmit');
 
     // Checklist Items
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist', [ChecklistItemController::class, 'store'])->name('projects.committees.activities.tasks.checklist.store');
