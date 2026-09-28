@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { Modal } from '@/Components/Modal';
@@ -9,19 +9,26 @@ import { Button } from '@/Components/Button';
 import {
     ArrowLeft,
     Calendar,
+    Check,
     CheckCircle2,
+    CheckSquare,
     ChevronRight,
     Clock,
+    Download,
     Edit3,
+    FileText,
     Layers,
     ListTodo,
+    Paperclip,
     Plus,
+    RotateCcw,
     Send,
     Shield,
     Trash2,
+    Upload,
     User,
     AlertTriangle,
-    RotateCcw,
+    X,
 } from 'lucide-react';
 
 interface AssigneeItem {
@@ -30,19 +37,54 @@ interface AssigneeItem {
     email: string;
 }
 
+export interface ChecklistItemData {
+    id: string;
+    content: string;
+    is_completed: boolean;
+    order: number;
+}
+
+export type TaskStatus = 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned';
+
+export interface TaskEvidenceData {
+    id: string;
+    original_name: string;
+    file_size: number;
+    file_size_formatted: string;
+    mime_type: string;
+    remarks: string | null;
+    uploaded_at: string | null;
+    uploader: {
+        id: number;
+        name: string;
+    } | null;
+    download_url: string;
+    can: {
+        delete: boolean;
+    };
+}
+
 export interface TaskItem {
     id: string;
     title: string;
     description: string | null;
-    status: 'To Do' | 'In Progress' | 'Completed';
+    status: TaskStatus;
+    requires_review?: boolean;
     due_date: string | null;
     due_date_raw: string | null;
     assignee: AssigneeItem | null;
     is_assigned_to_me?: boolean;
+    checklist_items: ChecklistItemData[];
+    evidences?: TaskEvidenceData[];
     can: {
         update: boolean;
         delete: boolean;
         updateStatus?: boolean;
+        manageChecklist?: boolean;
+        submitReview?: boolean;
+        review?: boolean;
+        resubmit?: boolean;
+        uploadEvidence?: boolean;
     };
 }
 
@@ -50,7 +92,9 @@ export interface ActivityData {
     id: string;
     title: string;
     description: string | null;
-    status: 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned for Revision';
+    status: 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned' | 'Returned for Revision';
+    start_date: string | null;
+    start_date_raw: string | null;
     due_date: string | null;
     due_date_raw: string | null;
     submission_notes?: string | null;
@@ -110,6 +154,7 @@ export default function ActivityShow({
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
     const [deletingTask, setDeletingTask] = useState<TaskItem | null>(null);
+    const [viewingTask, setViewingTask] = useState<TaskItem | null>(null);
     const [isEditActivityModalOpen, setIsEditActivityModalOpen] = useState(false);
     const [isDeleteActivityModalOpen, setIsDeleteActivityModalOpen] = useState(false);
     const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -117,6 +162,54 @@ export default function ActivityShow({
     const [isReviewReturnModalOpen, setIsReviewReturnModalOpen] = useState(false);
     const [actionProcessing, setActionProcessing] = useState(false);
     const [statusUpdatingTaskId, setStatusUpdatingTaskId] = useState<string | null>(null);
+
+    // Task Review Modals state
+    const [submittingTask, setSubmittingTask] = useState<TaskItem | null>(null);
+    const [submittingTaskNotes, setSubmittingTaskNotes] = useState('');
+    const [approvingTask, setApprovingTask] = useState<TaskItem | null>(null);
+    const [returningTask, setReturningTask] = useState<TaskItem | null>(null);
+    const [returningTaskFeedback, setReturningTaskFeedback] = useState('');
+    const [taskActionProcessing, setTaskActionProcessing] = useState(false);
+    const [taskActionError, setTaskActionError] = useState<string | null>(null);
+
+    // Checklist interaction state
+    const [newChecklistContent, setNewChecklistContent] = useState('');
+    const [checklistProcessing, setChecklistProcessing] = useState(false);
+    const [checklistError, setChecklistError] = useState<string | null>(null);
+    const [editingChecklistId, setEditingChecklistId] = useState<string | null>(null);
+    const [editingChecklistContent, setEditingChecklistContent] = useState('');
+    const [deletingChecklistItem, setDeletingChecklistItem] = useState<ChecklistItemData | null>(null);
+
+    // Evidence interaction state
+    const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+    const [evidenceRemarks, setEvidenceRemarks] = useState('');
+    const [evidenceProcessing, setEvidenceProcessing] = useState(false);
+    const [evidenceError, setEvidenceError] = useState<string | null>(null);
+    const [evidenceSuccess, setEvidenceSuccess] = useState<string | null>(null);
+    const [deletingEvidence, setDeletingEvidence] = useState<{ task: TaskItem; evidence: TaskEvidenceData } | null>(null);
+    const [deletingEvidenceProcessing, setDeletingEvidenceProcessing] = useState(false);
+
+    // Sync viewingTask with incoming activity props when tasks change
+    useEffect(() => {
+        if (viewingTask) {
+            const fresh = activity.tasks.find((t) => String(t.id) === String(viewingTask.id));
+            if (fresh) {
+                setViewingTask(fresh);
+            }
+        }
+    }, [activity.tasks]);
+
+    // Reset evidence form state when switching or closing tasks
+    useEffect(() => {
+        setEvidenceFile(null);
+        setEvidenceRemarks('');
+        setEvidenceError(null);
+        setEvidenceSuccess(null);
+        const fileInput = document.getElementById('task-evidence-file-input') as HTMLInputElement | null;
+        if (fileInput) {
+            fileInput.value = '';
+        }
+    }, [viewingTask?.id]);
 
     // Create Task Form
     const {
@@ -131,7 +224,8 @@ export default function ActivityShow({
         title: '',
         description: '',
         due_date: '',
-        status: 'To Do' as 'To Do' | 'In Progress' | 'Completed',
+        status: 'To Do' as TaskStatus,
+        requires_review: false,
         assigned_to: '',
     });
 
@@ -147,7 +241,8 @@ export default function ActivityShow({
         title: '',
         description: '',
         due_date: '',
-        status: 'To Do' as 'To Do' | 'In Progress' | 'Completed',
+        status: 'To Do' as TaskStatus,
+        requires_review: false,
         assigned_to: '',
     });
 
@@ -162,6 +257,7 @@ export default function ActivityShow({
     } = useForm({
         title: activity.title,
         description: activity.description ?? '',
+        start_date: activity.start_date_raw ?? '',
         due_date: activity.due_date_raw ?? '',
         status: activity.status,
     });
@@ -195,6 +291,14 @@ export default function ActivityShow({
     const handleOpenCreateTask = () => {
         resetTaskForm();
         clearTaskErrors();
+        setTaskData({
+            title: '',
+            description: '',
+            due_date: '',
+            status: 'To Do',
+            requires_review: false,
+            assigned_to: '',
+        });
         setIsCreateTaskModalOpen(true);
     };
 
@@ -219,6 +323,7 @@ export default function ActivityShow({
             description: task.description ?? '',
             due_date: task.due_date_raw ?? '',
             status: task.status,
+            requires_review: task.requires_review ?? false,
             assigned_to: task.assignee ? String(task.assignee.id) : '',
         });
     };
@@ -266,11 +371,138 @@ export default function ActivityShow({
         );
     };
 
+    // Task Review Handlers
+    const handleOpenSubmitTaskReview = (task: TaskItem) => {
+        setSubmittingTask(task);
+        setSubmittingTaskNotes('');
+        setTaskActionError(null);
+    };
+
+    const handleSubmitTaskReview = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!submittingTask) return;
+
+        setTaskActionProcessing(true);
+        setTaskActionError(null);
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${submittingTask.id}/submit`,
+            { submission_notes: submittingTaskNotes },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSubmittingTask(null);
+                    setSubmittingTaskNotes('');
+                },
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    if (first) setTaskActionError(String(first));
+                },
+                onFinish: () => setTaskActionProcessing(false),
+            }
+        );
+    };
+
+    const handleOpenApproveTask = (task: TaskItem) => {
+        setApprovingTask(task);
+        setTaskActionError(null);
+    };
+
+    const handleApproveTask = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!approvingTask) return;
+
+        setTaskActionProcessing(true);
+        setTaskActionError(null);
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${approvingTask.id}/approve`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setApprovingTask(null);
+                },
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    if (first) setTaskActionError(String(first));
+                },
+                onFinish: () => setTaskActionProcessing(false),
+            }
+        );
+    };
+
+    const handleOpenReturnTask = (task: TaskItem) => {
+        setReturningTask(task);
+        setReturningTaskFeedback('');
+        setTaskActionError(null);
+    };
+
+    const handleReturnTask = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!returningTask) return;
+
+        setTaskActionProcessing(true);
+        setTaskActionError(null);
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${returningTask.id}/return`,
+            { review_feedback: returningTaskFeedback },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setReturningTask(null);
+                    setReturningTaskFeedback('');
+                },
+                onError: (errors) => {
+                    const first = Object.values(errors)[0];
+                    if (first) setTaskActionError(String(first));
+                },
+                onFinish: () => setTaskActionProcessing(false),
+            }
+        );
+    };
+
+    const handleResubmitTask = (task: TaskItem) => {
+        setTaskActionProcessing(true);
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/resubmit`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setTaskActionProcessing(false),
+            }
+        );
+    };
+
+    const getAvailableStatusOptions = (task: TaskItem) => {
+        // Staff or Leader with full update permissions:
+        if (task.can.delete) {
+            return ['To Do', 'In Progress', 'Under Review', 'Completed', 'Returned'] as TaskStatus[];
+        }
+
+        // Assigned Member:
+        if (task.requires_review) {
+            // Cannot directly mark completed or returned
+            if (task.status === 'To Do' || task.status === 'In Progress') {
+                return ['To Do', 'In Progress'] as TaskStatus[];
+            }
+            if (task.status === 'Returned') {
+                return ['Returned', 'In Progress'] as TaskStatus[];
+            }
+            return [task.status];
+        } else {
+            // Normal task: can do To Do -> In Progress -> Completed
+            if (task.status === 'Completed') {
+                return ['Completed'] as TaskStatus[];
+            }
+            return ['To Do', 'In Progress', 'Completed'] as TaskStatus[];
+        }
+    };
+
     const handleOpenEditActivity = () => {
         clearEditActivityErrors();
         setEditActivityData({
             title: activity.title,
             description: activity.description ?? '',
+            start_date: activity.start_date_raw ?? '',
             due_date: activity.due_date_raw ?? '',
             status: activity.status,
         });
@@ -297,6 +529,163 @@ export default function ActivityShow({
                 onFinish: () => setActionProcessing(false),
                 onSuccess: () => {
                     setIsDeleteActivityModalOpen(false);
+                },
+            }
+        );
+    };
+
+    // Checklist handlers
+    const handleToggleChecklist = (task: TaskItem, item: ChecklistItemData) => {
+        if (!task.can.manageChecklist) return;
+
+        setChecklistProcessing(true);
+        router.patch(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
+            { is_completed: !item.is_completed },
+            {
+                preserveScroll: true,
+                onFinish: () => setChecklistProcessing(false),
+            }
+        );
+    };
+
+    const handleAddChecklistItem = (e: React.FormEvent, task: TaskItem) => {
+        e.preventDefault();
+        const content = newChecklistContent.trim();
+        if (!content) {
+            setChecklistError('The checklist item content is required.');
+            return;
+        }
+        if (content.length > 500) {
+            setChecklistError('Checklist item content cannot exceed 500 characters.');
+            return;
+        }
+
+        setChecklistError(null);
+        setChecklistProcessing(true);
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist`,
+            {
+                content,
+                is_completed: false,
+                order: task.checklist_items ? task.checklist_items.length : 0,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setNewChecklistContent('');
+                },
+                onError: (err) => {
+                    if (err.content) setChecklistError(err.content);
+                },
+                onFinish: () => setChecklistProcessing(false),
+            }
+        );
+    };
+
+    const handleSaveEditChecklist = (task: TaskItem, item: ChecklistItemData) => {
+        const content = editingChecklistContent.trim();
+        if (!content) {
+            setChecklistError('The checklist item content is required.');
+            return;
+        }
+        if (content === item.content) {
+            setEditingChecklistId(null);
+            return;
+        }
+
+        setChecklistError(null);
+        setChecklistProcessing(true);
+        router.patch(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
+            { content },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setEditingChecklistId(null);
+                },
+                onError: (err) => {
+                    if (err.content) setChecklistError(err.content);
+                },
+                onFinish: () => setChecklistProcessing(false),
+            }
+        );
+    };
+
+    const handleDeleteChecklist = (task: TaskItem, item: ChecklistItemData) => {
+        setChecklistProcessing(true);
+        router.delete(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setDeletingChecklistItem(null);
+                },
+                onFinish: () => setChecklistProcessing(false),
+            }
+        );
+    };
+
+    const handleUploadEvidence = (e: React.FormEvent, task: TaskItem) => {
+        e.preventDefault();
+        if (!evidenceFile) {
+            setEvidenceError('Please select an evidence file to upload.');
+            return;
+        }
+
+        setEvidenceProcessing(true);
+        setEvidenceError(null);
+        setEvidenceSuccess(null);
+
+        const formData = new FormData();
+        formData.append('file', evidenceFile);
+        if (evidenceRemarks.trim()) {
+            formData.append('remarks', evidenceRemarks.trim());
+        }
+
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/evidence`,
+            formData,
+            {
+                preserveScroll: true,
+                forceFormData: true,
+                onSuccess: () => {
+                    setEvidenceFile(null);
+                    setEvidenceRemarks('');
+                    setEvidenceSuccess('Evidence uploaded successfully.');
+                    const fileInput = document.getElementById('task-evidence-file-input') as HTMLInputElement | null;
+                    if (fileInput) {
+                        fileInput.value = '';
+                    }
+                },
+                onError: (errs) => {
+                    const message = errs.file || errs.remarks || Object.values(errs)[0] || 'Failed to upload evidence.';
+                    setEvidenceError(message);
+                },
+                onFinish: () => {
+                    setEvidenceProcessing(false);
+                },
+            }
+        );
+    };
+
+    const handleConfirmDeleteEvidence = () => {
+        if (!deletingEvidence) return;
+        const { task, evidence } = deletingEvidence;
+        setDeletingEvidenceProcessing(true);
+
+        router.delete(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/evidence/${evidence.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setDeletingEvidence(null);
+                },
+                onError: (errs) => {
+                    alert(Object.values(errs)[0] || 'Failed to delete evidence.');
+                },
+                onFinish: () => {
+                    setDeletingEvidenceProcessing(false);
                 },
             }
         );
@@ -360,6 +749,7 @@ export default function ActivityShow({
                 return 'bg-blue-50 text-blue-700 border-blue-200';
             case 'Under Review':
                 return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'Returned':
             case 'Returned for Revision':
                 return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'To Do':
@@ -374,6 +764,10 @@ export default function ActivityShow({
                 return 'bg-emerald-50 text-emerald-700 border-emerald-200';
             case 'In Progress':
                 return 'bg-blue-50 text-blue-700 border-blue-200';
+            case 'Under Review':
+                return 'bg-amber-50 text-amber-700 border-amber-200';
+            case 'Returned':
+                return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'To Do':
             default:
                 return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -383,6 +777,25 @@ export default function ActivityShow({
     const completedTasksCount = activity.tasks.filter((t) => t.status === 'Completed').length;
     const taskProgressPercent =
         activity.tasks.length > 0 ? Math.round((completedTasksCount / activity.tasks.length) * 100) : 0;
+
+    const [taskFilter, setTaskFilter] = useState<'all' | 'under_review' | 'in_progress' | 'returned' | 'completed' | 'my_tasks'>('all');
+
+    const tasksAwaitingReview = activity.tasks.filter((t) => t.status === 'Under Review');
+    const inProgressTasks = activity.tasks.filter((t) => t.status === 'In Progress');
+    const returnedTasks = activity.tasks.filter((t) => t.status === 'Returned');
+    const completedTasks = activity.tasks.filter((t) => t.status === 'Completed');
+    const myTasks = activity.tasks.filter((t) => t.is_assigned_to_me);
+
+    const filteredTasks = activity.tasks.filter((task) => {
+        if (taskFilter === 'under_review') return task.status === 'Under Review';
+        if (taskFilter === 'in_progress') return task.status === 'In Progress';
+        if (taskFilter === 'returned') return task.status === 'Returned';
+        if (taskFilter === 'completed') return task.status === 'Completed';
+        if (taskFilter === 'my_tasks') return Boolean(task.is_assigned_to_me);
+        return true;
+    });
+
+    const allTasksCompleted = activity.tasks.length > 0 && completedTasksCount === activity.tasks.length;
 
     return (
         <AppLayout>
@@ -420,7 +833,7 @@ export default function ActivityShow({
                 {/* ── Workflow Status Banners ── */}
 
                 {/* 1. Returned for Revision Banner */}
-                {activity.status === 'Returned for Revision' && (
+                {(activity.status === 'Returned' || activity.status === 'Returned for Revision') && (
                     <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
@@ -556,6 +969,12 @@ export default function ActivityShow({
                             </h1>
 
                             <div className="flex items-center gap-4 text-xs text-[color:var(--color-text-subtle)] flex-wrap pt-1">
+                                {activity.start_date && (
+                                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                        <span>Start: {activity.start_date}</span>
+                                    </span>
+                                )}
                                 {activity.due_date && (
                                     <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
                                         <Calendar className="w-3.5 h-3.5 text-slate-500" />
@@ -667,6 +1086,33 @@ export default function ActivityShow({
                     </div>
                 </div>
 
+                {/* ── Ready for Review Submission Callout (for Members) ── */}
+                {allTasksCompleted && activity.status === 'In Progress' && activity.can.submit && (
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-2xs">
+                        <div className="flex items-start gap-2.5">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                                <p className="text-xs font-bold text-emerald-950">
+                                    All {activity.tasks.length} Tasks Completed!
+                                </p>
+                                <p className="text-[11px] text-emerald-800">
+                                    This activity is ready for submission. Submit it to Project Staff for committee-level verification and approval.
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            onClick={handleOpenSubmitModal}
+                            className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                            <Send className="w-3.5 h-3.5 mr-1" />
+                            <span>Submit Activity for Review</span>
+                        </Button>
+                    </div>
+                )}
+
                 {/* ── Tasks Section ── */}
                 <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
@@ -691,93 +1137,439 @@ export default function ActivityShow({
                         )}
                     </div>
 
-                    {activity.tasks.length > 0 ? (
-                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                            {activity.tasks.map((task) => (
-                                <div
-                                    key={task.id}
-                                    className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/70 transition-colors"
-                                >
-                                    <div className="space-y-1.5 max-w-xl">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            {/* Status Badge or Member Status Dropdown */}
-                                            {task.can.updateStatus ? (
-                                                <select
-                                                    value={task.status}
-                                                    onChange={(e) =>
-                                                        handleTaskStatusChange(task, e.target.value as TaskItem['status'])
-                                                    }
-                                                    disabled={statusUpdatingTaskId === task.id}
-                                                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors ${getTaskStatusBadge(
-                                                        task.status
-                                                    )}`}
-                                                    title="Click to update task status"
-                                                >
-                                                    <option value="To Do">To Do</option>
-                                                    <option value="In Progress">In Progress</option>
-                                                    <option value="Completed">Completed</option>
-                                                </select>
-                                            ) : (
-                                                <span
-                                                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getTaskStatusBadge(
-                                                        task.status
-                                                    )}`}
-                                                >
-                                                    {task.status}
-                                                </span>
-                                            )}
-                                            <h4 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                                {task.title}
-                                            </h4>
-                                        </div>
-                                        {task.description && (
-                                            <p className="text-xs text-slate-500 line-clamp-2">
-                                                {task.description}
-                                            </p>
-                                        )}
-                                        <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-0.5">
-                                            {task.due_date && (
-                                                <span className="flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3 text-slate-400" />
-                                                    <span>Due: {task.due_date}</span>
-                                                </span>
-                                            )}
-                                            <span className="flex items-center gap-1">
-                                                <User className="w-3 h-3 text-slate-400" />
-                                                <span>
-                                                    {task.assignee ? task.assignee.name : 'Unassigned'}
-                                                    {task.is_assigned_to_me ? ' (You)' : ''}
-                                                </span>
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Task Management Actions for Project Staff */}
-                                    <div className="flex items-center gap-1.5 self-start sm:self-center shrink-0">
-                                        {task.can.update && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleOpenEditTask(task)}
-                                                className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                                title="Edit Task"
-                                            >
-                                                <Edit3 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                        {task.can.delete && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setDeletingTask(task)}
-                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                                title="Delete Task"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
+                    {/* ── Staff Review Queue (Tasks Awaiting Review) ── */}
+                    {tasksAwaitingReview.length > 0 && (
+                        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                                        Staff Review Queue ({tasksAwaitingReview.length} awaiting review)
+                                    </h4>
                                 </div>
-                            ))}
+                                <span className="text-[11px] font-medium text-amber-800">
+                                    {activity.can.review ? 'Action required: Review task deliverables below' : 'Awaiting committee head review'}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {tasksAwaitingReview.map((revTask) => {
+                                    const count = revTask.checklist_items ? revTask.checklist_items.length : 0;
+                                    const done = revTask.checklist_items ? revTask.checklist_items.filter((i) => i.is_completed).length : 0;
+
+                                    return (
+                                        <div
+                                            key={revTask.id}
+                                            className="p-3 bg-white rounded-lg border border-amber-200 shadow-2xs flex flex-col justify-between space-y-2.5"
+                                        >
+                                            <div className="space-y-1">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewingTask(revTask)}
+                                                        className="text-xs font-bold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors text-left line-clamp-1 cursor-pointer"
+                                                    >
+                                                        {revTask.title}
+                                                    </button>
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700 shrink-0">
+                                                        <Shield className="w-2.5 h-2.5 text-purple-600" />
+                                                        <span>Review Required</span>
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                                                    <span className="flex items-center gap-1">
+                                                        <User className="w-3 h-3 text-slate-400" />
+                                                        <span>{revTask.assignee ? revTask.assignee.name : 'Unassigned'}</span>
+                                                    </span>
+                                                    {revTask.due_date && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="w-3 h-3 text-slate-400" />
+                                                            <span>Due: {revTask.due_date}</span>
+                                                        </span>
+                                                    )}
+                                                    <span className="flex items-center gap-1">
+                                                        <CheckSquare className="w-3 h-3 text-slate-400" />
+                                                        <span>Checklist: {done}/{count}</span>
+                                                    </span>
+                                                    {revTask.evidences && revTask.evidences.length > 0 && (
+                                                        <span className="flex items-center gap-1 font-semibold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
+                                                            <Paperclip className="w-2.5 h-2.5 text-orange-600" />
+                                                            <span>MOV: {revTask.evidences.length}</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewingTask(revTask)}
+                                                    className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                                                >
+                                                    View Details
+                                                </button>
+
+                                                {revTask.can.review && (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="text-rose-700 border-rose-300 hover:bg-rose-50 text-[11px] h-7 px-2"
+                                                            onClick={() => handleOpenReturnTask(revTask)}
+                                                            disabled={taskActionProcessing}
+                                                        >
+                                                            <AlertTriangle className="w-3 h-3 mr-1 text-rose-600" />
+                                                            <span>Return</span>
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="primary"
+                                                            size="sm"
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] h-7 px-2"
+                                                            onClick={() => handleOpenApproveTask(revTask)}
+                                                            disabled={taskActionProcessing}
+                                                        >
+                                                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                                                            <span>Approve</span>
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
+                    )}
+
+                    {/* ── Task Filter Tabs ── */}
+                    {activity.tasks.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1 pb-1 border-b border-slate-100 text-xs">
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('all')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                    taskFilter === 'all'
+                                        ? 'bg-slate-900 text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                All ({activity.tasks.length})
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('under_review')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                                    taskFilter === 'under_review'
+                                        ? 'bg-amber-600 text-white shadow-2xs'
+                                        : tasksAwaitingReview.length > 0
+                                        ? 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <span>Needs Review</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                    taskFilter === 'under_review' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                    {tasksAwaitingReview.length}
+                                </span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('in_progress')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                    taskFilter === 'in_progress'
+                                        ? 'bg-blue-600 text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                In Progress ({inProgressTasks.length})
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('returned')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                                    taskFilter === 'returned'
+                                        ? 'bg-rose-600 text-white shadow-2xs'
+                                        : returnedTasks.length > 0
+                                        ? 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                <span>Returned</span>
+                                {returnedTasks.length > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        taskFilter === 'returned' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+                                    }`}>
+                                        {returnedTasks.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setTaskFilter('completed')}
+                                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                    taskFilter === 'completed'
+                                        ? 'bg-emerald-600 text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                Completed ({completedTasks.length})
+                            </button>
+
+                            {myTasks.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setTaskFilter('my_tasks')}
+                                    className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                                        taskFilter === 'my_tasks'
+                                            ? 'bg-slate-800 text-white shadow-2xs'
+                                            : 'text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                >
+                                    My Tasks ({myTasks.length})
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {activity.tasks.length > 0 ? (
+                        filteredTasks.length > 0 ? (
+                            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                                {filteredTasks.map((task) => {
+                                const checklistCount = task.checklist_items ? task.checklist_items.length : 0;
+                                const checklistCompleted = task.checklist_items
+                                    ? task.checklist_items.filter((i) => i.is_completed).length
+                                    : 0;
+
+                                return (
+                                    <div
+                                        key={task.id}
+                                        className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/70 transition-colors"
+                                    >
+                                        <div className="space-y-1.5 max-w-xl">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {/* Status Badge or Member Status Dropdown */}
+                                                {task.can.updateStatus ? (
+                                                    <select
+                                                        value={task.status}
+                                                        onChange={(e) =>
+                                                            handleTaskStatusChange(task, e.target.value as TaskStatus)
+                                                        }
+                                                        disabled={statusUpdatingTaskId === task.id || task.status === 'Under Review' || task.status === 'Completed'}
+                                                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors ${getTaskStatusBadge(
+                                                            task.status
+                                                        )}`}
+                                                        title="Click to update task status"
+                                                    >
+                                                        {getAvailableStatusOptions(task).map((opt) => (
+                                                            <option key={opt} value={opt}>
+                                                                {opt}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <span
+                                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${getTaskStatusBadge(
+                                                            task.status
+                                                        )}`}
+                                                    >
+                                                        {task.status}
+                                                    </span>
+                                                )}
+
+                                                {/* Review Required Badge */}
+                                                {task.requires_review && (
+                                                    <span
+                                                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700"
+                                                        title="Requires Staff Review before completion"
+                                                    >
+                                                        <Shield className="w-3 h-3 text-purple-600" />
+                                                        <span>Review Required</span>
+                                                    </span>
+                                                )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewingTask(task)}
+                                                    className="text-sm font-bold text-[color:var(--color-text-main)] hover:text-[color:var(--color-brand-action-orange)] transition-colors text-left cursor-pointer"
+                                                >
+                                                    {task.title}
+                                                </button>
+                                            </div>
+                                            {task.description && (
+                                                <p className="text-xs text-slate-500 line-clamp-2">
+                                                    {task.description}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-0.5 flex-wrap">
+                                                {task.due_date && (
+                                                    <span className="flex items-center gap-1">
+                                                        <Calendar className="w-3 h-3 text-slate-400" />
+                                                        <span>Due: {task.due_date}</span>
+                                                    </span>
+                                                )}
+                                                <span className="flex items-center gap-1">
+                                                    <User className="w-3 h-3 text-slate-400" />
+                                                    <span>
+                                                        {task.assignee ? task.assignee.name : 'Unassigned'}
+                                                        {task.is_assigned_to_me ? ' (You)' : ''}
+                                                    </span>
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setViewingTask(task)}
+                                                    className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                                >
+                                                    <CheckSquare className="w-3 h-3 text-slate-400" />
+                                                    <span>
+                                                        Checklist ({checklistCompleted}/{checklistCount})
+                                                    </span>
+                                                </button>
+                                                {task.evidences && task.evidences.length > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setViewingTask(task)}
+                                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded hover:bg-orange-100 transition-colors cursor-pointer"
+                                                        title="Supporting Evidence / MOV uploaded"
+                                                    >
+                                                        <Paperclip className="w-3 h-3 text-orange-600" />
+                                                        <span>
+                                                            Evidence ({task.evidences.length})
+                                                        </span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Task Management Actions */}
+                                        <div className="flex items-center gap-2 self-start sm:self-center shrink-0 flex-wrap">
+                                            {/* Member Submit for Review button */}
+                                            {task.requires_review &&
+                                                (task.can.submitReview || (task.is_assigned_to_me && task.status === 'In Progress')) && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="primary"
+                                                        size="sm"
+                                                        onClick={() => handleOpenSubmitTaskReview(task)}
+                                                        className="text-[11px] h-7 px-2.5"
+                                                    >
+                                                        <Send className="w-3 h-3 mr-1" />
+                                                        <span>Submit for Review</span>
+                                                    </Button>
+                                                )}
+
+                                            {/* Member Resubmit button */}
+                                            {task.requires_review &&
+                                                task.status === 'Returned' &&
+                                                (task.can.resubmit || task.is_assigned_to_me) && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => handleResubmitTask(task)}
+                                                        disabled={taskActionProcessing}
+                                                        className="text-[11px] h-7 px-2.5 text-rose-700 border-rose-300 hover:bg-rose-50"
+                                                    >
+                                                        <RotateCcw className="w-3 h-3 mr-1" />
+                                                        <span>Continue Work</span>
+                                                    </Button>
+                                                )}
+
+                                            {/* Staff Review buttons (Under Review) */}
+                                            {task.status === 'Under Review' && task.can.review && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenReturnTask(task)}
+                                                        className="px-2 py-1 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition-colors cursor-pointer"
+                                                    >
+                                                        Return
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenApproveTask(task)}
+                                                        className="px-2 py-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors cursor-pointer"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {/* Awaiting Review notice for non-reviewers */}
+                                            {task.status === 'Under Review' && !task.can.review && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
+                                                    <Clock className="w-3 h-3 text-amber-500" />
+                                                    <span>Awaiting Staff Review</span>
+                                                </span>
+                                            )}
+
+                                            {/* Member normal task quick complete button */}
+                                            {!task.requires_review &&
+                                                task.status === 'In Progress' &&
+                                                (task.can.updateStatus && task.is_assigned_to_me) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleTaskStatusChange(task, 'Completed')}
+                                                        disabled={statusUpdatingTaskId === task.id}
+                                                        className="px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors cursor-pointer"
+                                                    >
+                                                        <CheckCircle2 className="w-3 h-3 inline mr-1 text-emerald-600" />
+                                                        <span>Mark Completed</span>
+                                                    </button>
+                                                )}
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setViewingTask(task)}
+                                                className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                            >
+                                                Details & Checklist
+                                            </button>
+                                            {task.can.update && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenEditTask(task)}
+                                                    className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                                    title="Edit Task"
+                                                >
+                                                    <Edit3 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            {task.can.delete && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeletingTask(task)}
+                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                    title="Delete Task"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        ) : (
+                            <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                                <p className="text-xs text-slate-500">
+                                    No tasks found matching the &ldquo;{taskFilter.replace('_', ' ')}&rdquo; filter.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setTaskFilter('all')}
+                                    className="mt-2 text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline cursor-pointer"
+                                >
+                                    Clear filter
+                                </button>
+                            </div>
+                        )
                     ) : (
                         <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50">
                             <ListTodo className="w-10 h-10 text-slate-300 mx-auto mb-2" />
@@ -802,11 +1594,616 @@ export default function ActivityShow({
                     )}
                 </div>
 
+                {/* ── Task Details & Checklist Modal ── */}
+                <Modal
+                    isOpen={viewingTask !== null}
+                    onClose={() => {
+                        setViewingTask(null);
+                        setEditingChecklistId(null);
+                        setChecklistError(null);
+                    }}
+                    title={viewingTask?.title ?? 'Task Details'}
+                    description={`Activity: ${activity.title} • Committee: ${committee.name}`}
+                    maxWidth="lg"
+                >
+                    {viewingTask && (
+                        <div className="space-y-5 pt-1">
+                            {/* Meta Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                        Status
+                                    </span>
+                                    {viewingTask.can.updateStatus ? (
+                                        <select
+                                            value={viewingTask.status}
+                                            onChange={(e) =>
+                                                handleTaskStatusChange(viewingTask, e.target.value as TaskStatus)
+                                            }
+                                            disabled={statusUpdatingTaskId === viewingTask.id || viewingTask.status === 'Under Review' || viewingTask.status === 'Completed'}
+                                            className={`text-xs font-semibold px-2.5 py-1 rounded-md border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-500 transition-colors ${getTaskStatusBadge(
+                                                viewingTask.status
+                                            )}`}
+                                        >
+                                            {getAvailableStatusOptions(viewingTask).map((opt) => (
+                                                <option key={opt} value={opt}>
+                                                    {opt}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <span
+                                            className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-md border ${getTaskStatusBadge(
+                                                viewingTask.status
+                                            )}`}
+                                        >
+                                            {viewingTask.status}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                        Review Requirement
+                                    </span>
+                                    {viewingTask.requires_review ? (
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-md">
+                                            <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                            <span>Staff Review Required</span>
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center text-xs font-medium text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md">
+                                            <span>Standard (No Review)</span>
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                        Assignee
+                                    </span>
+                                    <span className="text-xs font-medium text-slate-800 flex items-center gap-1.5 py-1">
+                                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span className="truncate">
+                                            {viewingTask.assignee ? viewingTask.assignee.name : 'Unassigned'}
+                                            {viewingTask.is_assigned_to_me ? ' (You)' : ''}
+                                        </span>
+                                    </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                        Target Due Date
+                                    </span>
+                                    <span className="text-xs font-medium text-slate-800 flex items-center gap-1.5 py-1">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                        <span>{viewingTask.due_date ?? 'No deadline set'}</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Contextual Workflow Action Banners */}
+                            {viewingTask.status === 'Under Review' && (
+                                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div className="flex items-start gap-2.5">
+                                        <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs font-bold text-amber-900">Task is Under Staff Review</p>
+                                            <p className="text-[11px] text-amber-700">
+                                                {viewingTask.can.review
+                                                    ? 'The assignee has submitted this task for verification.'
+                                                    : 'Awaiting review and approval by Project Staff.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {viewingTask.can.review && (
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-rose-700 border-rose-300 hover:bg-rose-50 text-xs"
+                                                onClick={() => handleOpenReturnTask(viewingTask)}
+                                            >
+                                                <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-600" />
+                                                <span>Return for Revision</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="primary"
+                                                size="sm"
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                                                onClick={() => handleOpenApproveTask(viewingTask)}
+                                            >
+                                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                                <span>Approve Task</span>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {viewingTask.status === 'Returned' && viewingTask.requires_review && (
+                                <div className="p-3.5 bg-rose-50 rounded-xl border border-rose-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div className="flex items-start gap-2.5">
+                                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs font-bold text-rose-900">Task Returned for Revision</p>
+                                            <p className="text-[11px] text-rose-700">
+                                                Please review staff feedback, address the requested revisions, and continue work.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {(viewingTask.can.resubmit || viewingTask.is_assigned_to_me) && (
+                                        <Button
+                                            type="button"
+                                            variant="primary"
+                                            size="sm"
+                                            onClick={() => handleResubmitTask(viewingTask)}
+                                            disabled={taskActionProcessing}
+                                            className="shrink-0 text-xs"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                                            <span>Continue Work (Resubmit)</span>
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+
+                            {viewingTask.status === 'In Progress' && viewingTask.requires_review && (viewingTask.can.submitReview || viewingTask.is_assigned_to_me) && (
+                                <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <div className="flex items-start gap-2.5">
+                                        <Shield className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs font-bold text-purple-900">Staff Review Required</p>
+                                            <p className="text-[11px] text-purple-700">
+                                                When you finish this task, submit it for staff review instead of marking it complete directly.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => handleOpenSubmitTaskReview(viewingTask)}
+                                        className="shrink-0 text-xs"
+                                    >
+                                        <Send className="w-3.5 h-3.5 mr-1" />
+                                        <span>Submit for Review</span>
+                                    </Button>
+                                </div>
+                            )}
+
+                            {viewingTask.status === 'In Progress' && !viewingTask.requires_review && (viewingTask.can.updateStatus && viewingTask.is_assigned_to_me) && (
+                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
+                                    <p className="text-xs text-slate-600">Standard task with normal completion workflow.</p>
+                                    <Button
+                                        type="button"
+                                        variant="primary"
+                                        size="sm"
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                                        onClick={() => handleTaskStatusChange(viewingTask, 'Completed')}
+                                    >
+                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                        <span>Mark as Completed</span>
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Task Description */}
+                            {viewingTask.description && (
+                                <div className="space-y-1">
+                                    <span className="text-xs font-semibold text-slate-700">Description</span>
+                                    <p className="text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 leading-relaxed whitespace-pre-line">
+                                        {viewingTask.description}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Checklist Section */}
+                            <div className="space-y-3 pt-3 border-t border-slate-200">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                            <CheckSquare className="w-4 h-4 text-[color:var(--color-brand-action-orange)]" />
+                                            <span>Task Checklist</span>
+                                        </h4>
+                                        <p className="text-[11px] text-slate-500">
+                                            Actionable items and deliverables to complete for this task
+                                        </p>
+                                    </div>
+                                    {/* Progress indicator */}
+                                    <div className="text-left sm:text-right">
+                                        <span className="text-xs font-bold text-slate-800">
+                                            {viewingTask.checklist_items?.filter((i) => i.is_completed).length ?? 0} /{' '}
+                                            {viewingTask.checklist_items?.length ?? 0} completed
+                                        </span>
+                                        <div className="w-32 h-1.5 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                                            <div
+                                                className="h-full bg-[color:var(--color-brand-dark-green)] transition-all duration-300 rounded-full"
+                                                style={{
+                                                    width: `${
+                                                        viewingTask.checklist_items &&
+                                                        viewingTask.checklist_items.length > 0
+                                                            ? Math.round(
+                                                                  (viewingTask.checklist_items.filter(
+                                                                      (i) => i.is_completed
+                                                                  ).length /
+                                                                      viewingTask.checklist_items.length) *
+                                                                      100
+                                                              )
+                                                            : 0
+                                                    }%`,
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Items List */}
+                                <div className="space-y-2">
+                                    {viewingTask.checklist_items && viewingTask.checklist_items.length > 0 ? (
+                                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white">
+                                            {viewingTask.checklist_items.map((item) => (
+                                                <div
+                                                    key={item.id}
+                                                    className={`p-3 flex items-start justify-between gap-3 transition-colors ${
+                                                        item.is_completed ? 'bg-slate-50/70' : 'hover:bg-slate-50/40'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                                        <button
+                                                            type="button"
+                                                            disabled={
+                                                                !viewingTask.can.manageChecklist || checklistProcessing
+                                                            }
+                                                            onClick={() => handleToggleChecklist(viewingTask, item)}
+                                                            className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                                                                item.is_completed
+                                                                    ? 'bg-[color:var(--color-brand-action-orange)] border-[color:var(--color-brand-action-orange)] text-white'
+                                                                    : 'border-slate-300 hover:border-slate-400 bg-white'
+                                                            } ${
+                                                                viewingTask.can.manageChecklist
+                                                                    ? 'cursor-pointer'
+                                                                    : 'cursor-not-allowed opacity-75'
+                                                            }`}
+                                                            title={
+                                                                viewingTask.can.manageChecklist
+                                                                    ? item.is_completed
+                                                                        ? 'Mark incomplete'
+                                                                        : 'Mark complete'
+                                                                    : 'Only Project Staff or Leader can toggle checklist items'
+                                                            }
+                                                        >
+                                                            {item.is_completed && (
+                                                                <Check className="w-3 h-3 stroke-[3]" />
+                                                            )}
+                                                        </button>
+
+                                                        {editingChecklistId === item.id ? (
+                                                            <div className="flex-1 space-y-2">
+                                                                <input
+                                                                    type="text"
+                                                                    value={editingChecklistContent}
+                                                                    onChange={(e) =>
+                                                                        setEditingChecklistContent(e.target.value)
+                                                                    }
+                                                                    className="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                                    autoFocus
+                                                                    maxLength={500}
+                                                                />
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            handleSaveEditChecklist(viewingTask, item)
+                                                                        }
+                                                                        disabled={checklistProcessing}
+                                                                        className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 transition-opacity"
+                                                                    >
+                                                                        Save
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setEditingChecklistId(null)}
+                                                                        className="px-2 py-0.5 rounded text-[11px] text-slate-600 hover:bg-slate-100 transition-colors"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span
+                                                                className={`text-xs leading-relaxed break-words flex-1 ${
+                                                                    item.is_completed
+                                                                        ? 'line-through text-slate-400'
+                                                                        : 'text-slate-700'
+                                                                }`}
+                                                            >
+                                                                {item.content}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {viewingTask.can.manageChecklist &&
+                                                        editingChecklistId !== item.id && (
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingChecklistId(item.id);
+                                                                        setEditingChecklistContent(item.content);
+                                                                    }}
+                                                                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                                                    title="Edit item"
+                                                                >
+                                                                    <Edit3 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        handleDeleteChecklist(viewingTask, item)
+                                                                    }
+                                                                    disabled={checklistProcessing}
+                                                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                                                    title="Delete item"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50 text-xs text-slate-500">
+                                            No checklist items created for this task yet.
+                                        </div>
+                                    )}
+
+                                    {/* Add Checklist Item Form */}
+                                    {viewingTask.can.manageChecklist && (
+                                        <form
+                                            onSubmit={(e) => handleAddChecklistItem(e, viewingTask)}
+                                            className="pt-2"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={newChecklistContent}
+                                                    onChange={(e) => setNewChecklistContent(e.target.value)}
+                                                    placeholder="Add a new checklist item..."
+                                                    maxLength={500}
+                                                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
+                                                />
+                                                <Button
+                                                    type="submit"
+                                                    variant="primary"
+                                                    size="sm"
+                                                    disabled={checklistProcessing || !newChecklistContent.trim()}
+                                                    isLoading={checklistProcessing}
+                                                >
+                                                    <Plus className="w-3.5 h-3.5 mr-1" />
+                                                    <span>Add Item</span>
+                                                </Button>
+                                            </div>
+                                            {checklistError && (
+                                                <p className="text-[11px] text-rose-600 mt-1 font-medium">
+                                                    {checklistError}
+                                                </p>
+                                            )}
+                                        </form>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Evidence / MOV (Optional) Section */}
+                            <div className="space-y-3 pt-3 border-t border-slate-100">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                            <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+                                            <span>Evidence / MOV (Optional)</span>
+                                        </h4>
+                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                            Optional supporting evidence for this task.
+                                        </p>
+                                    </div>
+                                    {viewingTask.evidences && viewingTask.evidences.length > 0 && (
+                                        <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                                            {viewingTask.evidences.length} {viewingTask.evidences.length === 1 ? 'file' : 'files'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Evidence List */}
+                                {viewingTask.evidences && viewingTask.evidences.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {viewingTask.evidences.map((ev) => (
+                                            <div
+                                                key={ev.id}
+                                                className="p-3 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors flex items-start justify-between gap-3"
+                                            >
+                                                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                                    <div className="p-2 rounded-md bg-orange-50 text-[color:var(--color-brand-action-orange)] shrink-0 mt-0.5">
+                                                        <FileText className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1 space-y-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <a
+                                                                href={ev.download_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-xs font-semibold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate max-w-xs sm:max-w-md cursor-pointer"
+                                                                title={ev.original_name}
+                                                            >
+                                                                {ev.original_name}
+                                                            </a>
+                                                            <span className="text-[10px] font-medium text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                                                {ev.file_size_formatted}
+                                                            </span>
+                                                        </div>
+                                                        {ev.remarks && (
+                                                            <p className="text-[11px] text-slate-600 italic">
+                                                                "{ev.remarks}"
+                                                            </p>
+                                                        )}
+                                                        <div className="flex items-center gap-3 text-[10px] text-slate-400 flex-wrap">
+                                                            {ev.uploader && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <User className="w-3 h-3" />
+                                                                    <span>{ev.uploader.name}</span>
+                                                                </span>
+                                                            )}
+                                                            {ev.uploaded_at && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    <span>{ev.uploaded_at}</span>
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                                                    <a
+                                                        href={ev.download_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors cursor-pointer"
+                                                        title="Download / View evidence file"
+                                                    >
+                                                        <Download className="w-3 h-3" />
+                                                        <span>Download</span>
+                                                    </a>
+                                                    {ev.can.delete && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDeletingEvidence({ task: viewingTask, evidence: ev })}
+                                                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                                            title="Delete evidence"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="p-4 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50 text-xs text-slate-500">
+                                        No evidence uploaded yet.
+                                    </div>
+                                )}
+
+                                {/* Upload Evidence Form (if authorized) */}
+                                {viewingTask.can.uploadEvidence && (
+                                    <form
+                                        onSubmit={(e) => handleUploadEvidence(e, viewingTask)}
+                                        className="pt-2 border-t border-slate-100 space-y-2"
+                                    >
+                                        <div className="space-y-1">
+                                            <label className="block text-[11px] font-semibold text-slate-700">
+                                                Upload Supporting Evidence (Optional)
+                                            </label>
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                                <input
+                                                    id="task-evidence-file-input"
+                                                    type="file"
+                                                    onChange={(e) => {
+                                                        setEvidenceFile(e.target.files?.[0] ?? null);
+                                                        setEvidenceError(null);
+                                                    }}
+                                                    className="text-xs file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-[color:var(--color-brand-action-orange)] hover:file:bg-orange-100 text-slate-500 cursor-pointer"
+                                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xls,.xlsx,.zip"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={evidenceRemarks}
+                                                    onChange={(e) => setEvidenceRemarks(e.target.value)}
+                                                    placeholder="Remarks or notes (optional)"
+                                                    maxLength={500}
+                                                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
+                                                />
+                                                <Button
+                                                    type="submit"
+                                                    variant="primary"
+                                                    size="sm"
+                                                    disabled={evidenceProcessing || !evidenceFile}
+                                                    isLoading={evidenceProcessing}
+                                                    className="shrink-0"
+                                                >
+                                                    <Upload className="w-3.5 h-3.5 mr-1" />
+                                                    <span>Upload</span>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400">
+                                            Allowed formats: PDF, Word, Excel, PNG, JPG, TXT, ZIP (max 10MB).
+                                        </p>
+                                        {evidenceSuccess && (
+                                            <p className="text-[11px] text-emerald-600 font-medium">
+                                                {evidenceSuccess}
+                                            </p>
+                                        )}
+                                        {evidenceError && (
+                                            <p className="text-[11px] text-rose-600 font-medium">
+                                                {evidenceError}
+                                            </p>
+                                        )}
+                                    </form>
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <div>
+                                    {viewingTask.can.delete && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setDeletingTask(viewingTask);
+                                                setViewingTask(null);
+                                            }}
+                                            className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 cursor-pointer"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span>Delete Task</span>
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {viewingTask.can.update && viewingTask.can.delete && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                                handleOpenEditTask(viewingTask);
+                                                setViewingTask(null);
+                                            }}
+                                        >
+                                            <Edit3 className="w-3.5 h-3.5 mr-1" />
+                                            <span>Edit Task</span>
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() => setViewingTask(null)}
+                                    >
+                                        Close
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </Modal>
+
                 {/* ── Submit for Review Modal ── */}
                 <Modal
                     isOpen={isSubmitModalOpen}
                     onClose={() => !submitProcessing && setIsSubmitModalOpen(false)}
-                    title={activity.status === 'Returned for Revision' ? 'Resubmit Activity for Review' : 'Submit Activity for Review'}
+                    title={activity.status === 'Returned for Revision' || activity.status === 'Returned' ? 'Resubmit Activity for Review' : 'Submit Activity for Review'}
                     description={`Submit "${activity.title}" to Project Staff for verification and approval.`}
                     maxWidth="md"
                 >
@@ -1000,14 +2397,16 @@ export default function ActivityShow({
                                     onChange={(e) =>
                                         setTaskData(
                                             'status',
-                                            e.target.value as TaskItem['status']
+                                            e.target.value as TaskStatus
                                         )
                                     }
                                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
                                 >
                                     <option value="To Do">To Do</option>
                                     <option value="In Progress">In Progress</option>
+                                    <option value="Under Review">Under Review</option>
                                     <option value="Completed">Completed</option>
+                                    <option value="Returned">Returned</option>
                                 </select>
                                 <InputError message={taskErrors.status} />
                             </div>
@@ -1030,6 +2429,26 @@ export default function ActivityShow({
                                 ))}
                             </select>
                             <InputError message={taskErrors.assigned_to} />
+                        </div>
+
+                        {/* Requires Staff Review */}
+                        <div className="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 bg-slate-50/50">
+                            <input
+                                id="create-task-requires-review"
+                                name="requires_review"
+                                type="checkbox"
+                                checked={taskData.requires_review}
+                                onChange={(e) => setTaskData('requires_review', e.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[color:var(--color-brand-action-orange)] focus:ring-[color:var(--color-brand-action-orange)] cursor-pointer"
+                            />
+                            <div className="space-y-0.5">
+                                <Label htmlFor="create-task-requires-review" className="cursor-pointer font-medium text-slate-800">
+                                    Requires Staff Review
+                                </Label>
+                                <p className="text-[11px] text-slate-500 leading-normal">
+                                    When enabled, this task must be submitted to Project Staff for review before it can be completed.
+                                </p>
+                            </div>
                         </div>
 
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -1104,14 +2523,16 @@ export default function ActivityShow({
                                     onChange={(e) =>
                                         setEditTaskData(
                                             'status',
-                                            e.target.value as TaskItem['status']
+                                            e.target.value as TaskStatus
                                         )
                                     }
                                     className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
                                 >
                                     <option value="To Do">To Do</option>
                                     <option value="In Progress">In Progress</option>
+                                    <option value="Under Review">Under Review</option>
                                     <option value="Completed">Completed</option>
+                                    <option value="Returned">Returned</option>
                                 </select>
                                 <InputError message={editTaskErrors.status} />
                             </div>
@@ -1135,6 +2556,28 @@ export default function ActivityShow({
                             </select>
                             <InputError message={editTaskErrors.assigned_to} />
                         </div>
+
+                        {/* Requires Staff Review (Staff / Leader only) */}
+                        {editingTask?.can.delete && (
+                            <div className="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 bg-slate-50/50">
+                                <input
+                                    id="edit-task-requires-review"
+                                    name="requires_review"
+                                    type="checkbox"
+                                    checked={editTaskData.requires_review}
+                                    onChange={(e) => setEditTaskData('requires_review', e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[color:var(--color-brand-action-orange)] focus:ring-[color:var(--color-brand-action-orange)] cursor-pointer"
+                                />
+                                <div className="space-y-0.5">
+                                    <Label htmlFor="edit-task-requires-review" className="cursor-pointer font-medium text-slate-800">
+                                        Requires Staff Review
+                                    </Label>
+                                    <p className="text-[11px] text-slate-500 leading-normal">
+                                        When enabled, this task must be submitted to Project Staff for review before it can be completed.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                             <Button
@@ -1225,36 +2668,45 @@ export default function ActivityShow({
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <FormField
-                                label="Target Due Date"
+                                label="Start Date (Optional)"
+                                id="edit-activity-start-date"
+                                type="date"
+                                value={editActivityData.start_date}
+                                onChange={(e) => setEditActivityData('start_date', e.target.value)}
+                                error={editActivityErrors.start_date}
+                            />
+
+                            <FormField
+                                label="Target Due Date (Optional)"
                                 id="edit-activity-due-date"
                                 type="date"
                                 value={editActivityData.due_date}
                                 onChange={(e) => setEditActivityData('due_date', e.target.value)}
                                 error={editActivityErrors.due_date}
                             />
+                        </div>
 
-                            <div className="space-y-1">
-                                <Label htmlFor="edit-activity-status">Status</Label>
-                                <select
-                                    id="edit-activity-status"
-                                    name="status"
-                                    value={editActivityData.status}
-                                    onChange={(e) =>
-                                        setEditActivityData(
-                                            'status',
-                                            e.target.value as ActivityData['status']
-                                        )
-                                    }
-                                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
-                                >
-                                    <option value="To Do">To Do</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Under Review">Under Review</option>
-                                    <option value="Returned for Revision">Returned for Revision</option>
-                                    <option value="Completed">Completed</option>
-                                </select>
-                                <InputError message={editActivityErrors.status} />
-                            </div>
+                        <div className="space-y-1">
+                            <Label htmlFor="edit-activity-status">Status</Label>
+                            <select
+                                id="edit-activity-status"
+                                name="status"
+                                value={editActivityData.status}
+                                onChange={(e) =>
+                                    setEditActivityData(
+                                        'status',
+                                        e.target.value as ActivityData['status']
+                                    )
+                                }
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                            >
+                                <option value="To Do">To Do</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Under Review">Under Review</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Returned">Returned</option>
+                            </select>
+                            <InputError message={editActivityErrors.status} />
                         </div>
 
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -1310,6 +2762,195 @@ export default function ActivityShow({
                                 disabled={actionProcessing}
                             >
                                 Confirm Delete
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+
+                {/* ── Submit Task for Review Modal ── */}
+                <Modal
+                    isOpen={submittingTask !== null}
+                    onClose={() => !taskActionProcessing && setSubmittingTask(null)}
+                    title="Submit Task for Review"
+                    description={`Submit "${submittingTask?.title}" to Project Staff for verification and approval.`}
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleSubmitTaskReview} className="space-y-4 pt-1">
+                        <div className="space-y-1">
+                            <Label htmlFor="task-submit-notes">Submission Notes (Optional)</Label>
+                            <textarea
+                                id="task-submit-notes"
+                                name="submission_notes"
+                                rows={4}
+                                value={submittingTaskNotes}
+                                onChange={(e) => setSubmittingTaskNotes(e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                placeholder="Explain completed work, deliverables, or notes for the staff reviewer..."
+                            />
+                            {taskActionError && (
+                                <p className="text-xs text-rose-600 mt-1 font-medium">{taskActionError}</p>
+                            )}
+                        </div>
+
+                        <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-xs text-purple-800">
+                            <p>
+                                Submitting will transition this task to <span className="font-semibold text-purple-900">Under Review</span>. Project Staff will review your submission and either approve it or return it for revision.
+                            </p>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSubmittingTask(null)}
+                                disabled={taskActionProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={taskActionProcessing}
+                                disabled={taskActionProcessing}
+                            >
+                                <Send className="w-3.5 h-3.5 mr-1" />
+                                <span>Submit Task for Review</span>
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* ── Approve Task Modal ── */}
+                <Modal
+                    isOpen={approvingTask !== null}
+                    onClose={() => !taskActionProcessing && setApprovingTask(null)}
+                    title="Approve Task"
+                    description={`Approve and complete "${approvingTask?.title}".`}
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleApproveTask} className="space-y-4 pt-1">
+                        <div className="p-3.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                            <p className="font-semibold">Confirm Task Approval</p>
+                            <p>
+                                Approving this task confirms that all deliverables and checklist items have been verified. The task status will transition to <span className="font-semibold text-emerald-900">Completed</span>.
+                            </p>
+                        </div>
+
+                        {taskActionError && (
+                            <p className="text-xs text-rose-600 font-medium">{taskActionError}</p>
+                        )}
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setApprovingTask(null)}
+                                disabled={taskActionProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                isLoading={taskActionProcessing}
+                                disabled={taskActionProcessing}
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                <span>Approve Task</span>
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* ── Return Task for Revision Modal ── */}
+                <Modal
+                    isOpen={returningTask !== null}
+                    onClose={() => !taskActionProcessing && setReturningTask(null)}
+                    title="Return Task for Revision"
+                    description={`Provide feedback to the assignee for revising "${returningTask?.title}".`}
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleReturnTask} className="space-y-4 pt-1">
+                        <div className="space-y-1">
+                            <Label htmlFor="task-review-feedback" required>
+                                Revision Feedback
+                            </Label>
+                            <textarea
+                                id="task-review-feedback"
+                                name="review_feedback"
+                                rows={4}
+                                value={returningTaskFeedback}
+                                onChange={(e) => setReturningTaskFeedback(e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                placeholder="Specify what adjustments, corrections, or missing items need to be resolved..."
+                                required
+                            />
+                            {taskActionError && (
+                                <p className="text-xs text-rose-600 mt-1 font-medium">{taskActionError}</p>
+                            )}
+                        </div>
+
+                        <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-800">
+                            <p>
+                                This task will be returned to the assignee with status <span className="font-semibold text-rose-700">Returned</span>. They can continue work, make changes, and resubmit for review.
+                            </p>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setReturningTask(null)}
+                                disabled={taskActionProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="danger"
+                                isLoading={taskActionProcessing}
+                                disabled={taskActionProcessing || !returningTaskFeedback.trim()}
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5 mr-1" />
+                                <span>Return Task</span>
+                            </Button>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* Delete Evidence Confirmation Modal */}
+                <Modal
+                    isOpen={deletingEvidence !== null}
+                    onClose={() => !deletingEvidenceProcessing && setDeletingEvidence(null)}
+                    title="Delete Supporting Evidence"
+                    description={`Are you sure you want to delete the file "${deletingEvidence?.evidence.original_name}"? This action cannot be undone.`}
+                    maxWidth="sm"
+                >
+                    <div className="space-y-4 pt-1">
+                        <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-800">
+                            <p>
+                                Deleting this file will permanently remove the uploaded evidence from this task.
+                            </p>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setDeletingEvidence(null)}
+                                disabled={deletingEvidenceProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="danger"
+                                isLoading={deletingEvidenceProcessing}
+                                onClick={handleConfirmDeleteEvidence}
+                            >
+                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                <span>Delete File</span>
                             </Button>
                         </div>
                     </div>

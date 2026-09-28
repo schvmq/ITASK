@@ -47,10 +47,11 @@ class UpdateActivityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255'],
+            'title'       => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'due_date' => ['nullable', 'date'],
-            'status' => ['required', 'string', Rule::in(Activity::STATUSES)],
+            'start_date'  => ['nullable', 'date'],
+            'due_date'    => ['nullable', 'date', 'after_or_equal:start_date'],
+            'status'      => ['required', 'string', Rule::in(Activity::STATUSES)],
         ];
     }
 
@@ -62,11 +63,13 @@ class UpdateActivityRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'title.required' => 'The activity title is required.',
-            'title.max' => 'The activity title cannot exceed 255 characters.',
-            'due_date.date' => 'The due date must be a valid date.',
-            'status.required' => 'The activity status is required.',
-            'status.in' => 'The selected activity status is invalid.',
+            'title.required'            => 'The activity title is required.',
+            'title.max'                 => 'The activity title cannot exceed 255 characters.',
+            'start_date.date'           => 'The start date must be a valid date.',
+            'due_date.date'             => 'The deadline must be a valid date.',
+            'due_date.after_or_equal'   => 'The deadline must not be earlier than the start date.',
+            'status.required'           => 'The activity status is required.',
+            'status.in'                 => 'The selected activity status is invalid.',
         ];
     }
 }

@@ -40,10 +40,23 @@ class TaskPolicy
 
     /**
      * Determine whether the user can create a task under the activity.
-     * Allowed only for the Project Staff who heads this committee.
+     * Allowed for:
+     * - Project Leader of the project
+     * - Project Staff assigned to this specific committee
      */
     public function create(User $user, Activity $activity): bool
     {
+        $project = $activity->committee->project;
+
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
         return $activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
@@ -52,11 +65,26 @@ class TaskPolicy
 
     /**
      * Determine whether the user can update the task.
-     * Allowed for Project Staff who heads this committee, or the assigned Project Member (for status updates).
+     * Allowed for:
+     * - Project Leader of the project (full management)
+     * - Project Staff who heads this committee (full management)
+     * - Assigned Project Member in this committee (status updates only — enforced in UpdateTaskRequest)
      */
     public function update(User $user, Task $task): bool
     {
-        // 1. Project Staff heading this committee
+        $project = $task->activity->committee->project;
+
+        // 1. Project Leader
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
+        // 2. Project Staff heading this committee
         $isStaff = $task->activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
@@ -66,7 +94,119 @@ class TaskPolicy
             return true;
         }
 
-        // 2. Assigned Project Member in this committee
+        // 3. Assigned Project Member in this committee (limited update — status only)
+        if ((int) $task->assigned_to === (int) $user->id) {
+            return $task->activity->committee->roleAssignments()
+                ->where('user_id', $user->id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+                ->exists();
+        }
+
+        return false;
+    }
+
+
+    /**
+     * Determine whether the user can delete the task.
+     * Allowed for:
+     * - Project Leader of the project
+     * - Project Staff assigned to this committee
+     */
+    public function delete(User $user, Task $task): bool
+    {
+        $project = $task->activity->committee->project;
+
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
+        return $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->exists();
+    }
+
+    /**
+     * Determine whether the user can submit the task for staff review.
+     * Allowed only for the assigned Project Member in this committee.
+     */
+    public function submitReview(User $user, Task $task): bool
+    {
+        if ((int) $task->assigned_to !== (int) $user->id) {
+            return false;
+        }
+
+        return $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+            ->exists();
+    }
+
+    /**
+     * Determine whether the user can review (approve or return) the task.
+     * Allowed only for Project Staff assigned to this specific committee.
+     */
+    public function review(User $user, Task $task): bool
+    {
+        return $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->exists();
+    }
+
+    /**
+     * Determine whether the user can resubmit a returned task.
+     * Allowed only for the assigned Project Member in this committee.
+     */
+    public function resubmit(User $user, Task $task): bool
+    {
+        if ((int) $task->assigned_to !== (int) $user->id) {
+            return false;
+        }
+
+        return $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+            ->exists();
+    }
+
+    /**
+     * Determine whether the user can upload evidence to the task.
+     * Allowed for:
+     * - Project Leader of the project
+     * - Project Staff assigned to this committee
+     * - Assigned Project Member in this committee
+     */
+    public function uploadEvidence(User $user, Task $task): bool
+    {
+        $project = $task->activity->committee->project;
+
+        // 1. Leader
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
+        // 2. Staff assigned to this committee
+        $isStaff = $task->activity->committee->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->exists();
+
+        if ($isStaff) {
+            return true;
+        }
+
+        // 3. Assigned Project Member in this committee
         if ((int) $task->assigned_to === (int) $user->id) {
             return $task->activity->committee->roleAssignments()
                 ->where('user_id', $user->id)
@@ -78,14 +218,53 @@ class TaskPolicy
     }
 
     /**
-     * Determine whether the user can delete the task.
-     * Allowed only for the Project Staff who heads this committee.
+     * Determine whether the user can view/download task evidence.
+     * Allowed for anyone who can view the task (Leader, Staff, Member in committee).
      */
-    public function delete(User $user, Task $task): bool
+    public function viewEvidence(User $user, Task $task): bool
     {
-        return $task->activity->committee->roleAssignments()
+        return $this->view($user, $task);
+    }
+
+    /**
+     * Determine whether the user can delete task evidence.
+     * Allowed for:
+     * - Project Leader of the project
+     * - Project Staff assigned to this committee
+     * - The user who uploaded the evidence (if in this committee)
+     */
+    public function deleteEvidence(User $user, Task $task, ?\App\Models\TaskEvidence $evidence = null): bool
+    {
+        $project = $task->activity->committee->project;
+
+        // 1. Leader
+        $isLeader = $project->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isLeader) {
+            return true;
+        }
+
+        // 2. Staff assigned to this committee
+        $isStaff = $task->activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
+
+        if ($isStaff) {
+            return true;
+        }
+
+        // 3. Uploader
+        if ($evidence && (int) $evidence->uploaded_by === (int) $user->id) {
+            return $task->activity->committee->roleAssignments()
+                ->where('user_id', $user->id)
+                ->exists();
+        }
+
+        return false;
     }
 }
+

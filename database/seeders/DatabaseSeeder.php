@@ -15,11 +15,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Default base test user
+        User::firstOrCreate(
+            ['email' => 'test@example.com'],
+            [
+                'name' => 'Test User',
+                'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                'email_verified_at' => now(),
+            ]
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        // Seed development test dataset
+        $this->call(DevTestDataSeeder::class);
     }
 }

@@ -84,9 +84,8 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
 export const UTILITY_NAV_ITEMS: NavItem[] = [
     {
         name: 'Notifications',
-        href: '#notifications',
+        href: '/notifications',
         icon: Bell,
-        comingSoon: true,
         description: 'Activity alerts and role updates',
     },
 ];

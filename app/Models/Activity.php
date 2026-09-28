@@ -15,14 +15,16 @@ class Activity extends Model
     public const STATUS_TODO = self::STATUS_TO_DO;
     public const STATUS_IN_PROGRESS = 'In Progress';
     public const STATUS_UNDER_REVIEW = 'Under Review';
-    public const STATUS_RETURNED_FOR_REVISION = 'Returned for Revision';
+    public const STATUS_RETURNED = 'Returned';
+    /** @deprecated Use STATUS_RETURNED */
+    public const STATUS_RETURNED_FOR_REVISION = self::STATUS_RETURNED;
     public const STATUS_COMPLETED = 'Completed';
 
     public const STATUSES = [
         self::STATUS_TO_DO,
         self::STATUS_IN_PROGRESS,
         self::STATUS_UNDER_REVIEW,
-        self::STATUS_RETURNED_FOR_REVISION,
+        self::STATUS_RETURNED,
         self::STATUS_COMPLETED,
     ];
 
@@ -33,6 +35,7 @@ class Activity extends Model
         'title',
         'description',
         'status',
+        'start_date',
         'due_date',
         'submission_notes',
         'review_feedback',
@@ -43,6 +46,7 @@ class Activity extends Model
     protected function casts(): array
     {
         return [
+            'start_date' => 'date',
             'due_date' => 'date',
             'reviewed_at' => 'datetime',
         ];

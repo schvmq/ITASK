@@ -7,10 +7,13 @@ use App\Http\Requests\StoreActivityRequest;
 use App\Http\Requests\SubmitActivityRequest;
 use App\Http\Requests\UpdateActivityRequest;
 use App\Models\Activity;
+use App\Models\ChecklistItem;
 use App\Models\Committee;
 use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
+use App\Notifications\ActivityReviewedNotification;
+use App\Notifications\ActivitySubmittedForReviewNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -33,12 +36,13 @@ class ActivityController extends Controller
         Gate::authorize('create', [Activity::class, $committee]);
 
         $activity = $committee->activities()->create([
-            'project_id' => $project->id,
-            'created_by' => Auth::id(),
-            'title' => $request->validated('title'),
+            'project_id'  => $project->id,
+            'created_by'  => Auth::id(),
+            'title'       => $request->validated('title'),
             'description' => $request->validated('description'),
-            'due_date' => $request->validated('due_date'),
-            'status' => $request->validated('status', Activity::STATUS_TO_DO),
+            'start_date'  => $request->validated('start_date'),
+            'due_date'    => $request->validated('due_date'),
+            'status'      => $request->validated('status', Activity::STATUS_TO_DO),
         ]);
 
         return redirect()->route('projects.committees.activities.show', [
@@ -70,6 +74,8 @@ class ActivityController extends Controller
             'reviewer',
             'committee.staffAssignment.user',
             'tasks.assignee',
+            'tasks.checklistItems',
+            'tasks.evidences.uploader',
         ]);
 
         $user = Auth::user();
@@ -88,12 +94,14 @@ class ActivityController extends Controller
             ->all();
 
         $activityData = [
-            'id' => (string) $activity->id,
-            'title' => $activity->title,
-            'description' => $activity->description,
-            'status' => $activity->status,
-            'due_date' => $activity->due_date?->format('M d, Y'),
-            'due_date_raw' => $activity->due_date?->format('Y-m-d'),
+            'id'              => (string) $activity->id,
+            'title'           => $activity->title,
+            'description'     => $activity->description,
+            'status'          => $activity->status,
+            'start_date'      => $activity->start_date?->format('M d, Y'),
+            'start_date_raw'  => $activity->start_date?->format('Y-m-d'),
+            'due_date'        => $activity->due_date?->format('M d, Y'),
+            'due_date_raw'    => $activity->due_date?->format('Y-m-d'),
             'submission_notes' => $activity->submission_notes,
             'review_feedback' => $activity->review_feedback,
             'reviewed_at' => $activity->reviewed_at?->format('M d, Y, g:i A'),
@@ -117,22 +125,57 @@ class ActivityController extends Controller
                 'review' => $user ? Gate::forUser($user)->allows('review', $activity) && $activity->status === Activity::STATUS_UNDER_REVIEW : false,
             ],
             'tasks' => $activity->tasks->map(fn ($task) => [
-                'id' => (string) $task->id,
-                'title' => $task->title,
-                'description' => $task->description,
-                'status' => $task->status,
-                'due_date' => $task->due_date?->format('M d, Y'),
-                'due_date_raw' => $task->due_date?->format('Y-m-d'),
+                'id'              => (string) $task->id,
+                'title'           => $task->title,
+                'description'     => $task->description,
+                'status'          => $task->status,
+                'requires_review' => (bool) $task->requires_review,
+                'due_date'        => $task->due_date?->format('M d, Y'),
+                'due_date_raw'    => $task->due_date?->format('Y-m-d'),
                 'is_assigned_to_me' => $user ? (int) $task->assigned_to === (int) $user->id : false,
-                'assignee' => $task->assignee ? [
-                    'id' => $task->assignee->id,
-                    'name' => $task->assignee->name,
+                'assignee'        => $task->assignee ? [
+                    'id'    => $task->assignee->id,
+                    'name'  => $task->assignee->name,
                     'email' => $task->assignee->email,
                 ] : null,
+                'checklist_items' => $task->checklistItems->map(fn ($item) => [
+                    'id'           => (string) $item->id,
+                    'content'      => $item->content,
+                    'is_completed' => $item->is_completed,
+                    'order'        => $item->order,
+                ])->values()->all(),
+                'evidences' => $task->evidences->map(fn ($ev) => [
+                    'id'                  => (string) $ev->id,
+                    'original_name'       => $ev->original_name,
+                    'file_size'           => $ev->file_size,
+                    'file_size_formatted' => $this->formatFileSize($ev->file_size),
+                    'mime_type'           => $ev->mime_type,
+                    'remarks'             => $ev->remarks,
+                    'uploaded_at'         => $ev->created_at?->format('M d, Y, g:i A'),
+                    'uploader'            => $ev->uploader ? [
+                        'id'   => $ev->uploader->id,
+                        'name' => $ev->uploader->name,
+                    ] : null,
+                    'download_url'        => route('projects.committees.activities.tasks.evidence.download', [
+                        'project'   => $project->id,
+                        'committee' => $committee->id,
+                        'activity'  => $activity->id,
+                        'task'      => $task->id,
+                        'evidence'  => $ev->id,
+                    ]),
+                    'can' => [
+                        'delete' => $user ? Gate::forUser($user)->allows('deleteEvidence', [$task, $ev]) : false,
+                    ],
+                ])->values()->all(),
                 'can' => [
-                    'update' => $user ? Gate::forUser($user)->allows('update', $task) : false,
-                    'delete' => $user ? Gate::forUser($user)->allows('delete', $task) : false,
-                    'updateStatus' => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
+                    'update'          => $user ? Gate::forUser($user)->allows('update', $task) : false,
+                    'delete'          => $user ? Gate::forUser($user)->allows('delete', $task) : false,
+                    'updateStatus'    => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
+                    'manageChecklist' => $user ? Gate::forUser($user)->allows('create', [ChecklistItem::class, $task]) : false,
+                    'uploadEvidence'  => $user ? Gate::forUser($user)->allows('uploadEvidence', $task) : false,
+                    'submitReview'    => $user ? Gate::forUser($user)->allows('submitReview', $task) && $task->requires_review && in_array($task->status, [Task::STATUS_TO_DO, Task::STATUS_IN_PROGRESS], true) : false,
+                    'review'          => $user ? Gate::forUser($user)->allows('review', $task) && $task->status === Task::STATUS_UNDER_REVIEW : false,
+                    'resubmit'        => $user ? Gate::forUser($user)->allows('resubmit', $task) && $task->requires_review && $task->status === Task::STATUS_RETURNED : false,
                 ],
             ])->values()->all(),
         ];
@@ -231,6 +274,25 @@ class ActivityController extends Controller
             'submission_notes' => $request->validated('submission_notes'),
         ]);
 
+        // Notify committee staff reviewer(s)
+        $staffUsers = $committee->roleAssignments()
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->with('user')
+            ->get()
+            ->pluck('user')
+            ->filter();
+
+        foreach ($staffUsers as $staff) {
+            if ($staff->id !== $request->user()->id) {
+                $staff->notify(new ActivitySubmittedForReviewNotification(
+                    $activity,
+                    $committee,
+                    $project,
+                    $request->user()
+                ));
+            }
+        }
+
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
             'committee' => $committee->id,
@@ -258,21 +320,43 @@ class ActivityController extends Controller
         $action = $request->validated('action');
 
         if (in_array($action, ['complete', 'mark_completed'], true)) {
+            $status = Activity::STATUS_COMPLETED;
+            $feedback = null;
             $activity->update([
-                'status' => Activity::STATUS_COMPLETED,
+                'status' => $status,
                 'reviewed_by' => $request->user()->id,
                 'reviewed_at' => now(),
                 'review_feedback' => null,
             ]);
             $message = 'Activity marked as completed.';
         } else {
+            $status = Activity::STATUS_RETURNED_FOR_REVISION;
+            $feedback = $request->validated('review_feedback');
             $activity->update([
-                'status' => Activity::STATUS_RETURNED_FOR_REVISION,
+                'status' => $status,
                 'reviewed_by' => $request->user()->id,
                 'reviewed_at' => now(),
-                'review_feedback' => $request->validated('review_feedback'),
+                'review_feedback' => $feedback,
             ]);
             $message = 'Activity returned for revision.';
+        }
+
+        // Notify relevant owning/submitting members and creator
+        $recipients = collect([$activity->creator])
+            ->merge($activity->tasks()->with('assignee')->get()->pluck('assignee'))
+            ->filter()
+            ->unique('id')
+            ->reject(fn ($u) => $u->id === $request->user()->id);
+
+        foreach ($recipients as $recipient) {
+            $recipient->notify(new ActivityReviewedNotification(
+                $activity,
+                $committee,
+                $project,
+                $request->user(),
+                $status,
+                $feedback
+            ));
         }
 
         return redirect()->route('projects.committees.activities.show', [
@@ -296,5 +380,19 @@ class ActivityController extends Controller
     public function returnForRevision(ReviewActivityRequest $request, Project $project, Committee $committee, Activity $activity): RedirectResponse
     {
         return $this->review($request, $project, $committee, $activity);
+    }
+
+    /**
+     * Format raw bytes into human-readable representation.
+     */
+    private function formatFileSize(int $bytes): string
+    {
+        if ($bytes >= 1048576) {
+            return round($bytes / 1048576, 2) . ' MB';
+        }
+        if ($bytes >= 1024) {
+            return round($bytes / 1024, 1) . ' KB';
+        }
+        return $bytes . ' B';
     }
 }

@@ -23,6 +23,7 @@ import {
     AvatarImage,
 } from '@/Components/ui/avatar';
 import { Alert } from '@/Components/Alert';
+import { NotificationDropdown } from '@/Components/NotificationDropdown';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -155,19 +156,8 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogout }: SidebarContentProps) {
-    // Determine active project display:
-    // 1. Explicit currentProject passed in props
-    // 2. Or fallback when inside /projects/{project} route
-    // 3. Otherwise (/dashboard, /projects, etc.) remains null (No project selected)
-    const isInsideProjectRoute =
-        currentPage.startsWith('/projects/') && currentPage.replace(/\/+$/, '') !== '/projects';
-
-    const activeProject =
-        currentProject !== undefined
-            ? currentProject
-            : isInsideProjectRoute
-            ? { title: 'CCIS General Assembly 2026', role: 'Project Leader', status: 'In Progress' }
-            : null;
+    // Determine active project display from explicitly passed currentProject prop
+    const activeProject = currentProject ?? null;
 
     return (
         <div className="flex flex-col h-full">
@@ -247,7 +237,7 @@ function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogou
                             </p>
                             <p className="text-[10px] text-orange-200/50 leading-snug">
                                 {activeProject
-                                    ? `${activeProject.role || 'Member'} · ${activeProject.status || 'Active'}`
+                                    ? `${activeProject.role || 'No project role'}${activeProject.status ? ` · ${activeProject.status}` : ''}`
                                     : 'Select from Projects'}
                             </p>
                         </div>
@@ -421,26 +411,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                             <TooltipContent className="text-xs">Search coming soon</TooltipContent>
                         </Tooltip>
 
-                        {/* Notification bell placeholder */}
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button
-                                    type="button"
-                                    className="relative p-2 rounded-lg text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-surface-muted)] transition-colors cursor-not-allowed"
-                                    disabled
-                                    aria-label="Notifications (coming soon)"
-                                >
-                                    <Bell className="w-4.5 h-4.5" />
-                                    {/* Dot indicator placeholder */}
-                                    <span
-                                        className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-white"
-                                        style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
-                                        aria-hidden="true"
-                                    />
-                                </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs">Notifications coming soon</TooltipContent>
-                        </Tooltip>
+                        {/* Notification Bell Dropdown */}
+                        <NotificationDropdown />
 
                         <Separator orientation="vertical" className="h-6 mx-1" />
 

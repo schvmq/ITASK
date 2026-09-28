@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\CommitteeController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPersonnelController;
@@ -59,9 +60,12 @@ Route::post('/email/verification-notification', function (Request $request) {
 
 // Authenticated Application / Dashboard Route
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', function () {
-        return Inertia::render('Welcome');
-    })->name('dashboard');
+    Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+    // Notifications
+    Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
+    Route::post('/notifications/mark-all-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
 
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
@@ -79,6 +83,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees', [CommitteeController::class, 'store'])->name('projects.committees.store');
     Route::get('/projects/{project}/committees/{committee}', [CommitteeController::class, 'show'])->name('projects.committees.show');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}', [CommitteeController::class, 'update'])->name('projects.committees.update');
+    Route::post('/projects/{project}/committees/{committee}/staff', [CommitteeController::class, 'assignStaff'])->name('projects.committees.staff.store');
     Route::delete('/projects/{project}/committees/{committee}', [CommitteeController::class, 'destroy'])->name('projects.committees.destroy');
 
     // Committee Members
@@ -99,6 +104,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('projects.committees.activities.tasks.update');
     Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('projects.committees.activities.tasks.destroy');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/submit', [\App\Http\Controllers\TaskController::class, 'submit'])->name('projects.committees.activities.tasks.submit');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/approve', [\App\Http\Controllers\TaskController::class, 'approve'])->name('projects.committees.activities.tasks.approve');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/complete', [\App\Http\Controllers\TaskController::class, 'approve'])->name('projects.committees.activities.tasks.complete');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/return', [\App\Http\Controllers\TaskController::class, 'returnForRevision'])->name('projects.committees.activities.tasks.return');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/resubmit', [\App\Http\Controllers\TaskController::class, 'resubmit'])->name('projects.committees.activities.tasks.resubmit');
+
+    // Checklist Items
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist', [ChecklistItemController::class, 'store'])->name('projects.committees.activities.tasks.checklist.store');
+    Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist/{checklist_item}', [ChecklistItemController::class, 'update'])->name('projects.committees.activities.tasks.checklist.update');
+    Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/checklist/{checklist_item}', [ChecklistItemController::class, 'destroy'])->name('projects.committees.activities.tasks.checklist.destroy');
+
+    // Task Evidence / MOV
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence', [\App\Http\Controllers\TaskEvidenceController::class, 'store'])->name('projects.committees.activities.tasks.evidence.store');
+    Route::get('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence/{evidence}/download', [\App\Http\Controllers\TaskEvidenceController::class, 'download'])->name('projects.committees.activities.tasks.evidence.download');
+    Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence/{evidence}', [\App\Http\Controllers\TaskEvidenceController::class, 'destroy'])->name('projects.committees.activities.tasks.evidence.destroy');
 });
 
 // Logout
