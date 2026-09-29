@@ -7,117 +7,31 @@ import { FormField } from '@/Components/FormField';
 import { Label } from '@/Components/Label';
 import { InputError } from '@/Components/InputError';
 import { Button } from '@/Components/Button';
+import { ProjectRoleBadge } from '@/Components/ProjectRoleBadge';
 import {
     FolderOpen,
     Plus,
     Search,
     Calendar,
-    Users,
-    CheckCircle2,
-    Clock,
     AlertTriangle,
     RotateCcw,
-    Layers,
     ArrowUpRight,
+    ChevronRight,
     Info,
     X,
-    Filter,
     FileText,
+    LayoutGrid,
+    List,
+    Archive,
 } from 'lucide-react';
 import { Skeleton } from '@/Components/ui/skeleton';
-
-// ─── Status Types & Semantic Color Configurations ─────────────────────────────
-// Project statuses are kept visually distinct from task/activity status.
-// Brand orange and semantic status colors remain strictly separate.
-// NO purple/indigo is used anywhere.
-
-export type ProjectStatus = 'Planning' | 'In Progress' | 'Active' | 'Completed' | 'On Hold' | 'Archived';
-
-interface StatusConfig {
-    label: string;
-    bgClass: string;
-    textClass: string;
-    borderClass: string;
-    dotClass: string;
-}
-
-const STATUS_CONFIGS: Record<ProjectStatus, StatusConfig> = {
-    Planning: {
-        label: 'Planning',
-        bgClass: 'bg-slate-50',
-        textClass: 'text-slate-700',
-        borderClass: 'border-slate-200',
-        dotClass: 'bg-slate-400',
-    },
-    'In Progress': {
-        label: 'In Progress',
-        bgClass: 'bg-sky-50',
-        textClass: 'text-sky-700',
-        borderClass: 'border-sky-200',
-        dotClass: 'bg-sky-500',
-    },
-    Active: {
-        label: 'Active',
-        bgClass: 'bg-emerald-50',
-        textClass: 'text-emerald-700',
-        borderClass: 'border-emerald-200',
-        dotClass: 'bg-emerald-500',
-    },
-    Completed: {
-        label: 'Completed',
-        bgClass: 'bg-emerald-50',
-        textClass: 'text-emerald-700',
-        borderClass: 'border-emerald-200',
-        dotClass: 'bg-emerald-500',
-    },
-    'On Hold': {
-        label: 'On Hold',
-        bgClass: 'bg-amber-50',
-        textClass: 'text-amber-800',
-        borderClass: 'border-amber-200',
-        dotClass: 'bg-amber-500',
-    },
-    Archived: {
-        label: 'Archived',
-        bgClass: 'bg-slate-100',
-        textClass: 'text-slate-600',
-        borderClass: 'border-slate-300',
-        dotClass: 'bg-slate-500',
-    },
-};
-
-// ─── Role Badge Configurations ────────────────────────────────────────────────
-// The 3 project-scoped roles: Project Leader, Project Staff, Project Member
-interface RoleConfig {
-    bgClass: string;
-    textClass: string;
-    borderClass: string;
-}
-
-const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
-    'Project Leader': {
-        bgClass: 'bg-emerald-50/80',
-        textClass: 'text-[color:var(--color-brand-dark-green)]',
-        borderClass: 'border-emerald-300/60',
-    },
-    'Project Staff': {
-        bgClass: 'bg-[color:var(--color-brand-active-warm-orange)]',
-        textClass: 'text-[color:var(--color-brand-action-orange)]',
-        borderClass: 'border-orange-200',
-    },
-    'Project Member': {
-        bgClass: 'bg-slate-100',
-        textClass: 'text-slate-700',
-        borderClass: 'border-slate-300/70',
-    },
-};
 
 // ─── Project Item Data Model ────────────────────────────────────────────────
 export interface ProjectItem {
     id: string;
     title: string;
     description: string;
-    status: ProjectStatus;
+    status: string;
     role: ProjectRole;
     progress: number;
     deadline: string;
@@ -126,39 +40,18 @@ export interface ProjectItem {
     tasksCount: number;
 }
 
-// ─── Status Badge Component ──────────────────────────────────────────────────
-function StatusBadge({ status }: { status: ProjectStatus }) {
-    const config = STATUS_CONFIGS[status] ?? STATUS_CONFIGS.Planning;
-    return (
-        <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${config.bgClass} ${config.textClass} ${config.borderClass}`}
-        >
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dotClass}`} />
-            <span>{config.label}</span>
-        </span>
-    );
-}
-
-// ─── Role Badge Component ────────────────────────────────────────────────────
-function RoleBadge({ role }: { role: ProjectRole }) {
-    const config = ROLE_CONFIGS[role] ?? ROLE_CONFIGS['Project Member'];
-    return (
-        <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase border ${config.bgClass} ${config.textClass} ${config.borderClass}`}
-        >
-            {role}
-        </span>
-    );
-}
-
 // ─── Project Card Component ──────────────────────────────────────────────────
+// Only displays: Project Name, Your Role, Progress, Deadline, and Open action.
 interface ProjectCardProps {
     project: ProjectItem;
     onSelect: (project: ProjectItem) => void;
 }
 
 function ProjectCard({ project, onSelect }: ProjectCardProps) {
-    const isCompleted = project.status === 'Completed';
+    const isCompletedOrArchived =
+        project.status === 'Completed' ||
+        project.status === 'Archived' ||
+        project.progress === 100;
 
     return (
         <div
@@ -171,62 +64,159 @@ function ProjectCard({ project, onSelect }: ProjectCardProps) {
                     onSelect(project);
                 }
             }}
-            className="group relative bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:shadow-md hover:border-[color:var(--color-brand-action-orange)]/50 transition-all duration-200 cursor-pointer flex flex-col justify-between"
+            className="group relative bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:shadow-md hover:border-[color:var(--color-brand-action-orange)]/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
         >
-            {/* Top row: Role + Status */}
+            {/* Top row: Role */}
             <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                    <RoleBadge role={project.role} />
-                    <StatusBadge status={project.status} />
+                    <ProjectRoleBadge role={project.role} />
                 </div>
 
                 {/* Project Title */}
                 <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-base font-bold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug line-clamp-1">
+                    <h3 className="text-base font-bold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug line-clamp-2">
                         {project.title}
                     </h3>
                     <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-[color:var(--color-brand-action-orange)] transition-colors shrink-0 mt-0.5" />
                 </div>
-
-                {/* Description */}
-                <p className="text-xs text-[color:var(--color-text-muted)] mt-1.5 line-clamp-2 leading-relaxed">
-                    {project.description}
-                </p>
             </div>
 
-            {/* Middle: Progress bar */}
-            <div className="mt-5 pt-4 border-t border-[color:var(--color-border-light)]">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="text-[11px] font-medium text-[color:var(--color-text-muted)]">
-                        Progress
-                    </span>
-                    <span className="text-xs font-bold text-[color:var(--color-text-main)]">
-                        {project.progress}%
-                    </span>
+            <div>
+                {/* Progress bar */}
+                <div className="mt-5 pt-3.5 border-t border-[color:var(--color-border-light)]">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="text-[11px] font-medium text-[color:var(--color-text-muted)]">
+                            Progress
+                        </span>
+                        <span className="text-xs font-bold text-[color:var(--color-text-main)]">
+                            {project.progress}%
+                        </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                                width: `${project.progress}%`,
+                                backgroundColor: isCompletedOrArchived
+                                    ? '#10b981'
+                                    : 'var(--color-brand-action-orange)',
+                            }}
+                        />
+                    </div>
                 </div>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                            width: `${project.progress}%`,
-                            backgroundColor: isCompleted
-                                ? '#10b981'
-                                : 'var(--color-brand-action-orange)',
-                        }}
-                    />
+
+                {/* Bottom row: Deadline & Open action */}
+                <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-[color:var(--color-text-subtle)]">
+                    <div className="flex items-center gap-1.5" title={`Deadline: ${project.deadline}`}>
+                        <Calendar className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate text-slate-600 font-medium">
+                            {project.deadline}
+                        </span>
+                    </div>
+
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--color-brand-action-orange)] group-hover:translate-x-0.5 transition-transform shrink-0">
+                        <span>Open</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                    </span>
                 </div>
             </div>
+        </div>
+    );
+}
 
-            {/* Bottom metadata row */}
-            <div className="mt-4 flex items-center justify-between text-[11px] text-[color:var(--color-text-subtle)]">
-                <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{project.deadline}</span>
-                </div>
-                <div className="flex items-center gap-1.5 font-medium">
-                    <Layers className="w-3.5 h-3.5 shrink-0" />
-                    <span>{project.committeesCount} Committees</span>
-                </div>
+// ─── Project List Component ──────────────────────────────────────────────────
+// Only displays columns: Project Name, Your Role, Progress, Deadline, Action.
+interface ProjectListProps {
+    projects: ProjectItem[];
+    onSelect: (project: ProjectItem) => void;
+}
+
+function ProjectList({ projects, onSelect }: ProjectListProps) {
+    return (
+        <div className="w-full bg-white rounded-xl border border-[color:var(--color-border-light)] shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[640px]">
+                    <thead>
+                        <tr className="border-b border-[color:var(--color-border-light)] bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                            <th className="px-5 py-3">Project Name</th>
+                            <th className="px-4 py-3">Your Role</th>
+                            <th className="px-4 py-3">Progress</th>
+                            <th className="px-4 py-3">Deadline</th>
+                            <th className="px-5 py-3 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                        {projects.map((project) => {
+                            const isCompletedOrArchived =
+                                project.status === 'Completed' ||
+                                project.status === 'Archived' ||
+                                project.progress === 100;
+                            return (
+                                <tr
+                                    key={project.id}
+                                    onClick={() => onSelect(project)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            onSelect(project);
+                                        }
+                                    }}
+                                    className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
+                                >
+                                    {/* Project Name */}
+                                    <td className="px-5 py-3.5 max-w-sm">
+                                        <div className="font-semibold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors">
+                                            {project.title}
+                                        </div>
+                                    </td>
+
+                                    {/* Your Role */}
+                                    <td className="px-4 py-3.5 whitespace-nowrap">
+                                        <ProjectRoleBadge role={project.role} />
+                                    </td>
+
+                                    {/* Progress */}
+                                    <td className="px-4 py-3.5 whitespace-nowrap">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-20 sm:w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-300"
+                                                    style={{
+                                                        width: `${project.progress}%`,
+                                                        backgroundColor: isCompletedOrArchived
+                                                            ? '#10b981'
+                                                            : 'var(--color-brand-action-orange)',
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="text-[11px] font-medium text-slate-700 w-8">
+                                                {project.progress}%
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    {/* Deadline */}
+                                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">
+                                        <div className="flex items-center gap-1.5 text-[11px]">
+                                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            <span className="font-medium">{project.deadline}</span>
+                                        </div>
+                                    </td>
+
+                                    {/* Action */}
+                                    <td className="px-5 py-3.5 whitespace-nowrap text-right">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold text-[color:var(--color-brand-action-orange)] group-hover:bg-orange-50/80 transition-colors">
+                                            <span>Open</span>
+                                            <ArrowUpRight className="w-3.5 h-3.5" />
+                                        </span>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
@@ -243,10 +233,8 @@ function ProjectsLoadingSkeleton() {
                 >
                     <div className="flex items-center justify-between">
                         <Skeleton className="h-5 w-24 rounded-md" />
-                        <Skeleton className="h-5 w-20 rounded-full" />
                     </div>
                     <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-10 w-full" />
                     <div className="pt-4 border-t border-slate-100 space-y-2">
                         <div className="flex justify-between">
                             <Skeleton className="h-3.5 w-16" />
@@ -256,7 +244,6 @@ function ProjectsLoadingSkeleton() {
                     </div>
                     <div className="flex justify-between pt-2">
                         <Skeleton className="h-3.5 w-28" />
-                        <Skeleton className="h-3.5 w-24" />
                     </div>
                 </div>
             ))}
@@ -290,13 +277,17 @@ function ProjectsErrorState({ onRetry }: { onRetry: () => void }) {
 
 // ─── Empty State Component ───────────────────────────────────────────────────
 interface ProjectsEmptyStateProps {
+    activeTab: 'ongoing' | 'archived';
     isFiltered: boolean;
+    searchTerm: string;
     onResetFilters?: () => void;
     onCreateClick?: () => void;
 }
 
 function ProjectsEmptyState({
+    activeTab,
     isFiltered,
+    searchTerm,
     onResetFilters,
     onCreateClick,
 }: ProjectsEmptyStateProps) {
@@ -304,14 +295,20 @@ function ProjectsEmptyState({
         return (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-xl border border-dashed border-[color:var(--color-border-dark)] bg-[color:var(--color-surface-subtle)]">
                 <div className="w-12 h-12 rounded-xl bg-white border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-xs">
-                    <Search className="w-5 h-5" />
+                    <Search className="w-5 h-5 text-slate-400" />
                 </div>
                 <h4 className="text-base font-semibold text-[color:var(--color-text-main)]">
                     No matching projects found
                 </h4>
                 <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 mb-4 leading-relaxed">
-                    No projects match the specified search term or filters. Try adjusting your
-                    keywords or resetting the filter options.
+                    {searchTerm ? (
+                        <>
+                            No {activeTab === 'archived' ? 'archived' : 'ongoing'} projects match the search query{' '}
+                            <span className="font-semibold text-slate-700">"{searchTerm}"</span> or selected role filter.
+                        </>
+                    ) : (
+                        `No ${activeTab === 'archived' ? 'archived' : 'ongoing'} projects match the selected filter criteria.`
+                    )}
                 </p>
                 {onResetFilters && (
                     <button
@@ -320,33 +317,49 @@ function ProjectsEmptyState({
                         className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-brand-dark-green)] bg-[color:var(--color-brand-active-warm-orange)] hover:bg-orange-100 transition-colors cursor-pointer border border-orange-200"
                     >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        Clear Filters
+                        <span>Clear Filters</span>
                     </button>
                 )}
             </div>
         );
     }
 
+    if (activeTab === 'archived') {
+        return (
+            <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-white">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 mb-3 shadow-xs">
+                    <Archive className="w-6 h-6" />
+                </div>
+                <h4 className="text-base font-bold text-[color:var(--color-text-main)]">
+                    No archived projects
+                </h4>
+                <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 leading-relaxed">
+                    Completed and archived projects will appear here for historical records.
+                </p>
+            </div>
+        );
+    }
+
     return (
-        <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-[color:var(--color-border-dark)] bg-white">
+        <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-white">
             <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-muted)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-xs">
-                <FolderOpen className="w-6 h-6" />
+                <FolderOpen className="w-6 h-6 text-slate-400" />
             </div>
             <h4 className="text-base font-bold text-[color:var(--color-text-main)]">
-                No projects yet
+                No ongoing projects
             </h4>
             <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 mb-5 leading-relaxed">
-                Projects where you are assigned a role will appear here.
+                You do not have any ongoing projects. Start a new project to get underway.
             </p>
             {onCreateClick && (
                 <button
                     type="button"
                     onClick={onCreateClick}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-white shadow-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer hover:opacity-95"
                     style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
                 >
                     <Plus className="w-4 h-4" />
-                    + Create Project
+                    <span>+ Create Project</span>
                 </button>
             )}
         </div>
@@ -359,9 +372,16 @@ interface ProjectsIndexProps {
 
 // ─── Main Projects Page Component ─────────────────────────────────────────────
 export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
+    // Top-level organization:
+    // 1. "My Projects" (ongoing) - all non-archived, non-completed projects
+    // 2. "Archived" - completed and archived projects
+    const [activeTab, setActiveTab] = useState<'ongoing' | 'archived'>('ongoing');
+
+    // View mode state (Card vs List)
+    const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+
     // Search and filter state
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [roleFilter, setRoleFilter] = useState<string>('ALL');
 
     // Modal / Notice feedback state
@@ -428,30 +448,61 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
         });
     };
 
-    // Client-side filtering of real backend projects
+    // Calculate counts for the two primary categories: My Projects (ongoing) and Archived (completed/archived)
+    const ongoingCount = useMemo(() => {
+        return projects.filter(
+            (p) => p.status !== 'Archived' && p.status !== 'Completed'
+        ).length;
+    }, [projects]);
+
+    const archivedCount = useMemo(() => {
+        return projects.filter(
+            (p) => p.status === 'Archived' || p.status === 'Completed'
+        ).length;
+    }, [projects]);
+
+    const tabs: { key: 'ongoing' | 'archived'; label: string; count: number }[] = [
+        { key: 'ongoing', label: 'My Projects', count: ongoingCount },
+        { key: 'archived', label: 'Archived', count: archivedCount },
+    ];
+
+    // Client-side filtering of projects
     const filteredProjects = useMemo(() => {
         return projects.filter((project) => {
-            const matchesSearch =
-                searchTerm.trim() === '' ||
-                project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                project.description.toLowerCase().includes(searchTerm.toLowerCase());
+            const isArchivedOrCompleted =
+                project.status === 'Archived' || project.status === 'Completed';
 
-            const matchesStatus =
-                statusFilter === 'ALL' || project.status === statusFilter;
+            // Tab filter:
+            // "ongoing" = all ongoing / non-archived projects
+            // "archived" = completed & archived projects
+            if (activeTab === 'ongoing' && isArchivedOrCompleted) {
+                return false;
+            }
+            if (activeTab === 'archived' && !isArchivedOrCompleted) {
+                return false;
+            }
 
-            const matchesRole =
-                roleFilter === 'ALL' || project.role === roleFilter;
+            // Search Term
+            if (searchTerm.trim() !== '') {
+                const query = searchTerm.toLowerCase();
+                const matchesTitle = project.title.toLowerCase().includes(query);
+                const matchesDesc = (project.description || '').toLowerCase().includes(query);
+                if (!matchesTitle && !matchesDesc) return false;
+            }
 
-            return matchesSearch && matchesStatus && matchesRole;
+            // Role Filter
+            if (roleFilter !== 'ALL' && project.role !== roleFilter) {
+                return false;
+            }
+
+            return true;
         });
-    }, [projects, searchTerm, statusFilter, roleFilter]);
+    }, [projects, activeTab, searchTerm, roleFilter]);
 
-    const isFiltered =
-        searchTerm.trim() !== '' || statusFilter !== 'ALL' || roleFilter !== 'ALL';
+    const isFiltered = searchTerm.trim() !== '' || roleFilter !== 'ALL';
 
     const handleResetFilters = () => {
         setSearchTerm('');
-        setStatusFilter('ALL');
         setRoleFilter('ALL');
     };
 
@@ -481,7 +532,7 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
         >
             <Head title="Projects — ITASK" />
 
-            <div className="space-y-6">
+            <div className="space-y-5">
 
                 {/* ── Notice Banner Modal / Alert ── */}
                 {activeNotice && (
@@ -508,97 +559,144 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                     </div>
                 )}
 
-                {/* ── Search and Filter Toolbar ── */}
-                <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-3 sm:space-y-0 sm:flex sm:items-center sm:gap-3">
+                {/* ── Search and Filter Controls Toolbar ── */}
+                <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-3.5 sm:p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-3.5">
                     
-                    {/* Search Projects input */}
-                    <div className="relative flex-1 min-w-[200px]">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search projects by title or description…"
-                            className="w-full pl-9 pr-8 py-2 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] rounded-lg border border-[color:var(--color-border-light)] placeholder:text-slate-400 focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] focus:ring-2 focus:ring-[color:var(--color-brand-action-orange)]/20 transition-all"
-                        />
-                        {searchTerm && (
-                            <button
-                                type="button"
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
-                                aria-label="Clear search"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        )}
+                    {/* Primary Organization Tabs: My Projects vs Archived */}
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none border-b border-[color:var(--color-border-light)]">
+                        {tabs.map((tab) => {
+                            const isActive = activeTab === tab.key;
+                            return (
+                                <button
+                                    key={tab.key}
+                                    type="button"
+                                    onClick={() => setActiveTab(tab.key)}
+                                    className={`relative flex items-center gap-2 px-4 py-2.5 text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors border-b-2 -mb-[1px] ${
+                                        isActive
+                                            ? 'border-[color:var(--color-brand-action-orange)] text-[color:var(--color-brand-dark-green)]'
+                                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-200'
+                                    }`}
+                                >
+                                    <span>{tab.label}</span>
+                                    <span
+                                        className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                            isActive
+                                                ? 'bg-[color:var(--color-brand-active-warm-orange)] text-[color:var(--color-brand-action-orange)]'
+                                                : 'bg-slate-100 text-slate-600'
+                                        }`}
+                                    >
+                                        {tab.count}
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
 
-                    {/* Filter Controls Row */}
-                    <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Search & Role Filter & View Switcher Row */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-0.5">
                         
-                        {/* Status Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-semibold text-[color:var(--color-text-muted)] hidden md:inline">
-                                Status:
-                            </span>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="h-8 px-2.5 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] rounded-lg focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] cursor-pointer"
-                            >
-                                <option value="ALL">All Statuses</option>
-                                <option value="Planning">Planning</option>
-                                <option value="Active">Active</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Completed">Completed</option>
-                                <option value="On Hold">On Hold</option>
-                                <option value="Archived">Archived</option>
-                            </select>
+                        {/* Search Projects input */}
+                        <div className="relative flex-1 min-w-[200px]">
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                placeholder="Search projects by title or description…"
+                                className="w-full pl-9 pr-8 py-2 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] rounded-lg border border-[color:var(--color-border-light)] placeholder:text-slate-400 focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] focus:ring-2 focus:ring-[color:var(--color-brand-action-orange)]/20 transition-all"
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                                    aria-label="Clear search"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            )}
                         </div>
 
-                        {/* Role Filter */}
-                        <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-semibold text-[color:var(--color-text-muted)] hidden md:inline">
-                                Role:
-                            </span>
-                            <select
-                                value={roleFilter}
-                                onChange={(e) => setRoleFilter(e.target.value)}
-                                className="h-8 px-2.5 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] rounded-lg focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] cursor-pointer"
-                            >
-                                <option value="ALL">All Roles</option>
-                                <option value="Project Leader">Project Leader</option>
-                                <option value="Project Staff">Project Staff</option>
-                                <option value="Project Member">Project Member</option>
-                            </select>
-                        </div>
+                        {/* Filter Controls + View Switcher */}
+                        <div className="flex flex-wrap items-center gap-2.5 justify-between sm:justify-end">
+                            
+                            <div className="flex items-center gap-2">
+                                {/* Role Filter */}
+                                <div className="flex items-center gap-1.5">
+                                    <select
+                                        value={roleFilter}
+                                        onChange={(e) => setRoleFilter(e.target.value)}
+                                        className="h-8 px-2.5 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] rounded-lg focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] cursor-pointer"
+                                        aria-label="Filter by your role"
+                                    >
+                                        <option value="ALL">All Roles</option>
+                                        <option value="Project Leader">Project Leader</option>
+                                        <option value="Project Staff">Project Staff</option>
+                                        <option value="Project Member">Project Member</option>
+                                    </select>
+                                </div>
+                            </div>
 
-                        {/* Reset Filter Button (visible when filters are active) */}
-                        {isFiltered && (
-                            <button
-                                type="button"
-                                onClick={handleResetFilters}
-                                className="h-8 px-2.5 text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)] hover:bg-slate-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                                title="Reset all search filters"
-                            >
-                                <RotateCcw className="w-3 h-3" />
-                                <span className="hidden sm:inline">Reset</span>
-                            </button>
-                        )}
+                            {/* View Switcher: Cards vs List */}
+                            <div className="flex items-center p-0.5 rounded-lg border border-[color:var(--color-border-light)] bg-slate-100/80">
+                                <button
+                                    type="button"
+                                    onClick={() => setViewMode('card')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                                        viewMode === 'card'
+                                            ? 'bg-white text-[color:var(--color-text-main)] shadow-2xs font-semibold'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    }`}
+                                    title="Card view"
+                                    aria-label="Switch to Card view"
+                                >
+                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">Cards</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setViewMode('list')}
+                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                                        viewMode === 'list'
+                                            ? 'bg-white text-[color:var(--color-text-main)] shadow-2xs font-semibold'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                    }`}
+                                    title="List view"
+                                    aria-label="Switch to List view"
+                                >
+                                    <List className="w-3.5 h-3.5" />
+                                    <span className="hidden sm:inline">List</span>
+                                </button>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
+
+                {/* ── Archived Notice Banner (when viewing archived tab) ── */}
+                {activeTab === 'archived' && filteredProjects.length > 0 && (
+                    <div className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-600">
+                        <Archive className="w-4 h-4 text-slate-500 shrink-0" />
+                        <div>
+                            <span className="font-semibold text-slate-800">Project Archive Records</span>
+                            <span className="text-slate-500 ml-1.5">— Completed and archived projects remain preserved and accessible for historical records and documentation.</span>
+                        </div>
+                    </div>
+                )}
 
                 {/* ── Content Area: Dynamic based on filters ── */}
                 {filteredProjects.length === 0 ? (
                     <ProjectsEmptyState
+                        activeTab={activeTab}
                         isFiltered={isFiltered}
+                        searchTerm={searchTerm}
                         onResetFilters={handleResetFilters}
                         onCreateClick={handleOpenCreateModal}
                     />
                 ) : (
                     <div>
-                        {/* Projects counter */}
-                        <div className="flex items-center justify-between mb-4 px-1">
+                        {/* Projects counter row */}
+                        <div className="flex items-center justify-between mb-3 px-1">
                             <p className="text-xs text-[color:var(--color-text-muted)]">
                                 Showing{' '}
                                 <span className="font-bold text-[color:var(--color-text-main)]">
@@ -606,21 +704,28 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                                 </span>{' '}
                                 {filteredProjects.length === 1 ? 'project' : 'projects'}
                             </p>
-                            <p className="text-[11px] text-[color:var(--color-text-subtle)]">
+                            <p className="text-[11px] text-[color:var(--color-text-subtle)] hidden sm:block">
                                 Click any project to open its workspace
                             </p>
                         </div>
 
-                        {/* Projects Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                            {filteredProjects.map((project) => (
-                                <ProjectCard
-                                    key={project.id}
-                                    project={project}
-                                    onSelect={handleProjectCardSelect}
-                                />
-                            ))}
-                        </div>
+                        {/* Projects Display: Card Grid vs List View */}
+                        {viewMode === 'card' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                {filteredProjects.map((project) => (
+                                    <ProjectCard
+                                        key={project.id}
+                                        project={project}
+                                        onSelect={handleProjectCardSelect}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <ProjectList
+                                projects={filteredProjects}
+                                onSelect={handleProjectCardSelect}
+                            />
+                        )}
                     </div>
                 )}
 

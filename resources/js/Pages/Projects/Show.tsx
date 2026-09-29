@@ -11,6 +11,13 @@ import { InputError } from '@/Components/InputError';
 import { Button } from '@/Components/Button';
 import { ProjectRoleBadge } from '@/Components/ProjectRoleBadge';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/Components/ui/dropdown-menu';
+import {
     FolderOpen,
     Calendar,
     Users,
@@ -654,7 +661,7 @@ export default function ProjectShow({
     return (
         <AppLayout
             title={project.title}
-            subtitle="Project Workspace & Hierarchy Overview"
+            subtitle="Project Workspace"
             currentProject={{
                 title: project.title,
                 role: project.role ?? undefined,
@@ -702,16 +709,18 @@ export default function ProjectShow({
 
                 {/* ── Project Header Card ── */}
                 <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 sm:p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                        
-                        {/* Left: Title, Description, and Badges */}
-                        <div className="space-y-2.5 max-w-3xl">
+
+                    {/* Row 1: Title + Actions */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+
+                        {/* Left: Status badges, Title, Description */}
+                        <div className="min-w-0 space-y-1.5 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                                 <ProjectStatusBadge status={project.status} />
                                 <ProjectRoleBadge role={project.role} />
                                 {project.userCommittee && (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium border bg-slate-50 text-slate-700 border-slate-200">
-                                        <span>Assigned to: {project.userCommittee.name}</span>
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border bg-slate-50 text-slate-600 border-slate-200">
+                                        {project.userCommittee.name}
                                     </span>
                                 )}
                             </div>
@@ -721,184 +730,135 @@ export default function ProjectShow({
                             </h1>
 
                             {project.description ? (
-                                <p className="text-xs sm:text-sm text-[color:var(--color-text-muted)] leading-relaxed">
+                                <p className="text-sm text-[color:var(--color-text-muted)] leading-relaxed max-w-2xl">
                                     {project.description}
                                 </p>
                             ) : (
-                                <p className="text-xs sm:text-sm text-slate-400 italic">
+                                <p className="text-sm text-slate-400 italic">
                                     No project description provided.
                                 </p>
                             )}
                         </div>
 
-                        {/* Right: Project Actions Area */}
-                        <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
+                        {/* Right: Action buttons — clear hierarchy */}
+                        <div className="flex items-center gap-2 shrink-0 pt-1 sm:pt-0">
+
+                            {/* Primary: Timeline */}
                             <button
                                 type="button"
                                 onClick={() => setActiveTab('timeline')}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-[color:var(--color-brand-active-warm-orange)] border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
-                                title="Open Gantt Timeline & Schedule"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors cursor-pointer shadow-xs"
+                                style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
+                                title="Open project Gantt timeline"
                             >
-                                <GanttChartSquare className="w-3.5 h-3.5 text-[color:var(--color-brand-action-orange)]" />
-                                <span>View Timeline</span>
+                                <GanttChartSquare className="w-3.5 h-3.5" />
+                                <span>Timeline</span>
                             </button>
 
+                            {/* Secondary: Edit (leader only) */}
                             {isLeader && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={handleOpenEditModal}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] hover:bg-slate-100 transition-colors cursor-pointer"
-                                        title="Edit project details"
-                                    >
-                                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
-                                        <span>Edit Project</span>
-                                    </button>
-
-                                    {project.status !== 'Archived' ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsArchiveModalOpen(true)}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
-                                            title="Archive project"
-                                        >
-                                            <Archive className="w-3.5 h-3.5 text-rose-600" />
-                                            <span>Archive</span>
-                                        </button>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200">
-                                            <Archive className="w-3.5 h-3.5 text-slate-400" />
-                                            <span>Archived</span>
-                                        </span>
-                                    )}
-                                </>
+                                <button
+                                    type="button"
+                                    onClick={handleOpenEditModal}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Edit project details"
+                                >
+                                    <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Edit</span>
+                                </button>
                             )}
 
-                            <button
-                                type="button"
-                                onClick={() => handleActionClick('Project Settings')}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] hover:bg-slate-100 transition-colors cursor-pointer"
-                                title="Project configuration & settings (Placeholder)"
-                            >
-                                <Settings className="w-3.5 h-3.5 text-slate-500" />
-                                <span>Project Settings</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => handleActionClick('More Project Actions')}
-                                className="p-2 rounded-lg text-[color:var(--color-text-muted)] hover:bg-slate-100 border border-[color:var(--color-border-light)] transition-colors cursor-pointer"
-                                title="More options"
-                                aria-label="More options"
-                            >
-                                <MoreHorizontal className="w-4 h-4" />
-                            </button>
+                            {/* Overflow: Settings + Archive (low-priority / destructive) */}
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className="p-2 rounded-lg text-[color:var(--color-text-muted)] hover:bg-slate-100 border border-[color:var(--color-border-light)] transition-colors cursor-pointer"
+                                        title="More options"
+                                        aria-label="More project options"
+                                    >
+                                        <MoreHorizontal className="w-4 h-4" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44">
+                                    <DropdownMenuItem
+                                        onClick={() => handleActionClick('Project Settings')}
+                                        className="gap-2 text-xs cursor-pointer"
+                                    >
+                                        <Settings className="w-3.5 h-3.5 text-slate-500" />
+                                        Project Settings
+                                    </DropdownMenuItem>
+                                    {isLeader && project.status !== 'Archived' && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={() => setIsArchiveModalOpen(true)}
+                                                className="gap-2 text-xs text-rose-600 focus:text-rose-700 focus:bg-rose-50 cursor-pointer"
+                                            >
+                                                <Archive className="w-3.5 h-3.5" />
+                                                Archive Project
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </div>
 
-                    {/* Key Project Information & Leadership Grid */}
-                    <div className="mt-5 pt-4 border-t border-[color:var(--color-border-light)] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {/* 1. Project Leader */}
-                        <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
-                                project.hasLeader
-                                    ? 'bg-orange-100 text-[color:var(--color-brand-action-orange)] border border-orange-200'
-                                    : 'bg-slate-100 text-slate-400 border border-slate-200'
-                            }`}>
-                                {project.hasLeader ? getInitials(project.leaderName) : <User className="w-4 h-4" />}
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
-                                    Project Leader
-                                </p>
-                                <p className={`text-xs font-bold truncate ${
-                                    project.hasLeader
-                                        ? 'text-[color:var(--color-text-main)]'
-                                        : 'text-slate-400 italic'
-                                }`} title={project.leaderName}>
-                                    {project.leaderName}
-                                </p>
-                                {project.leaderEmail ? (
-                                    <p className="text-[11px] text-[color:var(--color-text-subtle)] truncate" title={project.leaderEmail}>
-                                        {project.leaderEmail}
-                                    </p>
+                    {/* Row 2: Compact metadata strip — Leader, Dates, Progress */}
+                    <div className="mt-4 pt-4 border-t border-[color:var(--color-border-light)] flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+
+                        {/* Leader */}
+                        <div className="flex items-center gap-1.5 text-[color:var(--color-text-muted)]">
+                            <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>
+                                <span className="font-medium">Led by</span>{' '}
+                                {project.hasLeader ? (
+                                    <span className="text-[color:var(--color-text-main)] font-semibold">{project.leaderName}</span>
                                 ) : (
-                                    <p className="text-[10px] text-slate-400 italic">
-                                        {project.hasLeader ? 'Institutional Personnel' : 'Role assignment pending'}
-                                    </p>
+                                    <span className="text-slate-400 italic">No leader assigned</span>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* 2. Project Status */}
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0">
-                                <Shield className="w-4 h-4 text-slate-500" />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
-                                    Project Status
-                                </p>
-                                <div className="mt-0.5">
-                                    <ProjectStatusBadge status={project.status} />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 3. Start Date */}
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 text-slate-500">
-                                <Calendar className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
-                                    Start Date
-                                </p>
-                                <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate mt-0.5">
-                                    {project.startDate !== 'Not set' ? project.startDate : <span className="text-slate-400 italic font-normal">Not set</span>}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* 4. Target Deadline */}
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 text-slate-500">
-                                <Clock className="w-4 h-4" />
-                            </div>
-                            <div className="min-w-0">
-                                <p className="text-[11px] font-semibold text-[color:var(--color-text-muted)] uppercase tracking-wider">
-                                    Target Deadline
-                                </p>
-                                <p className="text-xs font-bold text-[color:var(--color-text-main)] truncate mt-0.5">
-                                    {project.deadline !== 'No deadline specified' ? project.deadline : <span className="text-slate-400 italic font-normal">No deadline set</span>}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Progress Bar inside Header Card */}
-                    <div className="mt-6 pt-5 border-t border-[color:var(--color-border-light)]">
-                        <div className="flex items-center justify-between text-xs mb-2">
-                            <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[color:var(--color-text-main)]">
-                                    Project Progress
-                                </span>
-                                <span className="text-[11px] text-[color:var(--color-text-muted)]">
-                                    (Aggregated across all committees)
-                                </span>
-                            </div>
-                            <span className="font-extrabold text-[color:var(--color-brand-action-orange)]">
-                                {project.progress}% Complete
                             </span>
                         </div>
-                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                    width: `${project.progress}%`,
-                                    backgroundColor: 'var(--color-brand-action-orange)',
-                                }}
-                            />
+
+                        {/* Start date */}
+                        {project.startDate && project.startDate !== 'Not set' && (
+                            <div className="flex items-center gap-1.5 text-[color:var(--color-text-muted)]">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>
+                                    <span className="font-medium">Started</span>{' '}
+                                    <span className="text-[color:var(--color-text-main)] font-semibold">{project.startDate}</span>
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Deadline */}
+                        <div className="flex items-center gap-1.5 text-[color:var(--color-text-muted)]">
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>
+                                <span className="font-medium">Deadline</span>{' '}
+                                {project.deadline && project.deadline !== 'No deadline specified' ? (
+                                    <span className="text-[color:var(--color-text-main)] font-semibold">{project.deadline}</span>
+                                ) : (
+                                    <span className="text-slate-400 italic">Not set</span>
+                                )}
+                            </span>
+                        </div>
+
+                        {/* Progress — pushed right */}
+                        <div className="flex items-center gap-2 sm:ml-auto">
+                            <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full rounded-full transition-all duration-500"
+                                    style={{
+                                        width: `${project.progress}%`,
+                                        backgroundColor: 'var(--color-brand-action-orange)',
+                                    }}
+                                />
+                            </div>
+                            <span className="font-semibold text-[color:var(--color-brand-action-orange)] tabular-nums">
+                                {project.progress}%
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -918,36 +878,36 @@ export default function ProjectShow({
 
                 {/* ── Project Level Navigation (Tabs) ── */}
                 <div className="border-b border-[color:var(--color-border-light)] overflow-x-auto scrollbar-none">
-                    <nav className="flex space-x-1 sm:space-x-2" aria-label="Project tabs">
+                    <nav className="flex space-x-0" aria-label="Project tabs">
                         {tabs.map((tab) => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.key;
+                            const count =
+                                tab.key === 'committees' ? project.summary.committees
+                                : tab.key === 'activities' ? project.summary.activities
+                                : tab.key === 'tasks' ? project.summary.tasks
+                                : null;
                             return (
                                 <button
                                     key={tab.key}
                                     type="button"
                                     onClick={() => setActiveTab(tab.key)}
-                                    className={`flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                                    className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
                                         isActive
-                                            ? 'border-[color:var(--color-brand-action-orange)] text-[color:var(--color-brand-action-orange)] bg-white/50'
-                                            : 'border-transparent text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)] hover:border-slate-300'
+                                            ? 'border-[color:var(--color-brand-action-orange)] text-[color:var(--color-brand-action-orange)]'
+                                            : 'border-transparent text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)] hover:border-slate-200'
                                     }`}
+                                    aria-current={isActive ? 'page' : undefined}
                                 >
-                                    <Icon className={`w-4 h-4 ${isActive ? 'text-[color:var(--color-brand-action-orange)]' : 'text-slate-400'}`} />
+                                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[color:var(--color-brand-action-orange)]' : 'text-slate-400'}`} />
                                     <span>{tab.label}</span>
-                                    {tab.key === 'committees' && (
-                                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
-                                            {project.summary.committees}
-                                        </span>
-                                    )}
-                                    {tab.key === 'activities' && (
-                                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
-                                            {project.summary.activities}
-                                        </span>
-                                    )}
-                                    {tab.key === 'tasks' && (
-                                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600">
-                                            {project.summary.tasks}
+                                    {count !== null && (
+                                        <span className={`text-[10px] font-bold px-1.5 rounded-full ${
+                                            isActive
+                                                ? 'bg-orange-100 text-[color:var(--color-brand-action-orange)]'
+                                                : 'bg-slate-100 text-slate-500'
+                                        }`}>
+                                            {count}
                                         </span>
                                     )}
                                 </button>
@@ -958,170 +918,58 @@ export default function ProjectShow({
 
                 {/* ── TAB 1: OVERVIEW ── */}
                 {activeTab === 'overview' && (
-                    <div className="space-y-6">
+                    <div className="space-y-5">
 
-                        {/* 1. High-Level Project Information Metrics Cards */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-                            
-                            {/* Metric 1: Project Progress */}
-                            <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-muted)]">
-                                    Project Progress
-                                </p>
-                                <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {project.progress}%
-                                </p>
-                                <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full"
-                                        style={{
-                                            width: `${project.progress}%`,
-                                            backgroundColor: 'var(--color-brand-action-orange)',
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Metric 2: Committees */}
-                            <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-muted)]">
-                                    Committees
-                                </p>
-                                <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {project.summary.committees}
-                                </p>
-                                <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
-                                    Active groups
-                                </p>
-                            </div>
-
-                            {/* Metric 3: Activities */}
-                            <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-muted)]">
-                                    Activities
-                                </p>
-                                <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {project.summary.activities}
-                                </p>
-                                <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
-                                    Planned & active
-                                </p>
-                            </div>
-
-                            {/* Metric 4: Tasks */}
-                            <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-muted)]">
-                                    Tasks
-                                </p>
-                                <p className="text-xl sm:text-2xl font-bold text-[color:var(--color-text-main)] mt-1">
-                                    {project.summary.tasks}
-                                </p>
-                                <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
-                                    Assigned items
-                                </p>
-                            </div>
-
-                            {/* Metric 5: Deadline */}
-                            <div className="col-span-2 sm:col-span-1 bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-[color:var(--color-text-muted)]">
-                                    Deadline
-                                </p>
-                                <p className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] mt-1 leading-snug">
-                                    {project.deadline !== 'No deadline specified' ? project.deadline : <span className="text-slate-400 italic font-normal">Not set</span>}
-                                </p>
-                                <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1">
-                                    Target conclusion
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* 2. Project Workflow Visualization (Hierarchy) */}
+                        {/* 1. Project Structure Summary + Quick Navigation */}
                         <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                            <div className="mb-3">
-                                <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                    Project Workflow Hierarchy
-                                </h3>
-                                <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                    Structure governing coordination, committee deliverables, and task execution
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-                                
-                                {/* Step 1: Project */}
-                                <div className="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/40 relative">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-[color:var(--color-brand-dark-green)]">
-                                            Tier 1 · Scope
-                                        </span>
-                                        <FolderOpen className="w-4 h-4 text-[color:var(--color-brand-dark-green)]" />
-                                    </div>
-                                    <h4 className="text-xs font-bold text-slate-900">Project</h4>
-                                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                        Governing project charter, objectives, and leadership oversight.
-                                    </p>
-                                    <p className="text-[10px] text-emerald-800 font-semibold mt-1.5 truncate">
-                                        Led by: {project.leaderName}
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div>
+                                    <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
+                                        Project Structure
+                                    </h3>
+                                    <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
+                                        {project.summary.committees === 0 && project.summary.activities === 0 && project.summary.tasks === 0
+                                            ? 'No committees, activities, or tasks have been created yet.'
+                                            : [
+                                                project.summary.committees > 0 && `${project.summary.committees} ${project.summary.committees === 1 ? 'committee' : 'committees'}`,
+                                                project.summary.activities > 0 && `${project.summary.activities} ${project.summary.activities === 1 ? 'activity' : 'activities'}`,
+                                                project.summary.tasks > 0 && `${project.summary.tasks} ${project.summary.tasks === 1 ? 'task' : 'tasks'}`,
+                                              ].filter(Boolean).join(' · ')
+                                        }
                                     </p>
                                 </div>
-
-                                {/* Step 2: Committees */}
-                                <div className="p-3.5 rounded-lg border border-orange-200 bg-[color:var(--color-brand-active-warm-orange)]/60 relative">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-[color:var(--color-brand-action-orange)]">
-                                            Tier 2 · Organization
-                                        </span>
-                                        <Users className="w-4 h-4 text-[color:var(--color-brand-action-orange)]" />
-                                    </div>
-                                    <h4 className="text-xs font-bold text-slate-900">Committees</h4>
-                                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                        Functional working teams headed by assigned Project Staff.
-                                    </p>
+                                <div className="flex flex-wrap gap-2">
+                                    <button type="button" onClick={() => setActiveTab('committees')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer">
+                                        <Users className="w-3.5 h-3.5 text-slate-500" />
+                                        Committees
+                                        <ChevronRight className="w-3 h-3 text-slate-400" />
+                                    </button>
+                                    <button type="button" onClick={() => setActiveTab('activities')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer">
+                                        <ListTodo className="w-3.5 h-3.5 text-slate-500" />
+                                        Activities
+                                        <ChevronRight className="w-3 h-3 text-slate-400" />
+                                    </button>
+                                    <button type="button" onClick={() => setActiveTab('tasks')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer">
+                                        <CheckSquare className="w-3.5 h-3.5 text-slate-500" />
+                                        Tasks
+                                        <ChevronRight className="w-3 h-3 text-slate-400" />
+                                    </button>
                                 </div>
-
-                                {/* Step 3: Activities */}
-                                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/80 relative">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-600">
-                                            Tier 3 · Deliverables
-                                        </span>
-                                        <ListTodo className="w-4 h-4 text-slate-600" />
-                                    </div>
-                                    <h4 className="text-xs font-bold text-slate-900">Activities</h4>
-                                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                        Events and milestones requiring submission and staff review.
-                                    </p>
-                                </div>
-
-                                {/* Step 4: Tasks */}
-                                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/80 relative">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-600">
-                                            Tier 4 · Execution
-                                        </span>
-                                        <CheckSquare className="w-4 h-4 text-slate-600" />
-                                    </div>
-                                    <h4 className="text-xs font-bold text-slate-900">Tasks</h4>
-                                    <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                                        Actionable member work items, deadlines, and progress logs.
-                                    </p>
-                                </div>
-
                             </div>
                         </div>
 
-                        {/* 3. Two-Column Layout: Committee Preview + Recent Activity */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* 2. Two-Column Layout: Committee Preview + Recent Activities */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-                            {/* Left (2 cols): Committee Preview */}
+                            {/* Left (2 cols): Committees */}
                             <div className="lg:col-span-2 bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
                                 <div className="flex items-center justify-between mb-4">
                                     <div>
                                         <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                            Committee Progress Preview
+                                            Committees
                                         </h3>
                                         <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                            Active functional committees assigned under this project
+                                            Progress by functional committee
                                         </p>
                                     </div>
                                     <button
@@ -1143,59 +991,42 @@ export default function ProjectShow({
                                                 <Link
                                                     key={committee.id}
                                                     href={`/projects/${project.id}/committees/${committee.id}`}
-                                                    className="block p-4 rounded-lg border border-[color:var(--color-border-light)] hover:border-slate-300 transition-colors bg-white space-y-2.5"
+                                                    className="flex items-center gap-3 p-3.5 rounded-lg border border-[color:var(--color-border-light)] hover:border-slate-300 hover:bg-slate-50/50 transition-colors"
                                                 >
-                                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-                                                        <div>
-                                                            <h4 className="text-xs font-bold text-[color:var(--color-text-main)] hover:text-[color:var(--color-brand-action-orange)] transition-colors">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                            <h4 className="text-xs font-semibold text-[color:var(--color-text-main)] truncate">
                                                                 {committee.name}
                                                             </h4>
-                                                            <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-0.5">
-                                                                {committee.head ? `Led by ${committee.head.name}` : 'Unassigned Staff Head'}
-                                                            </p>
-                                                        </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-[11px] font-semibold text-[color:var(--color-text-muted)]">
-                                                                {committee.membersCount} {committee.membersCount === 1 ? 'member' : 'members'}
-                                                            </span>
-                                                            <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)] min-w-[36px] text-right">
+                                                            <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)] shrink-0">
                                                                 {committee.progress}%
                                                             </span>
                                                         </div>
+                                                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full rounded-full transition-all duration-300"
+                                                                style={{
+                                                                    width: `${committee.progress}%`,
+                                                                    backgroundColor: 'var(--color-brand-dark-green)',
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <p className="text-[11px] text-[color:var(--color-text-subtle)] mt-1.5">
+                                                            {committee.head ? `Led by ${committee.head.name}` : 'Unassigned head'} · {committee.membersCount} {committee.membersCount === 1 ? 'member' : 'members'}
+                                                        </p>
                                                     </div>
-
-                                                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full rounded-full transition-all duration-300"
-                                                            style={{
-                                                                width: `${committee.progress}%`,
-                                                                backgroundColor: 'var(--color-brand-dark-green)',
-                                                            }}
-                                                        />
-                                                    </div>
+                                                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
                                                 </Link>
                                             ) : (
                                                 <div
                                                     key={committee.id}
-                                                    className="block p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1.5"
+                                                    className="flex items-center gap-3 p-3.5 rounded-lg border border-slate-200 bg-slate-50/70"
                                                 >
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <h4 className="text-xs font-bold text-slate-700">
-                                                                {committee.name}
-                                                            </h4>
-                                                            <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-slate-200/80 px-1.5 py-0.5 rounded font-medium">
-                                                                <Lock className="w-2.5 h-2.5 text-slate-400" />
-                                                                <span>Restricted</span>
-                                                            </span>
-                                                        </div>
-                                                        <span className="text-[11px] text-slate-400 font-medium">
-                                                            Assigned members only
-                                                        </span>
+                                                    <Lock className="w-4 h-4 text-slate-400 shrink-0" />
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="text-xs font-semibold text-slate-600">{committee.name}</h4>
+                                                        <p className="text-[11px] text-slate-400 mt-0.5">Restricted to assigned members</p>
                                                     </div>
-                                                    <p className="text-[11px] text-slate-500">
-                                                        Workspace access and details are restricted to assigned committee personnel.
-                                                    </p>
                                                 </div>
                                             );
                                         })
@@ -1222,53 +1053,57 @@ export default function ProjectShow({
                                 </div>
                             </div>
 
-                            {/* Right (1 col): Recent Project Activity */}
+                            {/* Right (1 col): Recent Activities */}
                             <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <div className="mb-4">
-                                    <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                        Recent Activities
-                                    </h3>
-                                    <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                        Latest activities across committee workflows
-                                    </p>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
+                                            Recent Activities
+                                        </h3>
+                                        <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
+                                            Latest across committees
+                                        </p>
+                                    </div>
+                                    {recentActivities.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveTab('activities')}
+                                            className="text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <span>All</span>
+                                            <ChevronRight className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-1">
                                     {recentActivities.length > 0 ? (
-                                        recentActivities.map((activity, index) => (
-                                            <div key={activity.id} className="relative flex items-start gap-3">
-                                                {/* Step dot and line */}
-                                                <div className="flex flex-col items-center">
-                                                    <div className="w-7 h-7 rounded-full bg-orange-50 border border-orange-200 flex items-center justify-center text-[color:var(--color-brand-action-orange)] shrink-0">
-                                                        <Clock className="w-3.5 h-3.5" />
-                                                    </div>
-                                                    {index < recentActivities.length - 1 && (
-                                                        <div className="w-px h-8 bg-slate-200 mt-1" />
-                                                    )}
+                                        recentActivities.map((activity) => (
+                                            <Link
+                                                key={activity.id}
+                                                href={`/projects/${initialProject.id}/committees/${activity.committee.id}/activities/${activity.id}`}
+                                                className="flex items-start gap-2.5 p-2.5 rounded-lg hover:bg-slate-50 transition-colors group"
+                                            >
+                                                <div className="w-6 h-6 rounded-full bg-orange-50 border border-orange-200 flex items-center justify-center text-[color:var(--color-brand-action-orange)] shrink-0 mt-0.5">
+                                                    <ListTodo className="w-3 h-3" />
                                                 </div>
-
-                                                <div className="flex-1 min-w-0 pt-0.5">
-                                                    <p className="text-xs font-semibold text-[color:var(--color-text-main)] leading-snug">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-semibold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] leading-snug transition-colors truncate">
                                                         {activity.title}
                                                     </p>
-                                                    <p className="text-[11px] text-[color:var(--color-text-muted)] truncate mt-0.5">
+                                                    <p className="text-[11px] text-[color:var(--color-text-muted)] mt-0.5 truncate">
                                                         {activity.committee?.name ?? 'Project Activity'}
-                                                        {activity.creator ? ` · ${activity.creator.name}` : ''}
                                                     </p>
-                                                    {activity.status && (
-                                                        <p className="text-[10px] text-[color:var(--color-text-subtle)] mt-0.5">
-                                                            Status: {activity.status}
-                                                        </p>
-                                                    )}
                                                 </div>
-                                            </div>
+                                                <ChevronRight className="w-3.5 h-3.5 text-slate-300 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </Link>
                                         ))
                                     ) : (
                                         <div className="py-6 text-center">
                                             <ListTodo className="w-7 h-7 text-slate-300 mx-auto mb-2" />
                                             <p className="text-xs font-semibold text-slate-500">No activities yet</p>
                                             <p className="text-[11px] text-slate-400 mt-1">
-                                                Committee activities will appear here once created.
+                                                Activities appear here once committees are active.
                                             </p>
                                         </div>
                                     )}
@@ -1276,25 +1111,26 @@ export default function ProjectShow({
                             </div>
                         </div>
 
-                        {/* 4. Project Supporting & Approval Documents Section */}
+                        {/* 3. Project Documents */}
                         <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                                 <div>
                                     <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                        Project Approval Documents
+                                        Project Documents
                                     </h3>
                                     <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                        Official project memos, activity designs, and dean approval letters
+                                        Official memos, activity designs, and approval letters
                                     </p>
                                 </div>
                                 {(initialProject.can?.uploadDocument) && (
                                     <button
                                         type="button"
                                         onClick={handleOpenUploadDocumentModal}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 transition-opacity cursor-pointer shadow-xs self-start sm:self-auto"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white cursor-pointer shadow-xs self-start sm:self-auto"
+                                        style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
                                     >
                                         <FileText className="w-3.5 h-3.5" />
-                                        <span>+ Attach Document</span>
+                                        <span>Attach Document</span>
                                     </button>
                                 )}
                             </div>
