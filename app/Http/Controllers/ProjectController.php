@@ -129,7 +129,7 @@ class ProjectController extends Controller
     /**
      * Display the specified project.
      */
-    public function show(string $project): Response
+    public function show(string $project, ?string $initialTab = null): Response
     {
         $projectModel = is_numeric($project)
             ? Project::with([
@@ -323,10 +323,13 @@ class ProjectController extends Controller
             })->values()->all(),
         ] : null;
 
+        $currentTab = $initialTab ?? request('tab');
+
         return Inertia::render('Projects/Show', [
             'projectId' => $project,
             'project' => $projectData,
             'timeline' => $timelineData,
+            'initialTab' => $currentTab,
         ]);
     }
 

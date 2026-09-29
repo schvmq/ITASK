@@ -660,7 +660,7 @@ export default function Welcome({
 
                                         <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                                             <span>
-                                                {comm.activities_count} activities · {comm.tasks_count} tasks
+                                                {comm.activities_count} activities · {comm.completed_tasks_count}/{comm.tasks_count} tasks ({comm.progressPercentage ?? (comm.tasks_count > 0 ? Math.round((comm.completed_tasks_count / comm.tasks_count) * 100) : 0)}%)
                                             </span>
                                             <Link
                                                 href={`/projects/${comm.project_id}/committees/${comm.id}`}
@@ -668,6 +668,15 @@ export default function Welcome({
                                             >
                                                 Manage <ChevronRight className="w-3 h-3" />
                                             </Link>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all"
+                                                style={{
+                                                    width: `${comm.progressPercentage ?? (comm.tasks_count > 0 ? Math.round((comm.completed_tasks_count / comm.tasks_count) * 100) : 0)}%`,
+                                                    backgroundColor: 'var(--color-brand-action-orange)',
+                                                }}
+                                            />
                                         </div>
                                     </div>
                                 ))}

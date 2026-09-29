@@ -137,6 +137,8 @@ class DashboardController extends Controller
                     'activities_count' => $committee->activities->count(),
                     'tasks_count' => $tasksCount,
                     'completed_tasks_count' => $completedTasksCount,
+                    'progress' => $committeeProgress['progress'],
+                    'progressPercentage' => $committeeProgress['progress'],
                 ];
             });
 

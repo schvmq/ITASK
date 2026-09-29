@@ -3,6 +3,7 @@ import { Head, Link, useForm, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { type ProjectRole } from '@/Config/navigation';
 import type { ProjectTimelineData } from '@/types';
+import { GanttTimeline } from '@/Components/GanttTimeline';
 import { Modal } from '@/Components/Modal';
 import { FormField } from '@/Components/FormField';
 import { Label } from '@/Components/Label';
@@ -129,6 +130,7 @@ export interface ProjectData {
     title: string;
     description: string | null;
     status: string;
+    progress?: number;
     start_date?: string | null;
     end_date?: string | null;
     start_date_raw?: string | null;
@@ -169,6 +171,7 @@ export interface ProjectShowProps {
     projectId?: string;
     project?: ProjectData | null;
     timeline?: ProjectTimelineData | null;
+    initialTab?: TabKey | string | null;
 }
 
 type TabKey = 'overview' | 'committees' | 'activities' | 'tasks' | 'timeline';
@@ -269,9 +272,16 @@ function getInitials(name: string): string {
 }
 
 // ─── Main Project Detail Page Shell ───────────────────────────────────────────
-export default function ProjectShow({ projectId: _projectId, project: initialProject, timeline: initialTimeline }: ProjectShowProps) {
-    const _timelineData = initialTimeline ?? initialProject?.timeline;
-    const [activeTab, setActiveTab] = useState<TabKey>('overview');
+export default function ProjectShow({
+    projectId: _projectId,
+    project: initialProject,
+    timeline: initialTimeline,
+    initialTab,
+}: ProjectShowProps) {
+    const timelineData = initialTimeline ?? initialProject?.timeline;
+    const [activeTab, setActiveTab] = useState<TabKey>(
+        (initialTab as TabKey) || 'overview'
+    );
 
     // Role-aware authorization (Project Leader only for edit and archive)
     const isLeader = Boolean(
@@ -599,7 +609,7 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
         status: initialProject.status,
         role: initialProject.role ?? null,
         userCommittee: initialProject.userCommittee ?? null,
-        progress: 0,
+        progress: initialProject.progress ?? 0,
         deadline: initialProject.end_date ?? 'No deadline specified',
         startDate: initialProject.start_date ?? 'Not set',
         leader: leaderUser,
@@ -723,6 +733,16 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
 
                         {/* Right: Project Actions Area */}
                         <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab('timeline')}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-[color:var(--color-brand-active-warm-orange)] border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                                title="Open Gantt Timeline & Schedule"
+                            >
+                                <GanttChartSquare className="w-3.5 h-3.5 text-[color:var(--color-brand-action-orange)]" />
+                                <span>View Timeline</span>
+                            </button>
+
                             {isLeader && (
                                 <>
                                     <button
@@ -1800,68 +1820,9 @@ export default function ProjectShow({ projectId: _projectId, project: initialPro
                     </div>
                 )}
 
-                {/* ── TAB 5: TIMELINE PLACEHOLDER ── */}
+                {/* ── TAB 5: TIMELINE VISUALIZATION ── */}
                 {activeTab === 'timeline' && (
-                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-5">
-                        <div>
-                            <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
-                                Project Timeline & Schedule
-                            </h3>
-                            <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                Cascading schedule monitoring through Committee → Activity → Task
-                            </p>
-                        </div>
-
-                        {/* Visual Timeline Roadmap Preview */}
-                        <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-4">
-                            <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
-                                <span>September 2026</span>
-                                <span>October 2026 (Target Conclusion)</span>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div>
-                                    <div className="flex justify-between text-[11px] mb-1">
-                                        <span className="font-semibold text-slate-800">Program & Events Committee Milestone</span>
-                                        <span className="text-slate-500">Sep 01 - Oct 18</span>
-                                    </div>
-                                    <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-[color:var(--color-brand-dark-green)] rounded-full" style={{ width: '68%' }} />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between text-[11px] mb-1">
-                                        <span className="font-semibold text-slate-800">Technical Committee Audio-Visual Readiness</span>
-                                        <span className="text-slate-500">Sep 15 - Oct 15</span>
-                                    </div>
-                                    <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-[color:var(--color-brand-action-orange)] rounded-full" style={{ width: '42%' }} />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <div className="flex justify-between text-[11px] mb-1">
-                                        <span className="font-semibold text-slate-800">Documentation & Attendance Collation</span>
-                                        <span className="text-slate-500">Oct 01 - Oct 18</span>
-                                    </div>
-                                    <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-emerald-600 rounded-full" style={{ width: '75%' }} />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 text-center">
-                            <GanttChartSquare className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                            <h4 className="text-xs font-bold text-slate-800">
-                                Interactive Gantt & Timeline Engine Placeholder
-                            </h4>
-                            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                                Project progress will be monitored through Committee → Activity → Task deadlines and milestones. The interactive Gantt chart calculation will be implemented in a dedicated upcoming step.
-                            </p>
-                        </div>
-                    </div>
+                    <GanttTimeline timeline={timelineData} />
                 )}
 
                 {/* ── Edit Project Modal ── */}

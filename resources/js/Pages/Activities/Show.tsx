@@ -93,6 +93,7 @@ export interface ActivityData {
     title: string;
     description: string | null;
     status: 'To Do' | 'In Progress' | 'Under Review' | 'Completed' | 'Returned' | 'Returned for Revision';
+    progress?: number;
     start_date: string | null;
     start_date_raw: string | null;
     due_date: string | null;
@@ -776,7 +777,9 @@ export default function ActivityShow({
 
     const completedTasksCount = activity.tasks.filter((t) => t.status === 'Completed').length;
     const taskProgressPercent =
-        activity.tasks.length > 0 ? Math.round((completedTasksCount / activity.tasks.length) * 100) : 0;
+        activity.progress !== undefined
+            ? Math.round(activity.progress)
+            : (activity.tasks.length > 0 ? Math.round((completedTasksCount / activity.tasks.length) * 100) : 0);
 
     const [taskFilter, setTaskFilter] = useState<'all' | 'under_review' | 'in_progress' | 'returned' | 'completed' | 'my_tasks'>('all');
 
@@ -996,6 +999,14 @@ export default function ActivityShow({
 
                         {/* Action Controls */}
                         <div className="flex items-center gap-2 self-start shrink-0 flex-wrap">
+                            <Link
+                                href={`/projects/${project.id}/timeline`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
+                            >
+                                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                <span>View in Timeline</span>
+                            </Link>
+
                             {/* Member Submit for Review button */}
                             {activity.can.submit && activity.status !== 'Returned for Revision' && (
                                 <Button

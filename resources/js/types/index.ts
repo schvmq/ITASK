@@ -84,6 +84,8 @@ export interface DashboardCommittee {
     activities_count: number;
     tasks_count: number;
     completed_tasks_count: number;
+    progress?: number;
+    progressPercentage?: number;
 }
 
 export interface DashboardTask {
