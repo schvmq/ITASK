@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { type ProjectRole } from '@/Config/navigation';
+import type { ProjectTimelineData } from '@/types';
 import { Modal } from '@/Components/Modal';
 import { FormField } from '@/Components/FormField';
 import { Label } from '@/Components/Label';
@@ -161,11 +162,13 @@ export interface ProjectData {
     documents?: DocumentItem[];
     activities?: ProjectActivityItem[];
     tasks?: ProjectTaskItem[];
+    timeline?: ProjectTimelineData | null;
 }
 
 export interface ProjectShowProps {
     projectId?: string;
     project?: ProjectData | null;
+    timeline?: ProjectTimelineData | null;
 }
 
 type TabKey = 'overview' | 'committees' | 'activities' | 'tasks' | 'timeline';
@@ -266,7 +269,8 @@ function getInitials(name: string): string {
 }
 
 // ─── Main Project Detail Page Shell ───────────────────────────────────────────
-export default function ProjectShow({ projectId: _projectId, project: initialProject }: ProjectShowProps) {
+export default function ProjectShow({ projectId: _projectId, project: initialProject, timeline: initialTimeline }: ProjectShowProps) {
+    const _timelineData = initialTimeline ?? initialProject?.timeline;
     const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
     // Role-aware authorization (Project Leader only for edit and archive)

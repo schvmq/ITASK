@@ -12,6 +12,7 @@ use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use App\Services\ProjectProgressService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -20,6 +21,9 @@ use Inertia\Response;
 
 class CommitteeController extends Controller
 {
+    public function __construct(
+        protected ProjectProgressService $progressService
+    ) {}
     /**
      * Store a newly created committee in storage.
      */
@@ -115,10 +119,13 @@ class CommitteeController extends Controller
                 ->all()
             : [];
 
+        $committeeProgress = $this->progressService->calculateCommitteeProgress($committee);
+
         $committeeData = [
             'id' => (string) $committee->id,
             'name' => $committee->name,
             'description' => $committee->description,
+            'progress' => $committeeProgress['progress'],
             'project' => [
                 'id' => (string) $project->id,
                 'title' => $project->title,
@@ -146,6 +153,7 @@ class CommitteeController extends Controller
                 'title' => $act->title,
                 'description' => $act->description,
                 'status' => $act->status,
+                'progress' => $this->progressService->calculateActivityProgress($act)['progress'],
                 'start_date' => $act->start_date?->format('M d, Y'),
                 'start_date_raw' => $act->start_date?->format('Y-m-d'),
                 'due_date' => $act->due_date?->format('M d, Y'),
