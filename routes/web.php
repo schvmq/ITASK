@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\CommitteeController;
+use App\Http\Controllers\MyTasksController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPersonnelController;
+use App\Http\Controllers\TimelineIndexController;
 use App\Models\User;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
@@ -61,6 +64,15 @@ Route::post('/email/verification-notification', function (Request $request) {
 // Authenticated Application / Dashboard Route
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+    // My Tasks (cross-project task hub, role-scoped)
+    Route::get('/my-tasks', [MyTasksController::class, 'index'])->name('my-tasks.index');
+
+    // Calendar (date-oriented view of project/activity/task dates)
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+
+    // Timeline index (project list → select project → view Gantt)
+    Route::get('/timeline', [TimelineIndexController::class, 'index'])->name('timeline.index');
 
     // Notifications
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
