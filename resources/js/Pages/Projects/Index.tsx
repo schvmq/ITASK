@@ -526,11 +526,11 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
 
     return (
         <AppLayout
-            title="Projects"
-            subtitle="CCIS projects where you hold an active role"
+            title="My Projects"
+            subtitle={`${projects.length} total ${projects.length === 1 ? 'project' : 'projects'}`}
             headerAction={createProjectButton}
         >
-            <Head title="Projects — ITASK" />
+            <Head title="My Projects — ITASK" />
 
             <div className="space-y-5">
 
