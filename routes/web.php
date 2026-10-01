@@ -64,6 +64,8 @@ Route::post('/email/verification-notification', function (Request $request) {
 // Authenticated Application / Dashboard Route
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/tasks', fn() => redirect()->route('my-tasks.index'))->name('tasks.index');
+    Route::post('/tasks/assign-sample', [\App\Http\Controllers\UserTaskController::class, 'assignSampleTasks'])->name('tasks.assign_sample');
 
     // My Tasks (cross-project task hub, role-scoped)
     Route::get('/my-tasks', [MyTasksController::class, 'index'])->name('my-tasks.index');
