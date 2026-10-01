@@ -148,4 +148,31 @@ class ActivityPolicy
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
     }
+
+    /**
+     * Determine whether the user can send a manual reminder for the activity.
+     * Allowed for:
+     * - Project Leader of the parent project
+     * - Project Staff assigned to this committee
+     */
+    public function sendReminder(User $user, Activity $activity): bool
+    {
+        $project = $activity->project ?? $activity->committee?->project;
+
+        if ($project) {
+            $isLeader = $project->roleAssignments()
+                ->where('user_id', $user->id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                ->exists();
+
+            if ($isLeader) {
+                return true;
+            }
+        }
+
+        return $activity->committee?->roleAssignments()
+            ->where('user_id', $user->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->exists() ?? false;
+    }
 }
