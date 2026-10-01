@@ -14,155 +14,211 @@ use Inertia\Response;
 class CalendarController extends Controller
 {
     /**
-     * Display the monthly project and task schedule calendar.
+     * Display a calendar view of existing ITASK project/activity/task dates.
+     *
+     * Respects project/committee authorization — users only see dates
+     * for projects/activities/tasks they are authorized to access.
      */
     public function index(Request $request): Response
     {
-        $userId = $request->user()->id;
-        $today = now()->startOfDay();
+        $user   = $request->user();
+        $userId = $user->id;
 
-        // 1. Determine projects the user is authorized to see
-        $authorizedProjectIds = Project::query()
+        // Determine the user's scoped project/committee access
+        $userRoleAssignments = ProjectRoleAssignment::query()
+            ->where('user_id', $userId)
+            ->get();
+
+        $leaderProjectIds = Project::query()
             ->where('created_by', $userId)
-            ->orWhereHas('roleAssignments', fn($q) => $q->where('user_id', $userId))
-            ->pluck('id');
+            ->pluck('id')
+            ->merge(
+                $userRoleAssignments
+                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                    ->pluck('project_id')
+            )
+            ->unique()
+            ->values();
 
-        // Distinct project options for filtering
-        $projects = Project::query()
-            ->whereIn('id', $authorizedProjectIds)
-            ->select('id', 'title')
-            ->orderBy('title')
-            ->get()
-            ->map(fn($p) => [
-                'id' => (string) $p->id,
-                'title' => $p->title,
-            ]);
+        $staffCommitteeIds = $userRoleAssignments
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+            ->pluck('committee_id')
+            ->filter()
+            ->values();
 
-        $projectFilter = $request->input('project_id', 'all');
-        $typeFilter = $request->input('type', 'all'); // 'all', 'tasks', 'activities'
+        $memberCommitteeIds = $userRoleAssignments
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+            ->pluck('committee_id')
+            ->filter()
+            ->values();
 
-        // 2. Fetch Tasks with due dates
-        $tasksQuery = Task::query()
-            ->whereNotNull('due_date')
-            ->whereHas('activity', function ($q) use ($authorizedProjectIds, $projectFilter) {
-                $q->whereIn('project_id', $authorizedProjectIds);
-                if ($projectFilter !== 'all' && !empty($projectFilter)) {
-                    $q->where('project_id', $projectFilter);
-                }
-            })
-            ->with(['activity.committee.project', 'assignee']);
+        $allAccessibleProjectIds = $leaderProjectIds
+            ->merge($userRoleAssignments->pluck('project_id')->filter())
+            ->unique()
+            ->values();
 
-        // 3. Fetch Activities with dates
-        $activitiesQuery = Activity::query()
-            ->where(function ($q) {
-                $q->whereNotNull('start_date')
-                  ->orWhereNotNull('due_date');
-            })
-            ->whereIn('project_id', $authorizedProjectIds)
-            ->with(['project', 'committee']);
-
-        if ($projectFilter !== 'all' && !empty($projectFilter)) {
-            $activitiesQuery->where('project_id', $projectFilter);
-        }
+        $allAccessibleCommitteeIds = $staffCommitteeIds
+            ->merge($memberCommitteeIds)
+            ->unique()
+            ->values();
 
         $events = collect();
 
-        // Include Tasks in calendar events
-        if ($typeFilter === 'all' || $typeFilter === 'tasks') {
-            $tasks = $tasksQuery->get();
-            foreach ($tasks as $task) {
-                $dueDate = Carbon::parse($task->due_date)->startOfDay();
-                $isOverdue = $dueDate->lt($today) && $task->status !== Task::STATUS_COMPLETED;
+        // ── 1. Project start/end dates ────────────────────────────────────────
+        $projects = Project::query()
+            ->whereIn('id', $allAccessibleProjectIds)
+            ->where(function ($q) {
+                $q->whereNotNull('start_date')->orWhereNotNull('end_date');
+            })
+            ->get();
 
+        foreach ($projects as $project) {
+            $userRole = $leaderProjectIds->contains($project->id)
+                ? 'Project Leader'
+                : ($userRoleAssignments->where('project_id', $project->id)->first()?->role ?? 'Project Member');
+
+            if ($project->start_date) {
                 $events->push([
-                    'id' => "task-{$task->id}",
-                    'raw_id' => (string) $task->id,
-                    'type' => 'task',
-                    'title' => $task->title,
-                    'description' => $task->description,
-                    'status' => $task->status,
-                    'date' => $task->due_date->format('Y-m-d'),
-                    'start_date' => $task->due_date->format('Y-m-d'),
-                    'end_date' => $task->due_date->format('Y-m-d'),
-                    'due_date_formatted' => $task->due_date->format('M d, Y'),
-                    'is_overdue' => $isOverdue,
-                    'assigned_to_user' => $task->assigned_to === $userId,
-                    'assignee_name' => $task->assignee?->name ?? 'Unassigned',
-                    'project' => [
-                        'id' => (string) $task->activity->project_id,
-                        'title' => $task->activity->project->title,
-                    ],
-                    'committee' => [
-                        'id' => (string) $task->activity->committee_id,
-                        'name' => $task->activity->committee->name,
-                    ],
-                    'activity' => [
-                        'id' => (string) $task->activity->id,
-                        'title' => $task->activity->title,
-                    ],
-                    'action_url' => route('projects.committees.activities.show', [
-                        'project' => $task->activity->project_id,
-                        'committee' => $task->activity->committee_id,
-                        'activity' => $task->activity->id,
-                    ]),
+                    'id'         => "project-start-{$project->id}",
+                    'type'       => 'project_start',
+                    'title'      => $project->title,
+                    'label'      => 'Project Start',
+                    'date'       => $project->start_date->format('Y-m-d'),
+                    'date_formatted' => $project->start_date->format('M d, Y'),
+                    'status'     => $project->status,
+                    'role'       => $userRole,
+                    'url'        => route('projects.show', $project->id),
+                    'color_group' => 'project',
+                ]);
+            }
+            if ($project->end_date) {
+                $events->push([
+                    'id'         => "project-end-{$project->id}",
+                    'type'       => 'project_deadline',
+                    'title'      => $project->title,
+                    'label'      => 'Project Deadline',
+                    'date'       => $project->end_date->format('Y-m-d'),
+                    'date_formatted' => $project->end_date->format('M d, Y'),
+                    'status'     => $project->status,
+                    'role'       => $userRole,
+                    'url'        => route('projects.show', $project->id),
+                    'color_group' => 'project_deadline',
                 ]);
             }
         }
 
-        // Include Activities in calendar events
-        if ($typeFilter === 'all' || $typeFilter === 'activities') {
-            $activities = $activitiesQuery->get();
-            foreach ($activities as $act) {
-                $date = $act->due_date ?? $act->start_date;
-                if (!$date) {
-                    continue;
-                }
+        // ── 2. Activity start/due dates ───────────────────────────────────────
+        $activityQuery = Activity::query()
+            ->with(['project', 'committee'])
+            ->where(function ($q) {
+                $q->whereNotNull('start_date')->orWhereNotNull('due_date');
+            });
 
-                $dueDate = $act->due_date ? Carbon::parse($act->due_date)->startOfDay() : null;
-                $isOverdue = $dueDate && $dueDate->lt($today) && $act->status !== Activity::STATUS_COMPLETED;
+        if ($leaderProjectIds->isNotEmpty()) {
+            $activityQuery->where(function ($q) use ($leaderProjectIds, $allAccessibleCommitteeIds) {
+                $q->whereIn('project_id', $leaderProjectIds)
+                  ->orWhereIn('committee_id', $allAccessibleCommitteeIds);
+            });
+        } else {
+            $activityQuery->whereIn('committee_id', $allAccessibleCommitteeIds);
+        }
 
+        $activities = $activityQuery->get();
+
+        foreach ($activities as $activity) {
+            if ($activity->start_date) {
                 $events->push([
-                    'id' => "activity-{$act->id}",
-                    'raw_id' => (string) $act->id,
-                    'type' => 'activity',
-                    'title' => $act->title,
-                    'description' => $act->description,
-                    'status' => $act->status,
-                    'date' => $date->format('Y-m-d'),
-                    'start_date' => $act->start_date?->format('Y-m-d'),
-                    'end_date' => $act->due_date?->format('Y-m-d'),
-                    'due_date_formatted' => $act->due_date ? $act->due_date->format('M d, Y') : ($act->start_date ? $act->start_date->format('M d, Y') : 'No date'),
-                    'is_overdue' => (bool) $isOverdue,
-                    'assigned_to_user' => false,
-                    'assignee_name' => null,
-                    'project' => [
-                        'id' => (string) $act->project_id,
-                        'title' => $act->project->title,
-                    ],
-                    'committee' => [
-                        'id' => (string) $act->committee_id,
-                        'name' => $act->committee->name,
-                    ],
-                    'activity' => [
-                        'id' => (string) $act->id,
-                        'title' => $act->title,
-                    ],
-                    'action_url' => route('projects.committees.activities.show', [
-                        'project' => $act->project_id,
-                        'committee' => $act->committee_id,
-                        'activity' => $act->id,
+                    'id'         => "activity-start-{$activity->id}",
+                    'type'       => 'activity_start',
+                    'title'      => $activity->title,
+                    'label'      => 'Activity Start',
+                    'date'       => $activity->start_date->format('Y-m-d'),
+                    'date_formatted' => $activity->start_date->format('M d, Y'),
+                    'status'     => $activity->status,
+                    'project'    => ['id' => (string) $activity->project_id, 'title' => $activity->project->title],
+                    'committee'  => ['id' => (string) $activity->committee_id, 'name' => $activity->committee->name],
+                    'url'        => route('projects.committees.activities.show', [
+                        'project'   => $activity->project_id,
+                        'committee' => $activity->committee_id,
+                        'activity'  => $activity->id,
                     ]),
+                    'color_group' => 'activity',
+                ]);
+            }
+            if ($activity->due_date) {
+                $events->push([
+                    'id'         => "activity-due-{$activity->id}",
+                    'type'       => 'activity_due',
+                    'title'      => $activity->title,
+                    'label'      => 'Activity Due',
+                    'date'       => $activity->due_date->format('Y-m-d'),
+                    'date_formatted' => $activity->due_date->format('M d, Y'),
+                    'status'     => $activity->status,
+                    'project'    => ['id' => (string) $activity->project_id, 'title' => $activity->project->title],
+                    'committee'  => ['id' => (string) $activity->committee_id, 'name' => $activity->committee->name],
+                    'url'        => route('projects.committees.activities.show', [
+                        'project'   => $activity->project_id,
+                        'committee' => $activity->committee_id,
+                        'activity'  => $activity->id,
+                    ]),
+                    'color_group' => 'activity_due',
                 ]);
             }
         }
+
+        // ── 3. Task due dates (scoped) ────────────────────────────────────────
+        $taskQuery = Task::query()
+            ->with(['activity.project', 'activity.committee', 'assignee'])
+            ->whereNotNull('due_date');
+
+        if ($leaderProjectIds->isNotEmpty()) {
+            $taskQuery->where(function ($q) use ($leaderProjectIds, $allAccessibleCommitteeIds, $userId) {
+                $q->whereHas('activity', function ($aq) use ($leaderProjectIds) {
+                    $aq->whereIn('project_id', $leaderProjectIds);
+                })->orWhereHas('activity', function ($aq) use ($allAccessibleCommitteeIds) {
+                    $aq->whereIn('committee_id', $allAccessibleCommitteeIds);
+                })->orWhere('assigned_to', $userId);
+            });
+        } elseif ($allAccessibleCommitteeIds->isNotEmpty()) {
+            $taskQuery->where(function ($q) use ($allAccessibleCommitteeIds, $userId) {
+                $q->whereHas('activity', function ($aq) use ($allAccessibleCommitteeIds) {
+                    $aq->whereIn('committee_id', $allAccessibleCommitteeIds);
+                })->orWhere('assigned_to', $userId);
+            });
+        } else {
+            $taskQuery->where('assigned_to', $userId);
+        }
+
+        $tasks = $taskQuery->get();
+
+        foreach ($tasks as $task) {
+            $events->push([
+                'id'         => "task-due-{$task->id}",
+                'type'       => 'task_due',
+                'title'      => $task->title,
+                'label'      => 'Task Due',
+                'date'       => $task->due_date->format('Y-m-d'),
+                'date_formatted' => $task->due_date->format('M d, Y'),
+                'status'     => $task->status,
+                'project'    => ['id' => (string) $task->activity->project_id, 'title' => $task->activity->project->title],
+                'committee'  => ['id' => (string) $task->activity->committee_id, 'name' => $task->activity->committee->name],
+                'activity'   => ['id' => (string) $task->activity->id, 'title' => $task->activity->title],
+                'assignee'   => $task->assignee ? ['id' => $task->assignee->id, 'name' => $task->assignee->name] : null,
+                'is_mine'    => $task->assigned_to === $userId,
+                'url'        => route('projects.committees.activities.show', [
+                    'project'   => $task->activity->project_id,
+                    'committee' => $task->activity->committee_id,
+                    'activity'  => $task->activity->id,
+                ]),
+                'color_group' => 'task',
+            ]);
+        }
+
+        // Sort all events by date
+        $sortedEvents = $events->sortBy('date')->values();
 
         return Inertia::render('Calendar/Index', [
-            'events' => $events->values(),
-            'projects' => $projects,
-            'filters' => [
-                'project_id' => $projectFilter,
-                'type' => $typeFilter,
-            ],
+            'events' => $sortedEvents,
         ]);
     }
 }

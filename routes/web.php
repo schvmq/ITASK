@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\CommitteeController;
+use App\Http\Controllers\MyTasksController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPersonnelController;
+use App\Http\Controllers\TimelineIndexController;
 use App\Models\User;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
@@ -61,10 +64,17 @@ Route::post('/email/verification-notification', function (Request $request) {
 // Authenticated Application / Dashboard Route
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/tasks', [\App\Http\Controllers\UserTaskController::class, 'index'])->name('tasks.index');
+    Route::get('/tasks', fn() => redirect()->route('my-tasks.index'))->name('tasks.index');
     Route::post('/tasks/assign-sample', [\App\Http\Controllers\UserTaskController::class, 'assignSampleTasks'])->name('tasks.assign_sample');
-    Route::get('/calendar', [\App\Http\Controllers\CalendarController::class, 'index'])->name('calendar.index');
-    Route::get('/timeline', [\App\Http\Controllers\TimelineController::class, 'index'])->name('timeline.index');
+
+    // My Tasks (cross-project task hub, role-scoped)
+    Route::get('/my-tasks', [MyTasksController::class, 'index'])->name('my-tasks.index');
+
+    // Calendar (date-oriented view of project/activity/task dates)
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+
+    // Timeline index (project list → select project → view Gantt)
+    Route::get('/timeline', [TimelineIndexController::class, 'index'])->name('timeline.index');
 
     // Notifications
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
@@ -74,6 +84,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    Route::get('/projects/{project}/timeline', [\App\Http\Controllers\ProjectTimelineController::class, 'show'])->name('projects.timeline');
     Route::match(['put', 'patch'], '/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::post('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::get('/projects/{project}/documents/{document}', [ProjectController::class, 'downloadApprovalDocument'])->name('projects.documents.download');
@@ -103,6 +114,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/review', [\App\Http\Controllers\ActivityController::class, 'review'])->name('projects.committees.activities.review');
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/complete', [\App\Http\Controllers\ActivityController::class, 'markCompleted'])->name('projects.committees.activities.complete');
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/return', [\App\Http\Controllers\ActivityController::class, 'returnForRevision'])->name('projects.committees.activities.return');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/remind', [\App\Http\Controllers\ActivityController::class, 'sendReminder'])->name('projects.committees.activities.remind');
 
     // Tasks
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');

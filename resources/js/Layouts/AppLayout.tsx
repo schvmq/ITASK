@@ -11,6 +11,8 @@ import {
     Search,
     Menu,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     LogOut,
     User,
     Settings,
@@ -61,6 +63,8 @@ export interface AppLayoutProps {
     headerAction?: React.ReactNode;
     /** Optional active project context for sidebar display */
     currentProject?: CurrentProjectInfo | null;
+    /** If true, suppresses the redundant second page heading banner below the topbar */
+    hidePageHeadingBanner?: boolean;
     children: React.ReactNode;
 }
 
@@ -87,17 +91,19 @@ function getInitials(name: string): string {
 interface SidebarNavItemProps {
     item: NavItem;
     isActive: boolean;
+    isCollapsed?: boolean;
     onClick?: () => void;
 }
 
-function SidebarNavItem({ item, isActive, onClick }: SidebarNavItemProps) {
+function SidebarNavItem({ item, isActive, isCollapsed = false, onClick }: SidebarNavItemProps) {
     const Icon = item.icon;
 
-    const baseClass =
-        'group flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors duration-150 w-full';
+    const baseClass = isCollapsed
+        ? 'group flex items-center justify-center w-10 h-10 mx-auto rounded-lg text-xs font-medium transition-colors duration-150'
+        : 'group flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors duration-150 w-full';
 
     const activeClass =
-        'bg-[color:var(--color-brand-active-warm-orange)] text-[color:var(--color-brand-dark-green)] font-semibold';
+        'bg-[color:var(--color-brand-active-warm-orange)] text-[color:var(--color-brand-dark-green)] font-semibold shadow-xs';
 
     const inactiveClass =
         'text-orange-100 hover:bg-white/10 hover:text-white';
@@ -106,29 +112,34 @@ function SidebarNavItem({ item, isActive, onClick }: SidebarNavItemProps) {
         'text-orange-200/50 cursor-not-allowed';
 
     if (item.comingSoon) {
+        const soonElement = (
+            <span className={`${baseClass} ${comingSoonClass}`}>
+                <Icon className="w-4 h-4 shrink-0" />
+                {!isCollapsed && <span className="flex-1">{item.name}</span>}
+                {!isCollapsed && (
+                    <span className="text-[9px] font-semibold bg-orange-900/40 text-orange-200/60 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                        Soon
+                    </span>
+                )}
+            </span>
+        );
+
         return (
             <Tooltip>
-                <TooltipTrigger asChild>
-                    <span className={`${baseClass} ${comingSoonClass}`}>
-                        <Icon className="w-4 h-4 shrink-0" />
-                        <span className="flex-1">{item.name}</span>
-                        <span className="text-[9px] font-semibold bg-orange-900/40 text-orange-200/60 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                            Soon
-                        </span>
-                    </span>
-                </TooltipTrigger>
+                <TooltipTrigger asChild>{soonElement}</TooltipTrigger>
                 <TooltipContent side="right" className="text-xs">
-                    Coming in a future release
+                    {item.name} — Coming in a future release
                 </TooltipContent>
             </Tooltip>
         );
     }
 
-    return (
+    const linkContent = (
         <Link
             href={item.href}
             onClick={onClick}
             className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}
+            aria-label={item.name}
         >
             <Icon
                 className={`w-4 h-4 shrink-0 transition-colors ${
@@ -137,12 +148,25 @@ function SidebarNavItem({ item, isActive, onClick }: SidebarNavItemProps) {
                         : 'text-orange-200/70 group-hover:text-orange-50'
                 }`}
             />
-            <span className="flex-1">{item.name}</span>
-            {isActive && (
+            {!isCollapsed && <span className="flex-1">{item.name}</span>}
+            {!isCollapsed && isActive && (
                 <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--color-brand-dark-green)] shrink-0" />
             )}
         </Link>
     );
+
+    if (isCollapsed) {
+        return (
+            <Tooltip>
+                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                <TooltipContent side="right" className="text-xs font-semibold">
+                    {item.name}
+                </TooltipContent>
+            </Tooltip>
+        );
+    }
+
+    return linkContent;
 }
 
 // ─── Sidebar Content (shared between desktop & mobile sheet) ─────────────────
@@ -151,45 +175,89 @@ interface SidebarContentProps {
     user: { name: string; email: string } | null;
     currentPage: string;
     currentProject?: CurrentProjectInfo | null;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
     onNavClick?: () => void;
     onLogout: () => void;
 }
 
-function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogout }: SidebarContentProps) {
+function SidebarContent({
+    user,
+    currentPage,
+    currentProject,
+    isCollapsed = false,
+    onToggleCollapse,
+    onNavClick,
+    onLogout,
+}: SidebarContentProps) {
     // Determine active project display from explicitly passed currentProject prop
     const activeProject = currentProject ?? null;
 
     return (
         <div className="flex flex-col h-full">
             {/* ── Brand ── */}
-            <div className="h-16 px-5 border-b border-white/10 flex items-center shrink-0">
-                <Link
-                    href="/dashboard"
-                    onClick={onNavClick}
-                    className="flex items-center gap-3 group"
-                >
-                    <div className="w-8 h-8 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center shrink-0 shadow-sm group-hover:bg-white/20 transition-colors">
-                        <CheckCircle2 className="w-4.5 h-4.5 text-white" strokeWidth={2.2} />
-                    </div>
-                    <div>
-                        <span className="font-extrabold text-base tracking-tight text-white block leading-none">
-                            ITASK
-                        </span>
-                        <span
-                            className="text-[9px] font-bold tracking-widest uppercase block mt-0.5 leading-none"
-                            style={{ color: 'var(--color-brand-active-warm-orange)' }}
+            <div className={`h-14 border-b border-white/10 flex items-center shrink-0 ${
+                isCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'
+            }`}>
+                {!isCollapsed ? (
+                    <>
+                        <Link
+                            href="/dashboard"
+                            onClick={onNavClick}
+                            className="flex items-center gap-2.5 group min-w-0"
                         >
-                            CCIS · CarSU
-                        </span>
-                    </div>
-                </Link>
+                            <div className="w-8 h-8 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center shrink-0 shadow-sm group-hover:bg-white/20 transition-colors">
+                                <CheckCircle2 className="w-4.5 h-4.5 text-white" strokeWidth={2.2} />
+                            </div>
+                            <span className="font-extrabold text-base tracking-tight text-white block leading-none">
+                                ITASK
+                            </span>
+                        </Link>
+                        {onToggleCollapse && (
+                            <button
+                                type="button"
+                                onClick={onToggleCollapse}
+                                className="p-1.5 rounded-lg text-orange-200/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                                title="Collapse sidebar"
+                                aria-label="Collapse sidebar"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                        )}
+                    </>
+                ) : (
+                    onToggleCollapse ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <button
+                                    type="button"
+                                    onClick={onToggleCollapse}
+                                    className="w-9 h-9 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center text-white hover:bg-white/25 transition-all cursor-pointer shadow-sm"
+                                    title="Expand sidebar"
+                                    aria-label="Expand sidebar"
+                                >
+                                    <ChevronRight className="w-4.5 h-4.5 text-white" />
+                                </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="text-xs font-semibold">
+                                Expand sidebar
+                            </TooltipContent>
+                        </Tooltip>
+                    ) : (
+                        <div className="w-8 h-8 rounded-lg bg-white/15 border border-white/20 flex items-center justify-center shrink-0 shadow-sm">
+                            <CheckCircle2 className="w-4.5 h-4.5 text-white" strokeWidth={2.2} />
+                        </div>
+                    )
+                )}
             </div>
 
             {/* ── Navigation ── */}
-            <div className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
-                <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-orange-200/40 select-none">
-                    Navigation
-                </p>
+            <div className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2 py-3 space-y-1.5' : 'px-3 py-4 space-y-0.5'}`}>
+                {!isCollapsed && (
+                    <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-widest text-orange-200/40 select-none">
+                        Navigation
+                    </p>
+                )}
 
                 {MAIN_NAV_ITEMS.map((item) => {
                     const isActive = item.exact || item.href === '/dashboard'
@@ -201,17 +269,19 @@ function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogou
                             key={item.name}
                             item={item}
                             isActive={isActive}
+                            isCollapsed={isCollapsed}
                             onClick={onNavClick}
                         />
                     );
                 })}
 
-                <div className="pt-3 mt-3 border-t border-white/10 space-y-0.5">
+                <div className={`border-t border-white/10 ${isCollapsed ? 'pt-2 mt-2 space-y-1.5' : 'pt-3 mt-3 space-y-0.5'}`}>
                     {UTILITY_NAV_ITEMS.map((item) => (
                         <SidebarNavItem
                             key={item.name}
                             item={item}
                             isActive={currentPage === item.href}
+                            isCollapsed={isCollapsed}
                             onClick={onNavClick}
                         />
                     ))}
@@ -219,77 +289,159 @@ function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogou
             </div>
 
             {/* ── Current Project Context (Dynamic / Role-Aware) ── */}
-            <div className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/5 overflow-hidden shrink-0">
-                <div className="px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-200/40 mb-2 select-none">
-                        Current Project
-                    </p>
-                    <div className="flex items-center gap-2.5">
-                        <div
-                            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white"
-                            style={{ backgroundColor: 'var(--color-brand-project-darker-orange)' }}
-                        >
-                            <FolderOpen className="w-3.5 h-3.5" />
+            {activeProject && (
+                !isCollapsed ? (
+                    <div className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/5 overflow-hidden shrink-0">
+                        <div className="px-4 py-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-200/40 mb-2 select-none">
+                                Current Project
+                            </p>
+                            <div className="flex items-center gap-2.5">
+                                <div
+                                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white"
+                                    style={{ backgroundColor: 'var(--color-brand-project-darker-orange)' }}
+                                >
+                                    <FolderOpen className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-orange-50 truncate leading-snug">
+                                        {activeProject.title}
+                                    </p>
+                                    <p className="text-[10px] text-orange-200/50 leading-snug">
+                                        {activeProject.role || 'No project role'}{activeProject.status ? ` · ${activeProject.status}` : ''}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-orange-50 truncate leading-snug">
-                                {activeProject ? activeProject.title : 'No project selected'}
-                            </p>
-                            <p className="text-[10px] text-orange-200/50 leading-snug">
-                                {activeProject
-                                    ? `${activeProject.role || 'No project role'}${activeProject.status ? ` · ${activeProject.status}` : ''}`
-                                    : 'Select from Projects'}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* ── User footer ── */}
-            <div className="px-3 pb-4 shrink-0">
-                <Separator className="mb-3 bg-white/10" />
-                {user ? (
-                    <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/8 transition-colors group">
-                        <Avatar size="sm" className="shrink-0">
-                            <AvatarImage src={undefined} />
-                            <AvatarFallback
-                                className="text-[10px] font-bold"
-                                style={{
-                                    backgroundColor: 'var(--color-brand-dark-green)',
-                                    color: 'var(--color-brand-active-warm-orange)',
-                                }}
-                            >
-                                {getInitials(user.name)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-white truncate leading-snug">
-                                {user.name}
-                            </p>
-                            <p className="text-[10px] text-orange-200/60 truncate leading-snug">
-                                {user.email}
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={onLogout}
-                            className="p-1.5 rounded-lg text-orange-200/40 hover:text-rose-300 hover:bg-white/10 transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
-                            title="Sign out"
-                            aria-label="Sign out"
-                        >
-                            <LogOut className="w-3.5 h-3.5" />
-                        </button>
                     </div>
                 ) : (
-                    <Link
-                        href="/login"
-                        className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-orange-200/70 hover:text-white transition-colors"
-                    >
-                        <LogOut className="w-4 h-4" />
-                        Sign In
-                    </Link>
-                )}
-            </div>
+                    <div className="px-2 mb-2 flex justify-center shrink-0">
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div
+                                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white cursor-pointer shadow-xs"
+                                    style={{ backgroundColor: 'var(--color-brand-project-darker-orange)' }}
+                                >
+                                    <FolderOpen className="w-4 h-4" />
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="text-xs max-w-xs">
+                                <p className="font-bold">{activeProject.title}</p>
+                                <p className="text-[10px] text-slate-300">
+                                    {activeProject.role || 'Project'}{activeProject.status ? ` · ${activeProject.status}` : ''}
+                                </p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </div>
+                )
+            )}
+
+            {/* ── User footer ── */}
+            {!isCollapsed ? (
+                <div className="px-3 pb-4 shrink-0">
+                    <Separator className="mb-3 bg-white/10" />
+                    {user ? (
+                        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/8 transition-colors group">
+                            <Avatar size="sm" className="shrink-0">
+                                <AvatarImage src={undefined} />
+                                <AvatarFallback
+                                    className="text-[10px] font-bold"
+                                    style={{
+                                        backgroundColor: 'var(--color-brand-dark-green)',
+                                        color: 'var(--color-brand-active-warm-orange)',
+                                    }}
+                                >
+                                    {getInitials(user.name)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-white truncate leading-snug">
+                                    {user.name}
+                                </p>
+                                <p className="text-[10px] text-orange-200/60 truncate leading-snug">
+                                    {user.email}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onLogout}
+                                className="p-1.5 rounded-lg text-orange-200/40 hover:text-rose-300 hover:bg-white/10 transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
+                                title="Sign out"
+                                aria-label="Sign out"
+                            >
+                                <LogOut className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    ) : (
+                        <Link
+                            href="/login"
+                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-orange-200/70 hover:text-white transition-colors"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Sign In
+                        </Link>
+                    )}
+                </div>
+            ) : (
+                <div className="px-2 pb-3 shrink-0 flex flex-col items-center gap-2">
+                    <Separator className="mb-1 w-8 bg-white/10" />
+                    {user ? (
+                        <>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Avatar size="sm" className="shrink-0 cursor-default">
+                                        <AvatarImage src={undefined} />
+                                        <AvatarFallback
+                                            className="text-[10px] font-bold"
+                                            style={{
+                                                backgroundColor: 'var(--color-brand-dark-green)',
+                                                color: 'var(--color-brand-active-warm-orange)',
+                                            }}
+                                        >
+                                            {getInitials(user.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="text-xs">
+                                    <p className="font-bold">{user.name}</p>
+                                    <p className="text-[10px] text-slate-300">{user.email}</p>
+                                </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={onLogout}
+                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-orange-200/60 hover:text-rose-300 hover:bg-white/10 transition-colors cursor-pointer"
+                                        aria-label="Sign out"
+                                    >
+                                        <LogOut className="w-3.5 h-3.5" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="text-xs text-rose-300">
+                                    Sign Out
+                                </TooltipContent>
+                            </Tooltip>
+                        </>
+                    ) : (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Link
+                                    href="/login"
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-orange-200/70 hover:text-white hover:bg-white/10 transition-colors"
+                                    aria-label="Sign In"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="text-xs">
+                                Sign In
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
@@ -301,11 +453,38 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     subtitle,
     headerAction,
     currentProject,
+    hidePageHeadingBanner = false,
     children,
 }) => {
     const { auth, url, flash } = usePage<PageProps & { url: string }>().props;
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [dismissedFlash, setDismissedFlash] = useState<string | null>(null);
+
+    // Collapsed sidebar state (persisted across sessions)
+    const [isCollapsed, setIsCollapsed] = useState(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                return localStorage.getItem('itask_sidebar_collapsed') === 'true';
+            } catch {
+                return false;
+            }
+        }
+        return false;
+    });
+
+    const toggleCollapse = () => {
+        setIsCollapsed((prev) => {
+            const next = !prev;
+            if (typeof window !== 'undefined') {
+                try {
+                    localStorage.setItem('itask_sidebar_collapsed', String(next));
+                } catch {
+                    // ignore localStorage errors
+                }
+            }
+            return next;
+        });
+    };
 
     const user = auth?.user
         ? { name: auth.user.name, email: auth.user.email }
@@ -323,7 +502,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
             {/* ══ Desktop Sidebar ══════════════════════════════════════════ */}
             <aside
-                className="hidden lg:flex lg:flex-col lg:w-64 shrink-0 fixed inset-y-0 left-0 z-30"
+                className={`hidden lg:flex lg:flex-col shrink-0 fixed inset-y-0 left-0 z-30 transition-all duration-200 ease-in-out ${
+                    isCollapsed ? 'w-[70px]' : 'w-64'
+                }`}
                 style={{
                     background: 'linear-gradient(160deg, #1a4a1a 0%, var(--color-brand-dark-green) 60%, #0d2e0d 100%)',
                 }}
@@ -332,18 +513,24 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                     user={user}
                     currentPage={currentPath}
                     currentProject={currentProject}
+                    isCollapsed={isCollapsed}
+                    onToggleCollapse={toggleCollapse}
                     onLogout={handleLogout}
                 />
             </aside>
 
             {/* ══ Main Area (offset by sidebar width on desktop) ═══════════ */}
-            <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
+            <div
+                className={`flex flex-col min-w-0 w-full transition-all duration-200 ease-in-out ${
+                    isCollapsed ? 'lg:pl-[70px]' : 'lg:pl-64'
+                }`}
+            >
 
                 {/* ── Topbar ──────────────────────────────────────────────── */}
                 <header className="h-14 px-4 sm:px-6 border-b border-[color:var(--color-border-light)] flex items-center justify-between bg-white shrink-0 sticky top-0 z-20 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
 
-                    {/* Left: Mobile menu + breadcrumb */}
-                    <div className="flex items-center gap-3 min-w-0">
+                    {/* Left: Mobile menu + Desktop collapse toggle */}
+                    <div className="flex items-center gap-2 min-w-0">
                         {/* Mobile hamburger (Sheet trigger) */}
                         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                             <SheetTrigger asChild>
@@ -366,6 +553,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                     user={user}
                                     currentPage={currentPath}
                                     currentProject={currentProject}
+                                    isCollapsed={false}
                                     onNavClick={() => setIsMobileOpen(false)}
                                     onLogout={() => {
                                         setIsMobileOpen(false);
@@ -374,20 +562,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                 />
                             </SheetContent>
                         </Sheet>
-
-                        {/* Page title (desktop only) */}
-                        {title && (
-                            <div className="hidden sm:block min-w-0">
-                                <h1 className="text-sm font-semibold text-[color:var(--color-text-main)] truncate leading-snug">
-                                    {title}
-                                </h1>
-                                {subtitle && (
-                                    <p className="text-xs text-[color:var(--color-text-muted)] truncate leading-snug">
-                                        {subtitle}
-                                    </p>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* Right: Search + Notifications + User */}
@@ -499,7 +673,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 </header>
 
                 {/* ── Page heading (mobile / full width) ─────────────────── */}
-                {(title || headerAction) && (
+                {!hidePageHeadingBanner && (title || headerAction) && (
                     <div className="px-4 sm:px-6 pt-5 pb-4 bg-white border-b border-[color:var(--color-border-light)] flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                         <div className="min-w-0">
                             {title && (
@@ -520,7 +694,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 )}
 
                 {/* ── Main content ────────────────────────────────────────── */}
-                <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-screen-xl space-y-4">
+                <main className="flex-1 px-4 sm:px-6 py-6 w-full space-y-4">
                     {/* Global Flash Alerts (Success / Status / Error) */}
                     {(flash?.success || flash?.status) && dismissedFlash !== (flash.success || flash.status) && (
                         <Alert

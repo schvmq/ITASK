@@ -11,3 +11,4 @@ export * from './Card';
 export * from './LoadingState';
 export * from './EmptyState';
 export * from './ProjectRoleBadge';
+export * from './GanttTimeline';

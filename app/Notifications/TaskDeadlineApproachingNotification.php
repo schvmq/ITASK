@@ -78,6 +78,7 @@ class TaskDeadlineApproachingNotification extends Notification
             'task_id' => $this->task->id,
             'due_date' => $this->task->due_date?->format('Y-m-d'),
             'days_remaining' => $this->daysRemaining,
+            'reminder_interval' => $this->daysRemaining,
             'project' => [
                 'id' => $this->project->id,
                 'title' => $this->project->title,

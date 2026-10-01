@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ReviewActivityRequest;
+use App\Http\Requests\SendActivityReminderRequest;
 use App\Http\Requests\StoreActivityRequest;
 use App\Http\Requests\SubmitActivityRequest;
 use App\Http\Requests\UpdateActivityRequest;
@@ -12,16 +13,24 @@ use App\Models\Committee;
 use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
+use App\Notifications\ActivityAssignedNotification;
+use App\Notifications\ActivityReminderNotification;
 use App\Notifications\ActivityReviewedNotification;
 use App\Notifications\ActivitySubmittedForReviewNotification;
+use App\Services\ProjectProgressService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ActivityController extends Controller
 {
+    public function __construct(
+        protected ProjectProgressService $progressService
+    ) {}
     /**
      * Store a newly created activity in storage.
      */
@@ -44,6 +53,24 @@ class ActivityController extends Controller
             'due_date'    => $request->validated('due_date'),
             'status'      => $request->validated('status', Activity::STATUS_TO_DO),
         ]);
+
+        // Notify assigned committee staff and members of the new activity assignment
+        $assignedUsers = $committee->roleAssignments()
+            ->with('user')
+            ->get()
+            ->pluck('user')
+            ->filter()
+            ->reject(fn ($u) => (int) $u->id === (int) Auth::id())
+            ->unique('id');
+
+        foreach ($assignedUsers as $recipient) {
+            $recipient->notify(new ActivityAssignedNotification(
+                $activity,
+                $committee,
+                $project,
+                Auth::user()
+            ));
+        }
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
@@ -93,11 +120,16 @@ class ActivityController extends Controller
             ->values()
             ->all();
 
+        $activityProgress = $this->progressService->calculateActivityProgress($activity);
+
         $activityData = [
             'id'              => (string) $activity->id,
             'title'           => $activity->title,
             'description'     => $activity->description,
             'status'          => $activity->status,
+            'progress'        => $activityProgress['progress'],
+            'tasks_count'     => $activityProgress['total_tasks'],
+            'completed_tasks_count' => $activityProgress['completed_tasks'],
             'start_date'      => $activity->start_date?->format('M d, Y'),
             'start_date_raw'  => $activity->start_date?->format('Y-m-d'),
             'due_date'        => $activity->due_date?->format('M d, Y'),
@@ -123,12 +155,15 @@ class ActivityController extends Controller
                 'createTask' => $user ? Gate::forUser($user)->allows('create', [Task::class, $activity]) : false,
                 'submit' => $user ? Gate::forUser($user)->allows('submit', $activity) && in_array($activity->status, [Activity::STATUS_TO_DO, Activity::STATUS_IN_PROGRESS, Activity::STATUS_RETURNED_FOR_REVISION], true) : false,
                 'review' => $user ? Gate::forUser($user)->allows('review', $activity) && $activity->status === Activity::STATUS_UNDER_REVIEW : false,
+                'sendReminder' => $user ? Gate::forUser($user)->allows('sendReminder', $activity) : false,
             ],
             'tasks' => $activity->tasks->map(fn ($task) => [
                 'id'              => (string) $task->id,
                 'title'           => $task->title,
                 'description'     => $task->description,
                 'status'          => $task->status,
+                'progress'        => $task->status === Task::STATUS_COMPLETED ? 100 : 0,
+                'is_completed'    => $task->status === Task::STATUS_COMPLETED,
                 'requires_review' => (bool) $task->requires_review,
                 'due_date'        => $task->due_date?->format('M d, Y'),
                 'due_date_raw'    => $task->due_date?->format('Y-m-d'),
@@ -380,6 +415,88 @@ class ActivityController extends Controller
     public function returnForRevision(ReviewActivityRequest $request, Project $project, Committee $committee, Activity $activity): RedirectResponse
     {
         return $this->review($request, $project, $committee, $activity);
+    }
+
+    /**
+     * Send a manual reminder to personnel assigned to the activity.
+     */
+    public function sendReminder(SendActivityReminderRequest $request, Project $project, Committee $committee, Activity $activity): RedirectResponse|JsonResponse
+    {
+        // 1. Strict hierarchy parentage checks
+        if ((int) $committee->project_id !== (int) $project->id) {
+            abort(404, 'Committee not found in this project.');
+        }
+
+        if ((int) $activity->committee_id !== (int) $committee->id || (int) $activity->project_id !== (int) $project->id) {
+            abort(404, 'Activity not found in this committee.');
+        }
+
+        // 2. Authorize
+        Gate::authorize('sendReminder', $activity);
+
+        // 3. Prevent duplicate submission from rapid accidental double clicks
+        $lockKey = "activity_reminder_{$activity->id}_{$request->user()->id}";
+        $lock = Cache::lock($lockKey, 5);
+
+        if (! $lock->get()) {
+            if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A reminder was already submitted recently.',
+                ], 429);
+            }
+
+            return redirect()->route('projects.committees.activities.show', [
+                'project' => $project->id,
+                'committee' => $committee->id,
+                'activity' => $activity->id,
+            ])->with('status', 'A reminder was already submitted recently.');
+        }
+
+        $customMessage = $request->validated('message');
+
+        // 4. Resolve recipients: ONLY users explicitly assigned to Tasks under this Activity.
+        //    Activity has no direct assignment column; task-level assignment (assigned_to) is the
+        //    sole explicit assignment mechanism. Committee membership alone is NOT sufficient.
+        $recipients = $activity
+            ->tasks()
+            ->whereNotNull('assigned_to')
+            ->with('assignee')
+            ->get()
+            ->pluck('assignee')
+            ->filter()
+            ->reject(fn ($u) => (int) $u->id === (int) $request->user()->id)
+            ->unique('id')
+            ->values();
+
+        foreach ($recipients as $recipient) {
+            $recipient->notify(new ActivityReminderNotification(
+                $activity,
+                $committee,
+                $project,
+                $request->user(),
+                $customMessage
+            ));
+        }
+
+        $messageCount = $recipients->count();
+        $statusMessage = $messageCount > 0
+            ? "Reminder sent to {$messageCount} assigned personnel."
+            : 'No other personnel assigned to this activity to notify.';
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return response()->json([
+                'success' => true,
+                'message' => $statusMessage,
+                'recipients_count' => $messageCount,
+            ]);
+        }
+
+        return redirect()->route('projects.committees.activities.show', [
+            'project' => $project->id,
+            'committee' => $committee->id,
+            'activity' => $activity->id,
+        ])->with('status', $statusMessage);
     }
 
     /**

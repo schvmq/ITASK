@@ -47,6 +47,7 @@ export interface CommitteeActivityItem {
     title: string;
     description: string | null;
     status: string;
+    progress?: number;
     start_date?: string | null;
     start_date_raw?: string | null;
     due_date: string | null;
@@ -63,6 +64,7 @@ export interface CommitteeData {
     id: string;
     name: string;
     description: string | null;
+    progress?: number;
     project: {
         id: string;
         title: string;
@@ -443,11 +445,33 @@ export default function CommitteeShow({
                             <p className="text-xs sm:text-sm text-[color:var(--color-text-muted)] leading-relaxed">
                                 {committee.description || 'No committee description provided.'}
                             </p>
+
+                            {committee.progress !== undefined && (
+                                <div className="pt-2 flex items-center gap-3">
+                                    <div className="w-36 sm:w-48 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full transition-all duration-300 bg-[color:var(--color-brand-dark-green)]"
+                                            style={{ width: `${Math.round(committee.progress)}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)]">
+                                        {Math.round(committee.progress)}% Complete
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Action buttons (Project Leader only) */}
-                        {committee.can.update && (
-                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {/* Action buttons */}
+                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <Link
+                                href={`/projects/${project.id}/timeline`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
+                            >
+                                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                <span>View in Timeline</span>
+                            </Link>
+
+                            {committee.can.update && (
                                 <button
                                     type="button"
                                     onClick={handleOpenEditModal}
@@ -456,19 +480,19 @@ export default function CommitteeShow({
                                     <Edit3 className="w-3.5 h-3.5 text-slate-600" />
                                     <span>Edit Committee</span>
                                 </button>
+                            )}
 
-                                {committee.can.delete && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsDeleteModalOpen(true)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                                        <span>Remove Committee</span>
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                            {committee.can.delete && (
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDeleteModalOpen(true)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>Remove Committee</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -820,6 +844,21 @@ export default function CommitteeShow({
                                                 {act.description}
                                             </p>
                                         )}
+                                        {act.progress !== undefined && (
+                                            <div className="w-full space-y-1">
+                                                <div className="flex items-center justify-between text-[11px]">
+                                                    <span className="text-slate-500 font-medium">Progress</span>
+                                                    <span className="font-bold text-[color:var(--color-brand-dark-green)]">{Math.round(act.progress)}%</span>
+                                                </div>
+                                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full bg-[color:var(--color-brand-dark-green)] transition-all duration-300"
+                                                        style={{ width: `${Math.round(act.progress)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-1">
                                             <span>
                                                 {act.tasks_count} tasks ({act.completed_tasks_count} done)

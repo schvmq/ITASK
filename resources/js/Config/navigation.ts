@@ -59,7 +59,7 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
     },
     {
         name: 'My Tasks',
-        href: '/tasks',
+        href: '/my-tasks',
         icon: CheckSquare,
         description: 'Tasks assigned to you across all projects',
     },

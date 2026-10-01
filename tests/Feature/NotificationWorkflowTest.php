@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\ActivityAssignedNotification;
 use App\Notifications\ActivityReviewedNotification;
 use App\Notifications\ActivitySubmittedForReviewNotification;
 use App\Notifications\TaskAssignedNotification;
@@ -498,36 +499,400 @@ class NotificationWorkflowTest extends TestCase
             'due_date' => '2026-10-10',
         ]);
 
-        // 1. TaskAssignedNotification
+        // 1. TaskAssignedNotification: IN-APP ONLY (does NOT send email)
         $assignedNotif = new TaskAssignedNotification($task, $this->activity, $this->committee, $this->project, $this->staff);
-        $this->assertEquals(['database', 'mail'], $assignedNotif->via($this->member1));
-        $mail = $assignedNotif->toMail($this->member1);
-        $this->assertStringContainsString('Task Assigned', $mail->subject);
+        $this->assertEquals(['database'], $assignedNotif->via($this->member1));
 
-        // 2. TaskDeadlineApproachingNotification
-        $deadlineNotif = new TaskDeadlineApproachingNotification($task, $this->activity, $this->committee, $this->project, 2);
+        // 2. ActivityAssignedNotification: Sends email and in-app
+        $actAssignedNotif = new ActivityAssignedNotification($this->activity, $this->committee, $this->project, $this->staff);
+        $this->assertEquals(['database', 'mail'], $actAssignedNotif->via($this->member1));
+        $actMail = $actAssignedNotif->toMail($this->member1);
+        $this->assertStringContainsString('Activity Assigned', $actMail->subject);
+
+        // 3. TaskDeadlineApproachingNotification (3-day or 1-day): Sends email and in-app
+        $deadlineNotif = new TaskDeadlineApproachingNotification($task, $this->activity, $this->committee, $this->project, 3);
         $this->assertEquals(['database', 'mail'], $deadlineNotif->via($this->member1));
         $mail = $deadlineNotif->toMail($this->member1);
         $this->assertStringContainsString('Deadline Approaching', $mail->subject);
 
-        // 3. TaskSubmittedForReviewNotification
+        // 4. TaskSubmittedForReviewNotification: Sends email to reviewer and in-app
         $submittedNotif = new TaskSubmittedForReviewNotification($task, $this->activity, $this->committee, $this->project, $this->member1);
+        $this->assertEquals(['database', 'mail'], $submittedNotif->via($this->staff));
         $mail = $submittedNotif->toMail($this->staff);
         $this->assertStringContainsString('Task Submitted for Review', $mail->subject);
 
-        // 4. TaskReviewedNotification (Returned)
-        $reviewedNotif = new TaskReviewedNotification($task, $this->activity, $this->committee, $this->project, $this->staff, Task::STATUS_RETURNED, 'Please fix section 2.');
-        $mail = $reviewedNotif->toMail($this->member1);
+        // 5. TaskReviewedNotification: Returned sends email and in-app; Completed is in-app only
+        $reviewedReturnedNotif = new TaskReviewedNotification($task, $this->activity, $this->committee, $this->project, $this->staff, Task::STATUS_RETURNED, 'Please fix section 2.');
+        $this->assertEquals(['database', 'mail'], $reviewedReturnedNotif->via($this->member1));
+        $mail = $reviewedReturnedNotif->toMail($this->member1);
         $this->assertStringContainsString('Task Returned for Revision', $mail->subject);
 
-        // 5. ActivitySubmittedForReviewNotification
+        $reviewedCompletedNotif = new TaskReviewedNotification($task, $this->activity, $this->committee, $this->project, $this->staff, Task::STATUS_COMPLETED);
+        $this->assertEquals(['database'], $reviewedCompletedNotif->via($this->member1));
+
+        // 6. ActivitySubmittedForReviewNotification: Sends email and in-app
         $activitySubNotif = new ActivitySubmittedForReviewNotification($this->activity, $this->committee, $this->project, $this->member1);
+        $this->assertEquals(['database', 'mail'], $activitySubNotif->via($this->staff));
         $mail = $activitySubNotif->toMail($this->staff);
         $this->assertStringContainsString('Activity Submitted for Review', $mail->subject);
 
-        // 6. ActivityReviewedNotification (Completed)
-        $activityRevNotif = new ActivityReviewedNotification($this->activity, $this->committee, $this->project, $this->staff, Activity::STATUS_COMPLETED);
-        $mail = $activityRevNotif->toMail($this->member1);
-        $this->assertStringContainsString('Activity Completed', $mail->subject);
+        // 7. ActivityReviewedNotification: Returned sends email and in-app; Completed is in-app only
+        $activityRevReturnedNotif = new ActivityReviewedNotification($this->activity, $this->committee, $this->project, $this->staff, Activity::STATUS_RETURNED_FOR_REVISION, 'Revise dates');
+        $this->assertEquals(['database', 'mail'], $activityRevReturnedNotif->via($this->member1));
+        $mail = $activityRevReturnedNotif->toMail($this->member1);
+        $this->assertStringContainsString('Activity Returned for Revision', $mail->subject);
+
+        $activityRevCompletedNotif = new ActivityReviewedNotification($this->activity, $this->committee, $this->project, $this->staff, Activity::STATUS_COMPLETED);
+        $this->assertEquals(['database'], $activityRevCompletedNotif->via($this->member1));
+    }
+
+    // =========================================================================
+    // 7. EMAIL NOTIFICATION RULES & DEADLINE REMINDER TESTS
+    // =========================================================================
+
+    public function test_activity_assignment_sends_email_and_persists_in_app(): void
+    {
+        Notification::fake();
+
+        $response = $this->actingAs($this->staff)->post(
+            route('projects.committees.activities.store', [$this->project, $this->committee]),
+            [
+                'title' => 'New Logistics Activity',
+                'description' => 'Handle audio visual setup',
+                'start_date' => '2026-10-01',
+                'due_date' => '2026-10-20',
+                'status' => 'To Do',
+            ]
+        );
+
+        $response->assertRedirect();
+
+        // Committee members (member1 and member2) receive ActivityAssignedNotification
+        Notification::assertSentTo(
+            $this->member1,
+            ActivityAssignedNotification::class,
+            function (ActivityAssignedNotification $notification) {
+                return $notification->activity->title === 'New Logistics Activity'
+                    && in_array('mail', $notification->via($this->member1), true)
+                    && in_array('database', $notification->via($this->member1), true);
+            }
+        );
+
+        Notification::assertSentTo(
+            $this->member2,
+            ActivityAssignedNotification::class
+        );
+    }
+
+    public function test_task_assignment_does_not_send_email(): void
+    {
+        $task = Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Cabling and Mic Tests',
+            'status' => Task::STATUS_TO_DO,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => false,
+            'due_date' => '2026-10-10',
+        ]);
+
+        $notification = new TaskAssignedNotification($task, $this->activity, $this->committee, $this->project);
+        $channels = $notification->via($this->member1);
+
+        $this->assertContains('database', $channels);
+        $this->assertNotContains('mail', $channels, 'Task assignment must NOT include mail channel.');
+    }
+
+    public function test_3_day_deadline_reminder_sends_exactly_once(): void
+    {
+        $task = Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => '3-Day Due Task',
+            'status' => Task::STATUS_IN_PROGRESS,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => false,
+            'due_date' => now()->startOfDay()->addDays(3)->toDateString(),
+        ]);
+
+        Notification::fake();
+
+        // First run: sends 3-day reminder
+        $this->artisan('tasks:send-deadline-reminders')
+            ->assertSuccessful();
+
+        Notification::assertSentTo(
+            $this->member1,
+            TaskDeadlineApproachingNotification::class,
+            function (TaskDeadlineApproachingNotification $notification) use ($task) {
+                return $notification->task->id === $task->id
+                    && $notification->daysRemaining === 3
+                    && in_array('mail', $notification->via($this->member1), true)
+                    && in_array('database', $notification->via($this->member1), true);
+            }
+        );
+
+        // Real persistence test to verify exact-once idempotency
+        Notification::swap(new \Illuminate\Notifications\ChannelManager(app()));
+
+        // Run with database persistence
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 1 sent.')
+            ->assertSuccessful();
+
+        $this->assertSame(1, $this->member1->notifications()->count());
+
+        // Re-run: must NOT duplicate
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 0 sent.')
+            ->assertSuccessful();
+
+        $this->assertSame(1, $this->member1->notifications()->count());
+    }
+
+    public function test_1_day_deadline_reminder_sends_exactly_once(): void
+    {
+        $task = Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => '1-Day Due Task',
+            'status' => Task::STATUS_IN_PROGRESS,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => false,
+            'due_date' => now()->startOfDay()->addDays(1)->toDateString(),
+        ]);
+
+        Notification::fake();
+
+        $this->artisan('tasks:send-deadline-reminders')
+            ->assertSuccessful();
+
+        Notification::assertSentTo(
+            $this->member1,
+            TaskDeadlineApproachingNotification::class,
+            function (TaskDeadlineApproachingNotification $notification) use ($task) {
+                return $notification->task->id === $task->id
+                    && $notification->daysRemaining === 1
+                    && in_array('mail', $notification->via($this->member1), true);
+            }
+        );
+
+        // Real persistence check
+        Notification::swap(new \Illuminate\Notifications\ChannelManager(app()));
+
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 1 sent.')
+            ->assertSuccessful();
+
+        $this->assertSame(1, $this->member1->notifications()->count());
+
+        // Re-run
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 0 sent.')
+            ->assertSuccessful();
+
+        $this->assertSame(1, $this->member1->notifications()->count());
+    }
+
+    public function test_completed_tasks_do_not_receive_deadline_reminders(): void
+    {
+        // 3-day due completed task
+        Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Completed 3-Day Task',
+            'status' => Task::STATUS_COMPLETED,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => false,
+            'due_date' => now()->startOfDay()->addDays(3)->toDateString(),
+        ]);
+
+        // 1-day due completed task
+        Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Completed 1-Day Task',
+            'status' => Task::STATUS_COMPLETED,
+            'assigned_to' => $this->member2->id,
+            'requires_review' => false,
+            'due_date' => now()->startOfDay()->addDays(1)->toDateString(),
+        ]);
+
+        Notification::fake();
+
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 0 sent.')
+            ->assertSuccessful();
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_overdue_tasks_do_not_receive_deadline_reminders(): void
+    {
+        // Overdue yesterday
+        Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Past Deadline Task 1',
+            'status' => Task::STATUS_IN_PROGRESS,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => false,
+            'due_date' => now()->startOfDay()->subDay()->toDateString(),
+        ]);
+
+        // Overdue 3 days ago
+        Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Past Deadline Task 2',
+            'status' => Task::STATUS_IN_PROGRESS,
+            'assigned_to' => $this->member2->id,
+            'requires_review' => false,
+            'due_date' => now()->startOfDay()->subDays(3)->toDateString(),
+        ]);
+
+        Notification::fake();
+
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 0 sent.')
+            ->assertSuccessful();
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_re_running_reminder_command_does_not_duplicate_an_already_sent_reminder(): void
+    {
+        // Task due in 3 days
+        $task = Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Multi-interval Task',
+            'status' => Task::STATUS_IN_PROGRESS,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => false,
+            'due_date' => now()->startOfDay()->addDays(3)->toDateString(),
+        ]);
+
+        // First execution: sends 3-day reminder
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 1 sent.')
+            ->assertSuccessful();
+
+        // Repeated run on same interval: 0 sent
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 0 sent.')
+            ->assertSuccessful();
+
+        $this->assertSame(1, $this->member1->notifications()->count());
+
+        // Fast-forward task due date to 1-day remaining
+        $task->update(['due_date' => now()->startOfDay()->addDay()->toDateString()]);
+
+        // Next execution at 1-day interval: sends 1-day reminder
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 1 sent.')
+            ->assertSuccessful();
+
+        // Repeated run at 1-day interval: 0 sent
+        $this->artisan('tasks:send-deadline-reminders')
+            ->expectsOutput('Processed task deadline reminders: 0 sent.')
+            ->assertSuccessful();
+
+        // Total notifications for this task is exactly 2 (one 3-day, one 1-day)
+        $this->assertSame(2, $this->member1->notifications()->count());
+    }
+
+    public function test_submission_requiring_review_sends_email_to_appropriate_reviewer_only(): void
+    {
+        $task = Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Deliverable Review Document',
+            'status' => Task::STATUS_IN_PROGRESS,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => true,
+            'due_date' => '2026-10-10',
+        ]);
+
+        Notification::fake();
+
+        $this->actingAs($this->member1)->post(
+            route('projects.committees.activities.tasks.submit', [$this->project, $this->committee, $this->activity, $task])
+        );
+
+        // Only committee staff receives the review notification
+        Notification::assertSentTo(
+            $this->staff,
+            TaskSubmittedForReviewNotification::class,
+            function (TaskSubmittedForReviewNotification $notification) {
+                return in_array('mail', $notification->via($this->staff), true)
+                    && in_array('database', $notification->via($this->staff), true);
+            }
+        );
+
+        Notification::assertNotSentTo($this->member2, TaskSubmittedForReviewNotification::class);
+        Notification::assertNotSentTo($this->otherStaff, TaskSubmittedForReviewNotification::class);
+        Notification::assertNotSentTo($this->leader, TaskSubmittedForReviewNotification::class);
+    }
+
+    public function test_returned_submission_sends_email_to_responsible_user(): void
+    {
+        $task = Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Budget Proposal Sheet',
+            'status' => Task::STATUS_UNDER_REVIEW,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => true,
+            'due_date' => '2026-10-10',
+        ]);
+
+        Notification::fake();
+
+        $this->actingAs($this->staff)->post(
+            route('projects.committees.activities.tasks.return', [$this->project, $this->committee, $this->activity, $task]),
+            ['review_feedback' => 'Please provide cost breakdown for sound equipment.']
+        );
+
+        // Responsible user (member1) receives the returned for revision email
+        Notification::assertSentTo(
+            $this->member1,
+            TaskReviewedNotification::class,
+            function (TaskReviewedNotification $notification) {
+                return $notification->status === Task::STATUS_RETURNED
+                    && in_array('mail', $notification->via($this->member1), true)
+                    && in_array('database', $notification->via($this->member1), true);
+            }
+        );
+
+        Notification::assertNotSentTo($this->member2, TaskReviewedNotification::class);
+        Notification::assertNotSentTo($this->leader, TaskReviewedNotification::class);
+    }
+
+    public function test_approved_completion_does_not_send_email_and_remains_in_app_only(): void
+    {
+        $task = Task::create([
+            'activity_id' => $this->activity->id,
+            'title' => 'Signage Printing',
+            'status' => Task::STATUS_UNDER_REVIEW,
+            'assigned_to' => $this->member1->id,
+            'requires_review' => true,
+            'due_date' => '2026-10-10',
+        ]);
+
+        $completedNotif = new TaskReviewedNotification(
+            $task,
+            $this->activity,
+            $this->committee,
+            $this->project,
+            $this->staff,
+            Task::STATUS_COMPLETED
+        );
+
+        $channels = $completedNotif->via($this->member1);
+        $this->assertContains('database', $channels);
+        $this->assertNotContains('mail', $channels, 'Task completion must NOT send email.');
+
+        $activityCompletedNotif = new ActivityReviewedNotification(
+            $this->activity,
+            $this->committee,
+            $this->project,
+            $this->staff,
+            Activity::STATUS_COMPLETED
+        );
+
+        $actChannels = $activityCompletedNotif->via($this->member1);
+        $this->assertContains('database', $actChannels);
+        $this->assertNotContains('mail', $actChannels, 'Activity completion must NOT send email.');
     }
 }
