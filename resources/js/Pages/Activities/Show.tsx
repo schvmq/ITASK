@@ -1054,14 +1054,15 @@ export default function ActivityShow({
 
                             {/* Send Reminder Action (Authorized Project Leader & Staff only) */}
                             {activity.can.sendReminder && (
-                                <button
+                                <Button
                                     type="button"
+                                    variant="outline"
+                                    size="sm"
                                     onClick={handleOpenReminderModal}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
+                                    leftIcon={<Bell className="w-3.5 h-3.5 text-slate-500" />}
                                 >
-                                    <Bell className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>Send Reminder</span>
-                                </button>
+                                    Send Reminder
+                                </Button>
                             )}
 
                             {/* Member Submit for Review button */}

@@ -132,128 +132,77 @@ function renderDaysLeft(task: MyTask) {
     );
 }
 
-// ─── Section Table Component ──────────────────────────────────────────────────
+// ─── Task Row ─────────────────────────────────────────────────────────────────
 
-interface TaskSectionTableProps {
-    title: string;
-    dotColorClass: string;
-    tasks: MyTask[];
-    emptyMessage: string;
-}
-
-function TaskSectionTable({ title, dotColorClass, tasks, emptyMessage }: TaskSectionTableProps) {
+function TaskRow({ task }: { task: MyTask }) {
     return (
-        <section className="space-y-2.5">
-            {/* Section Header: Dot + Title + Count */}
-            <div className="flex items-center gap-2 px-1">
-                <span className={`w-2 h-2 rounded-full ${dotColorClass} inline-block shrink-0`} />
-                <h2 className="text-xs sm:text-[13px] font-semibold text-slate-800">
-                    {title}
-                </h2>
-                <span className="text-xs sm:text-[13px] font-normal text-slate-400">
-                    {tasks.length}
-                </span>
-            </div>
+        <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors group">
+            {/* Task */}
+            <td className="px-5 py-3">
+                <Link
+                    href={task.action_url}
+                    className="font-semibold text-[13px] text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug block truncate"
+                    title={task.title}
+                >
+                    {task.title}
+                </Link>
+            </td>
 
-            {/* Table Card */}
-            <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] shadow-[0_1px_3px_0_rgb(0,0,0,0.03)] overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[760px]">
-                        <thead>
-                            <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-white">
-                                <th className="px-5 py-3.5 text-left w-[24%]">Task</th>
-                                <th className="px-4 py-3.5 text-left w-[22%]">Activity</th>
-                                <th className="px-4 py-3.5 text-left w-[18%]">Committee</th>
-                                <th className="px-4 py-3.5 text-left w-[14%]">Project</th>
-                                <th className="px-4 py-3.5 text-left w-[8%]">Due</th>
-                                <th className="px-4 py-3.5 text-left w-[10%]">Days Left</th>
-                                <th className="px-5 py-3.5 text-left w-[10%]">Status</th>
-                            </tr>
-                        </thead>
-                        {tasks.length === 0 ? (
-                            <tbody>
-                                <tr>
-                                    <td colSpan={7} className="px-5 py-7 text-center text-xs text-slate-400 font-medium">
-                                        {emptyMessage}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        ) : (
-                            <tbody className="divide-y divide-slate-100 text-xs sm:text-[13px]">
-                                {tasks.map((task) => (
-                                    <tr key={task.id} className="hover:bg-slate-50/60 transition-colors">
-                                        {/* Task */}
-                                        <td className="px-5 py-3.5">
-                                            <Link
-                                                href={task.action_url}
-                                                className="font-bold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug block"
-                                            >
-                                                {task.title}
-                                            </Link>
-                                        </td>
-
-                                        {/* Activity */}
-                                        <td className="px-4 py-3.5">
-                                            <div className="text-slate-600 truncate max-w-[200px]" title={task.activity.title}>
-                                                {task.activity.title}
-                                            </div>
-                                            {task.activity.status === 'Under Review' && (
-                                                <div className="mt-1">
-                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                                        <span>Activity Under Review</span>
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {task.activity.status === 'Returned' && (
-                                                <div className="mt-1">
-                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                                        <span>Activity Returned for Revision</span>
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </td>
-
-                                        {/* Committee */}
-                                        <td className="px-4 py-3.5 text-slate-600 truncate max-w-[160px]" title={task.committee.name}>
-                                            {task.committee.name}
-                                        </td>
-
-                                        {/* Project */}
-                                        <td className="px-4 py-3.5 text-slate-600 truncate max-w-[150px]" title={task.project.title}>
-                                            {task.project.title}
-                                        </td>
-
-                                        {/* Due */}
-                                        <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">
-                                            {formatDueDate(task.due_date)}
-                                        </td>
-
-                                        {/* Days Left */}
-                                        <td className="px-4 py-3.5 whitespace-nowrap">
-                                            {renderDaysLeft(task)}
-                                        </td>
-
-                                        {/* Status */}
-                                        <td className="px-5 py-3.5 whitespace-nowrap">
-                                            <Link
-                                                href={task.action_url}
-                                                className="inline-flex items-center justify-between gap-2 px-3 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
-                                                title="Open task in activity workspace"
-                                            >
-                                                <span>{task.status}</span>
-                                                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        )}
-                    </table>
+            {/* Activity */}
+            <td className="px-4 py-3">
+                <div className="text-slate-500 text-[13px] truncate" title={task.activity.title}>
+                    {task.activity.title}
                 </div>
-            </div>
-        </section>
+                {task.activity.status === 'Under Review' && (
+                    <div className="mt-1">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                            Under Review
+                        </span>
+                    </div>
+                )}
+                {task.activity.status === 'Returned' && (
+                    <div className="mt-1">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                            Returned
+                        </span>
+                    </div>
+                )}
+            </td>
+
+            {/* Committee */}
+            <td className="px-4 py-3" title={task.committee.name}>
+                <div className="text-slate-500 text-[13px] truncate">{task.committee.name}</div>
+            </td>
+
+            {/* Project */}
+            <td className="px-4 py-3" title={task.project.title}>
+                <div className="text-slate-500 text-[13px] truncate">{task.project.title}</div>
+            </td>
+
+            {/* Due */}
+            <td className="px-4 py-3 text-slate-500 text-[13px] whitespace-nowrap">
+                {formatDueDate(task.due_date)}
+            </td>
+
+            {/* Days Left */}
+            <td className="px-4 py-3 whitespace-nowrap">
+                {renderDaysLeft(task)}
+            </td>
+
+            {/* Status */}
+            <td className="px-4 py-3 whitespace-nowrap">
+                <Link
+                    href={task.action_url}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
+                    title="Open task"
+                >
+                    <span>{task.status}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+                </Link>
+            </td>
+        </tr>
     );
 }
 
@@ -402,31 +351,89 @@ export default function MyTasksIndex({ tasks, roleContext }: MyTasksIndexProps) 
                         )}
                     </div>
                 ) : (
-                    /* ── Grouped Section Tables in Exact Order: In Progress, To Do, Completed ── */
-                    <div className="space-y-6">
-                        {/* 1. In Progress */}
-                        <TaskSectionTable
-                            title="In Progress"
-                            dotColorClass="bg-blue-500"
-                            tasks={inProgressTasks}
-                            emptyMessage="No tasks currently in progress."
-                        />
+                    /* ── Single unified table — sections are tbody groups with label rows ── */
+                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] shadow-[0_1px_3px_0_rgb(0,0,0,0.03)] overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left min-w-[760px]" style={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+                                {/* Single colgroup — every section shares these widths */}
+                                <colgroup>
+                                    <col style={{ width: '26%' }} />
+                                    <col style={{ width: '22%' }} />
+                                    <col style={{ width: '16%' }} />
+                                    <col style={{ width: '13%' }} />
+                                    <col style={{ width: '8%' }} />
+                                    <col style={{ width: '8%' }} />
+                                    <col style={{ width: '7%' }} />
+                                </colgroup>
 
-                        {/* 2. To Do */}
-                        <TaskSectionTable
-                            title="To Do"
-                            dotColorClass="bg-slate-400"
-                            tasks={toDoTasks}
-                            emptyMessage="No tasks to do."
-                        />
+                                {/* Sticky column header */}
+                                <thead>
+                                    <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-white">
+                                        <th className="px-5 py-3 text-left">Task</th>
+                                        <th className="px-4 py-3 text-left">Activity</th>
+                                        <th className="px-4 py-3 text-left">Committee</th>
+                                        <th className="px-4 py-3 text-left">Project</th>
+                                        <th className="px-4 py-3 text-left">Due</th>
+                                        <th className="px-4 py-3 text-left">Days Left</th>
+                                        <th className="px-4 py-3 text-left">Status</th>
+                                    </tr>
+                                </thead>
 
-                        {/* 3. Completed */}
-                        <TaskSectionTable
-                            title="Completed"
-                            dotColorClass="bg-emerald-500"
-                            tasks={completedTasks}
-                            emptyMessage="No completed tasks yet."
-                        />
+                                {/* ── In Progress ── */}
+                                <tbody>
+                                    <tr className="bg-slate-50/70 border-y border-slate-100">
+                                        <td colSpan={7} className="px-5 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block shrink-0" />
+                                                <span className="text-[12px] font-semibold text-slate-700">In Progress</span>
+                                                <span className="text-[12px] font-normal text-slate-400">{inProgressTasks.length}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {inProgressTasks.length === 0 ? (
+                                        <tr><td colSpan={7} className="px-5 py-5 text-center text-xs text-slate-400">No tasks currently in progress.</td></tr>
+                                    ) : (
+                                        inProgressTasks.map((task) => <TaskRow key={task.id} task={task} />)
+                                    )}
+                                </tbody>
+
+                                {/* ── To Do ── */}
+                                <tbody>
+                                    <tr className="bg-slate-50/70 border-y border-slate-100">
+                                        <td colSpan={7} className="px-5 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-slate-400 inline-block shrink-0" />
+                                                <span className="text-[12px] font-semibold text-slate-700">To Do</span>
+                                                <span className="text-[12px] font-normal text-slate-400">{toDoTasks.length}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {toDoTasks.length === 0 ? (
+                                        <tr><td colSpan={7} className="px-5 py-5 text-center text-xs text-slate-400">No tasks to do.</td></tr>
+                                    ) : (
+                                        toDoTasks.map((task) => <TaskRow key={task.id} task={task} />)
+                                    )}
+                                </tbody>
+
+                                {/* ── Completed ── */}
+                                <tbody>
+                                    <tr className="bg-slate-50/70 border-y border-slate-100">
+                                        <td colSpan={7} className="px-5 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
+                                                <span className="text-[12px] font-semibold text-slate-700">Completed</span>
+                                                <span className="text-[12px] font-normal text-slate-400">{completedTasks.length}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {completedTasks.length === 0 ? (
+                                        <tr><td colSpan={7} className="px-5 py-5 text-center text-xs text-slate-400">No completed tasks yet.</td></tr>
+                                    ) : (
+                                        completedTasks.map((task) => <TaskRow key={task.id} task={task} />)
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 

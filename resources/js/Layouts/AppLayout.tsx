@@ -521,7 +521,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
             {/* ══ Main Area (offset by sidebar width on desktop) ═══════════ */}
             <div
-                className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ease-in-out ${
+                className={`flex flex-col min-w-0 w-full transition-all duration-200 ease-in-out ${
                     isCollapsed ? 'lg:pl-[70px]' : 'lg:pl-64'
                 }`}
             >
@@ -694,7 +694,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 )}
 
                 {/* ── Main content ────────────────────────────────────────── */}
-                <main className="flex-1 px-4 sm:px-6 py-6 w-full max-w-screen-xl space-y-4">
+                <main className="flex-1 px-4 sm:px-6 py-6 w-full space-y-4">
                     {/* Global Flash Alerts (Success / Status / Error) */}
                     {(flash?.success || flash?.status) && dismissedFlash !== (flash.success || flash.status) && (
                         <Alert
