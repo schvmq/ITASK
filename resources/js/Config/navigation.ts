@@ -59,23 +59,20 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
     },
     {
         name: 'My Tasks',
-        href: '#tasks',
+        href: '/tasks',
         icon: CheckSquare,
-        comingSoon: true,
         description: 'Tasks assigned to you across all projects',
     },
     {
         name: 'Calendar',
-        href: '#calendar',
+        href: '/calendar',
         icon: CalendarDays,
-        comingSoon: true,
         description: 'Upcoming project deadlines and milestones',
     },
     {
         name: 'Timeline',
-        href: '#timeline',
+        href: '/timeline',
         icon: GanttChartSquare,
-        comingSoon: true,
         description: 'CCIS project schedules and Gantt timelines',
     },
 ];
