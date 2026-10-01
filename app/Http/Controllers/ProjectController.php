@@ -17,11 +17,18 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Services\ProjectProgressService;
+use App\Services\ProjectTimelineService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class ProjectController extends Controller
 {
+    public function __construct(
+        protected ProjectProgressService $progressService,
+        protected ProjectTimelineService $timelineService
+    ) {}
+
     /**
      * Display a listing of projects.
      */
@@ -45,17 +52,19 @@ class ProjectController extends Controller
                 $role = $userAssignment?->role
                     ?? ($project->created_by === $userId ? ProjectRoleAssignment::ROLE_PROJECT_LEADER : 'Project Member');
 
+                $projectProgress = $this->progressService->calculateProjectProgress($project);
+
                 return [
                     'id' => (string) $project->id,
                     'title' => $project->title,
                     'description' => $project->description ?? '',
                     'status' => $project->status,
                     'role' => $role,
-                    'progress' => 0,
+                    'progress' => $projectProgress['progress'],
                     'deadline' => $project->end_date ? $project->end_date->format('F d, Y') : 'No deadline',
                     'startDate' => $project->start_date ? $project->start_date->format('F d, Y') : null,
                     'committeesCount' => $project->committees()->count(),
-                    'tasksCount' => 0,
+                    'tasksCount' => $projectProgress['total_tasks'],
                 ];
             });
 
@@ -120,7 +129,7 @@ class ProjectController extends Controller
     /**
      * Display the specified project.
      */
-    public function show(string $project): Response
+    public function show(string $project, ?string $initialTab = null): Response
     {
         $projectModel = is_numeric($project)
             ? Project::with([
@@ -157,11 +166,18 @@ class ProjectController extends Controller
             'name' => $userAssignment->committee->name,
         ] : null;
 
+        $projectProgress = $projectModel ? $this->progressService->calculateProjectProgress($projectModel) : null;
+        $timelineData = (Auth::check() && $projectModel)
+            ? $this->timelineService->getTimelineData($projectModel, Auth::user())
+            : null;
+
         $projectData = $projectModel ? [
             'id' => (string) $projectModel->id,
             'title' => $projectModel->title,
             'description' => $projectModel->description,
             'status' => $projectModel->status,
+            'progress' => $projectProgress ? $projectProgress['progress'] : 0,
+            'timeline' => $timelineData,
             'start_date' => $projectModel->start_date?->format('F d, Y'),
             'end_date' => $projectModel->end_date?->format('F d, Y'),
             'start_date_raw' => $projectModel->start_date?->format('Y-m-d'),
@@ -192,7 +208,7 @@ class ProjectController extends Controller
                     'id' => (string) $committee->id,
                     'name' => $committee->name,
                     'description' => $committee->description,
-                    'progress' => 0,
+                    'progress' => $this->progressService->calculateCommitteeProgress($committee)['progress'],
                     'membersCount' => $committee->memberAssignments->count(),
                     'activitiesCount' => $committee->activities->count(),
                     'leadName' => $canView
@@ -223,6 +239,7 @@ class ProjectController extends Controller
                     'title' => $act->title,
                     'description' => $act->description,
                     'status' => $act->status,
+                    'progress' => $this->progressService->calculateActivityProgress($act)['progress'],
                     'due_date' => $act->due_date?->format('M d, Y'),
                     'due_date_raw' => $act->due_date?->format('Y-m-d'),
                     'committee' => [
@@ -306,9 +323,13 @@ class ProjectController extends Controller
             })->values()->all(),
         ] : null;
 
+        $currentTab = $initialTab ?? request('tab');
+
         return Inertia::render('Projects/Show', [
             'projectId' => $project,
             'project' => $projectData,
+            'timeline' => $timelineData,
+            'initialTab' => $currentTab,
         ]);
     }
 

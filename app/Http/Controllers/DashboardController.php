@@ -7,6 +7,7 @@ use App\Models\Committee;
 use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
+use App\Services\ProjectProgressService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -14,6 +15,9 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        protected ProjectProgressService $progressService
+    ) {}
     /**
      * Display the role-scoped user dashboard.
      */
@@ -71,10 +75,10 @@ class DashboardController extends Controller
                 $role = $userAssignment?->role
                     ?? ($project->created_by === $userId ? ProjectRoleAssignment::ROLE_PROJECT_LEADER : ProjectRoleAssignment::ROLE_PROJECT_MEMBER);
 
-                $allTasks = $project->activities->flatMap->tasks;
-                $tasksCount = $allTasks->count();
-                $completedTasksCount = $allTasks->where('status', Task::STATUS_COMPLETED)->count();
-                $progressPercentage = $tasksCount > 0 ? (int) round(($completedTasksCount / $tasksCount) * 100) : 0;
+                $projectProgress = $this->progressService->calculateProjectProgress($project);
+                $tasksCount = $projectProgress['total_tasks'];
+                $completedTasksCount = $projectProgress['completed_tasks'];
+                $progressPercentage = $projectProgress['progress'];
 
                 return [
                     'id' => (string) $project->id,
@@ -119,9 +123,9 @@ class DashboardController extends Controller
                     $committeeRole = ProjectRoleAssignment::ROLE_PROJECT_LEADER;
                 }
 
-                $allTasks = $committee->activities->flatMap->tasks;
-                $tasksCount = $allTasks->count();
-                $completedTasksCount = $allTasks->where('status', Task::STATUS_COMPLETED)->count();
+                $committeeProgress = $this->progressService->calculateCommitteeProgress($committee);
+                $tasksCount = $committeeProgress['total_tasks'];
+                $completedTasksCount = $committeeProgress['completed_tasks'];
 
                 return [
                     'id' => (string) $committee->id,
@@ -133,6 +137,8 @@ class DashboardController extends Controller
                     'activities_count' => $committee->activities->count(),
                     'tasks_count' => $tasksCount,
                     'completed_tasks_count' => $completedTasksCount,
+                    'progress' => $committeeProgress['progress'],
+                    'progressPercentage' => $committeeProgress['progress'],
                 ];
             });
 

@@ -14,6 +14,7 @@ use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
 use App\Notifications\ActivityReviewedNotification;
 use App\Notifications\ActivitySubmittedForReviewNotification;
+use App\Services\ProjectProgressService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,9 @@ use Inertia\Response;
 
 class ActivityController extends Controller
 {
+    public function __construct(
+        protected ProjectProgressService $progressService
+    ) {}
     /**
      * Store a newly created activity in storage.
      */
@@ -93,11 +97,16 @@ class ActivityController extends Controller
             ->values()
             ->all();
 
+        $activityProgress = $this->progressService->calculateActivityProgress($activity);
+
         $activityData = [
             'id'              => (string) $activity->id,
             'title'           => $activity->title,
             'description'     => $activity->description,
             'status'          => $activity->status,
+            'progress'        => $activityProgress['progress'],
+            'tasks_count'     => $activityProgress['total_tasks'],
+            'completed_tasks_count' => $activityProgress['completed_tasks'],
             'start_date'      => $activity->start_date?->format('M d, Y'),
             'start_date_raw'  => $activity->start_date?->format('Y-m-d'),
             'due_date'        => $activity->due_date?->format('M d, Y'),
@@ -129,6 +138,8 @@ class ActivityController extends Controller
                 'title'           => $task->title,
                 'description'     => $task->description,
                 'status'          => $task->status,
+                'progress'        => $task->status === Task::STATUS_COMPLETED ? 100 : 0,
+                'is_completed'    => $task->status === Task::STATUS_COMPLETED,
                 'requires_review' => (bool) $task->requires_review,
                 'due_date'        => $task->due_date?->format('M d, Y'),
                 'due_date_raw'    => $task->due_date?->format('Y-m-d'),

@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\CommitteeController;
+use App\Http\Controllers\MyTasksController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPersonnelController;
+use App\Http\Controllers\TimelineIndexController;
 use App\Models\User;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
@@ -62,6 +65,15 @@ Route::post('/email/verification-notification', function (Request $request) {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
 
+    // My Tasks (cross-project task hub, role-scoped)
+    Route::get('/my-tasks', [MyTasksController::class, 'index'])->name('my-tasks.index');
+
+    // Calendar (date-oriented view of project/activity/task dates)
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+
+    // Timeline index (project list → select project → view Gantt)
+    Route::get('/timeline', [TimelineIndexController::class, 'index'])->name('timeline.index');
+
     // Notifications
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
@@ -70,6 +82,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    Route::get('/projects/{project}/timeline', [\App\Http\Controllers\ProjectTimelineController::class, 'show'])->name('projects.timeline');
     Route::match(['put', 'patch'], '/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::post('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
     Route::get('/projects/{project}/documents/{document}', [ProjectController::class, 'downloadApprovalDocument'])->name('projects.documents.download');

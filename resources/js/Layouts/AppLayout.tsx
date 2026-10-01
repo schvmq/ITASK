@@ -61,6 +61,8 @@ export interface AppLayoutProps {
     headerAction?: React.ReactNode;
     /** Optional active project context for sidebar display */
     currentProject?: CurrentProjectInfo | null;
+    /** If true, suppresses the redundant second page heading banner below the topbar */
+    hidePageHeadingBanner?: boolean;
     children: React.ReactNode;
 }
 
@@ -219,31 +221,31 @@ function SidebarContent({ user, currentPage, currentProject, onNavClick, onLogou
             </div>
 
             {/* ── Current Project Context (Dynamic / Role-Aware) ── */}
-            <div className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/5 overflow-hidden shrink-0">
-                <div className="px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-200/40 mb-2 select-none">
-                        Current Project
-                    </p>
-                    <div className="flex items-center gap-2.5">
-                        <div
-                            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white"
-                            style={{ backgroundColor: 'var(--color-brand-project-darker-orange)' }}
-                        >
-                            <FolderOpen className="w-3.5 h-3.5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-orange-50 truncate leading-snug">
-                                {activeProject ? activeProject.title : 'No project selected'}
-                            </p>
-                            <p className="text-[10px] text-orange-200/50 leading-snug">
-                                {activeProject
-                                    ? `${activeProject.role || 'No project role'}${activeProject.status ? ` · ${activeProject.status}` : ''}`
-                                    : 'Select from Projects'}
-                            </p>
+            {activeProject && (
+                <div className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/5 overflow-hidden shrink-0">
+                    <div className="px-4 py-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-orange-200/40 mb-2 select-none">
+                            Current Project
+                        </p>
+                        <div className="flex items-center gap-2.5">
+                            <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-white"
+                                style={{ backgroundColor: 'var(--color-brand-project-darker-orange)' }}
+                            >
+                                <FolderOpen className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-orange-50 truncate leading-snug">
+                                    {activeProject.title}
+                                </p>
+                                <p className="text-[10px] text-orange-200/50 leading-snug">
+                                    {activeProject.role || 'No project role'}{activeProject.status ? ` · ${activeProject.status}` : ''}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* ── User footer ── */}
             <div className="px-3 pb-4 shrink-0">
@@ -301,6 +303,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     subtitle,
     headerAction,
     currentProject,
+    hidePageHeadingBanner = false,
     children,
 }) => {
     const { auth, url, flash } = usePage<PageProps & { url: string }>().props;
@@ -375,19 +378,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                             </SheetContent>
                         </Sheet>
 
-                        {/* Page title (desktop only) */}
-                        {title && (
-                            <div className="hidden sm:block min-w-0">
-                                <h1 className="text-sm font-semibold text-[color:var(--color-text-main)] truncate leading-snug">
-                                    {title}
-                                </h1>
-                                {subtitle && (
-                                    <p className="text-xs text-[color:var(--color-text-muted)] truncate leading-snug">
-                                        {subtitle}
-                                    </p>
-                                )}
-                            </div>
-                        )}
                     </div>
 
                     {/* Right: Search + Notifications + User */}
@@ -499,7 +489,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 </header>
 
                 {/* ── Page heading (mobile / full width) ─────────────────── */}
-                {(title || headerAction) && (
+                {!hidePageHeadingBanner && (title || headerAction) && (
                     <div className="px-4 sm:px-6 pt-5 pb-4 bg-white border-b border-[color:var(--color-border-light)] flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                         <div className="min-w-0">
                             {title && (

@@ -84,6 +84,8 @@ export interface DashboardCommittee {
     activities_count: number;
     tasks_count: number;
     completed_tasks_count: number;
+    progress?: number;
+    progressPercentage?: number;
 }
 
 export interface DashboardTask {
@@ -124,3 +126,97 @@ export interface DashboardStats {
     overdueTasksCount: number;
     approachingTasksCount: number;
 }
+
+export interface TaskTimelineItem {
+    id: string;
+    activity_id: string;
+    committee_id?: string;
+    project_id?: string;
+    title: string;
+    name: string;
+    description: string;
+    status: string;
+    due_date: string | null;
+    due_date_raw: string | null;
+    end_date: string | null;
+    end_date_raw: string | null;
+    start_date: string | null;
+    start_date_raw: string | null;
+    duration_days: number | null;
+    requires_review: boolean;
+    progress: number;
+    is_completed: boolean;
+    assigned_user: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+    parent_id: string;
+    type: 'task';
+}
+
+export interface ActivityTimelineItem {
+    id: string;
+    project_id: string;
+    committee_id: string;
+    title: string;
+    name: string;
+    description: string;
+    status: string;
+    start_date: string | null;
+    start_date_raw: string | null;
+    due_date: string | null;
+    due_date_raw: string | null;
+    end_date: string | null;
+    end_date_raw: string | null;
+    duration_days: number | null;
+    progress: number;
+    total_tasks: number;
+    completed_tasks: number;
+    tasks: TaskTimelineItem[];
+    parent_id: string;
+    type: 'activity';
+}
+
+export interface CommitteeTimelineItem {
+    id: string;
+    project_id: string;
+    name: string;
+    description: string;
+    start_date: string | null;
+    start_date_raw: string | null;
+    end_date: string | null;
+    end_date_raw: string | null;
+    duration_days: number | null;
+    progress: number;
+    total_activities: number;
+    completed_activities: number;
+    total_tasks: number;
+    completed_tasks: number;
+    activities: ActivityTimelineItem[];
+    parent_id: string;
+    type: 'committee';
+}
+
+export interface ProjectTimelineData {
+    id: string;
+    name: string;
+    title: string;
+    description: string;
+    status: string;
+    start_date: string | null;
+    start_date_raw: string | null;
+    end_date: string | null;
+    end_date_raw: string | null;
+    duration_days: number | null;
+    progress: number;
+    total_committees: number;
+    total_activities: number;
+    completed_activities: number;
+    total_tasks: number;
+    completed_tasks: number;
+    committees: CommitteeTimelineItem[];
+    parent_id: null;
+    type: 'project';
+}
+
