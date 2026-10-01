@@ -30,6 +30,10 @@ class ActivityReviewedNotification extends Notification
      */
     public function via(object $notifiable): array
     {
+        if ($this->status === Activity::STATUS_COMPLETED) {
+            return ['database'];
+        }
+
         return ['database', 'mail'];
     }
 

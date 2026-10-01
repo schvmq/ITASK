@@ -12,6 +12,7 @@ use App\Models\Committee;
 use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\Task;
+use App\Notifications\ActivityAssignedNotification;
 use App\Notifications\ActivityReviewedNotification;
 use App\Notifications\ActivitySubmittedForReviewNotification;
 use App\Services\ProjectProgressService;
@@ -48,6 +49,24 @@ class ActivityController extends Controller
             'due_date'    => $request->validated('due_date'),
             'status'      => $request->validated('status', Activity::STATUS_TO_DO),
         ]);
+
+        // Notify assigned committee staff and members of the new activity assignment
+        $assignedUsers = $committee->roleAssignments()
+            ->with('user')
+            ->get()
+            ->pluck('user')
+            ->filter()
+            ->reject(fn ($u) => (int) $u->id === (int) Auth::id())
+            ->unique('id');
+
+        foreach ($assignedUsers as $recipient) {
+            $recipient->notify(new ActivityAssignedNotification(
+                $activity,
+                $committee,
+                $project,
+                Auth::user()
+            ));
+        }
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
