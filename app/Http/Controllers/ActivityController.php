@@ -155,6 +155,7 @@ class ActivityController extends Controller
                 'createTask' => $user ? Gate::forUser($user)->allows('create', [Task::class, $activity]) : false,
                 'submit' => $user ? Gate::forUser($user)->allows('submit', $activity) && in_array($activity->status, [Activity::STATUS_TO_DO, Activity::STATUS_IN_PROGRESS, Activity::STATUS_RETURNED_FOR_REVISION], true) : false,
                 'review' => $user ? Gate::forUser($user)->allows('review', $activity) && $activity->status === Activity::STATUS_UNDER_REVIEW : false,
+                'sendReminder' => $user ? Gate::forUser($user)->allows('sendReminder', $activity) : false,
             ],
             'tasks' => $activity->tasks->map(fn ($task) => [
                 'id'              => (string) $task->id,

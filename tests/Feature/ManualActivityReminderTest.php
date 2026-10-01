@@ -450,4 +450,46 @@ class ManualActivityReminderTest extends TestCase
         // Second submission while lock held does not dispatch duplicate notifications
         Notification::assertNothingSent();
     }
+
+    /**
+     * 13. Activity show page props expose sendReminder capability for Project Leader and Staff.
+     */
+    public function test_activity_show_props_expose_send_reminder_capability_for_authorized_roles(): void
+    {
+        // Project Leader sees can.sendReminder = true
+        $responseLeader = $this->actingAs($this->leader)->get(
+            route('projects.committees.activities.show', [$this->project, $this->committee, $this->activity])
+        );
+        $responseLeader->assertOk();
+        $responseLeader->assertInertia(fn ($page) => $page
+            ->component('Activities/Show')
+            ->where('activity.can.sendReminder', true)
+        );
+
+        // Project Staff sees can.sendReminder = true
+        $responseStaff = $this->actingAs($this->staff)->get(
+            route('projects.committees.activities.show', [$this->project, $this->committee, $this->activity])
+        );
+        $responseStaff->assertOk();
+        $responseStaff->assertInertia(fn ($page) => $page
+            ->component('Activities/Show')
+            ->where('activity.can.sendReminder', true)
+        );
+    }
+
+    /**
+     * 14. Activity show page props hide sendReminder capability for Project Members.
+     */
+    public function test_activity_show_props_hide_send_reminder_capability_for_members(): void
+    {
+        $responseMember = $this->actingAs($this->taskAssignee1)->get(
+            route('projects.committees.activities.show', [$this->project, $this->committee, $this->activity])
+        );
+        $responseMember->assertOk();
+        $responseMember->assertInertia(fn ($page) => $page
+            ->component('Activities/Show')
+            ->where('activity.can.sendReminder', false)
+        );
+    }
 }
+
