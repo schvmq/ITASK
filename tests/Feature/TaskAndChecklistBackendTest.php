@@ -308,8 +308,8 @@ class TaskAndChecklistBackendTest extends TestCase
         }
     }
 
-    /** 13. All five statuses are accepted by store validation. */
-    public function test_all_five_task_statuses_accepted_by_store(): void
+    /** 13. Only To Do status is accepted by store validation; other statuses are rejected. */
+    public function test_only_to_do_status_accepted_by_store(): void
     {
         $leader    = $this->createVerifiedUser();
         $project   = $this->createProjectWithLeader($leader);
@@ -317,12 +317,20 @@ class TaskAndChecklistBackendTest extends TestCase
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
 
-        foreach (Task::STATUSES as $status) {
+        // To Do status is accepted
+        $response = $this->actingAs($staff)->post(
+            $this->taskRoute($project, $committee, $activity),
+            ['title' => 'Task To Do', 'status' => Task::STATUS_TO_DO]
+        );
+        $response->assertSessionDoesntHaveErrors('status');
+
+        // Other statuses are rejected by validation
+        foreach ([Task::STATUS_IN_PROGRESS, Task::STATUS_UNDER_REVIEW, Task::STATUS_RETURNED, Task::STATUS_COMPLETED] as $status) {
             $response = $this->actingAs($staff)->post(
                 $this->taskRoute($project, $committee, $activity),
                 ['title' => 'Task ' . $status, 'status' => $status]
             );
-            $response->assertSessionDoesntHaveErrors('status');
+            $response->assertSessionHasErrors('status');
         }
     }
 
@@ -678,8 +686,7 @@ class TaskAndChecklistBackendTest extends TestCase
 
         $this->actingAs($staff)
             ->patch($this->taskUpdateRoute($project, $committee, $activity, $task), [
-                'title'  => 'Staff Updated Task',
-                'status' => Task::STATUS_IN_PROGRESS,
+                'title' => 'Staff Updated Task',
             ])
             ->assertRedirect();
 
@@ -698,8 +705,7 @@ class TaskAndChecklistBackendTest extends TestCase
 
         $this->actingAs($leader)
             ->patch($this->taskUpdateRoute($project, $committee, $activity, $task), [
-                'title'  => 'Leader Updated Task',
-                'status' => Task::STATUS_COMPLETED,
+                'title' => 'Leader Updated Task',
             ])
             ->assertRedirect();
 
@@ -849,7 +855,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $task      = $this->createTask($activity, $staff);
 
         $response = $this->actingAs($staff)->post(
             $this->checklistRoute($project, $committee, $activity, $task),
@@ -905,7 +911,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $task      = $this->createTask($activity, $staff);
         $item      = $this->createChecklistItem($task, ['is_completed' => false]);
 
         // Mark complete
@@ -931,7 +937,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $task      = $this->createTask($activity, $staff);
         $item      = $this->createChecklistItem($task, ['content' => 'Old content']);
 
         $this->actingAs($staff)
@@ -949,7 +955,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $task      = $this->createTask($activity, $staff);
         $item      = $this->createChecklistItem($task, ['content' => 'To be deleted']);
 
         $this->actingAs($staff)
@@ -971,7 +977,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $task      = $this->createTask($activity, $staff);
 
         $this->actingAs($staff)
             ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => ''])
@@ -986,7 +992,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $task      = $this->createTask($activity, $staff);
 
         $this->actingAs($staff)
             ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => str_repeat('x', 501)])
@@ -1001,7 +1007,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $task      = $this->createTask($activity, $staff);
         $item      = $this->createChecklistItem($task);
 
         $this->actingAs($staff)
@@ -1013,38 +1019,42 @@ class TaskAndChecklistBackendTest extends TestCase
     // SECTION 12 — CHECKLIST AUTHORIZATION
     // =========================================================================
 
-    /** 49. Project Leader can create checklist items. */
-    public function test_project_leader_can_create_checklist_item(): void
+    /** 49. Project Leader cannot create checklist items on assigned member's task. */
+    public function test_project_leader_cannot_create_checklist_item_on_assigned_member_task(): void
     {
         $leader    = $this->createVerifiedUser();
         $project   = $this->createProjectWithLeader($leader);
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $member    = $this->createVerifiedUser();
+        $this->assignRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $task      = $this->createTask($activity, $member);
 
         $this->actingAs($leader)
             ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => 'Leader checklist item'])
-            ->assertSessionDoesntHaveErrors();
+            ->assertForbidden();
 
-        $this->assertDatabaseHas('checklist_items', ['task_id' => $task->id, 'content' => 'Leader checklist item']);
+        $this->assertDatabaseMissing('checklist_items', ['task_id' => $task->id, 'content' => 'Leader checklist item']);
     }
 
-    /** 50. Project Staff can create checklist items in their committee. */
-    public function test_project_staff_can_create_checklist_item(): void
+    /** 50. Project Staff cannot create checklist items on assigned member's task. */
+    public function test_project_staff_cannot_create_checklist_item_on_assigned_member_task(): void
     {
         $leader    = $this->createVerifiedUser();
         $project   = $this->createProjectWithLeader($leader);
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $member    = $this->createVerifiedUser();
+        $this->assignRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $task      = $this->createTask($activity, $member);
 
         $this->actingAs($staff)
             ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => 'Staff checklist item'])
-            ->assertSessionDoesntHaveErrors();
+            ->assertForbidden();
 
-        $this->assertDatabaseHas('checklist_items', ['task_id' => $task->id, 'content' => 'Staff checklist item']);
+        $this->assertDatabaseMissing('checklist_items', ['task_id' => $task->id, 'content' => 'Staff checklist item']);
     }
 
     /** 51. Project Staff cannot create checklist items in another committee. */
@@ -1057,7 +1067,7 @@ class TaskAndChecklistBackendTest extends TestCase
         $staffB     = $this->createVerifiedUser();
         $committeeB = $this->createCommitteeWithStaff($project, $staffB);
         $activityB  = $this->createActivity($committeeB, $staffB);
-        $taskB      = $this->createTask($activityB);
+        $taskB      = $this->createTask($activityB, $staffB);
 
         $this->actingAs($staffA)
             ->post($this->checklistRoute($project, $committeeB, $activityB, $taskB), ['content' => 'Unauthorized checklist item'])
@@ -1066,21 +1076,31 @@ class TaskAndChecklistBackendTest extends TestCase
         $this->assertDatabaseMissing('checklist_items', ['content' => 'Unauthorized checklist item']);
     }
 
-    /** 52. Project Member cannot create checklist items. */
-    public function test_project_member_cannot_create_checklist_item(): void
+    /** 52. Assigned Project Member can create checklist items, unassigned cannot. */
+    public function test_assigned_project_member_can_create_checklist_item(): void
     {
         $leader    = $this->createVerifiedUser();
         $project   = $this->createProjectWithLeader($leader);
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
-        $member    = $this->createVerifiedUser();
-        $this->assignRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $member1   = $this->createVerifiedUser();
+        $this->assignRole($project, $member1, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $member2   = $this->createVerifiedUser();
+        $this->assignRole($project, $member2, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $task      = $this->createTask($activity, $member1);
 
-        $this->actingAs($member)
-            ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => 'Member checklist item'])
+        // Unassigned member cannot create
+        $this->actingAs($member2)
+            ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => 'Member2 item'])
             ->assertForbidden();
+
+        // Assigned member can create
+        $this->actingAs($member1)
+            ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => 'Member1 item'])
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('checklist_items', ['task_id' => $task->id, 'content' => 'Member1 item']);
     }
 
     /** 53. Unassigned user cannot create checklist items. */
@@ -1113,42 +1133,62 @@ class TaskAndChecklistBackendTest extends TestCase
             ->assertRedirect('/login');
     }
 
-    /** 55. Project Member cannot update checklist items. */
-    public function test_project_member_cannot_update_checklist_item(): void
+    /** 55. Assigned Project Member can update checklist items, unassigned cannot. */
+    public function test_assigned_project_member_can_update_checklist_item(): void
     {
         $leader    = $this->createVerifiedUser();
         $project   = $this->createProjectWithLeader($leader);
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $member1   = $this->createVerifiedUser();
+        $this->assignRole($project, $member1, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $member2   = $this->createVerifiedUser();
+        $this->assignRole($project, $member2, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $task      = $this->createTask($activity, $member1);
         $item      = $this->createChecklistItem($task);
-        $member    = $this->createVerifiedUser();
-        $this->assignRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
 
-        $this->actingAs($member)
+        // Unassigned member cannot update
+        $this->actingAs($member2)
             ->patch($this->checklistItemRoute($project, $committee, $activity, $task, $item), ['is_completed' => true])
             ->assertForbidden();
+
+        // Assigned member can update
+        $this->actingAs($member1)
+            ->patch($this->checklistItemRoute($project, $committee, $activity, $task, $item), ['is_completed' => true])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('checklist_items', ['id' => $item->id, 'is_completed' => true]);
     }
 
-    /** 56. Project Member cannot delete checklist items. */
-    public function test_project_member_cannot_delete_checklist_item(): void
+    /** 56. Assigned Project Member can delete checklist items, unassigned cannot. */
+    public function test_assigned_project_member_can_delete_checklist_item(): void
     {
         $leader    = $this->createVerifiedUser();
         $project   = $this->createProjectWithLeader($leader);
         $staff     = $this->createVerifiedUser();
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $activity  = $this->createActivity($committee, $staff);
-        $task      = $this->createTask($activity);
+        $member1   = $this->createVerifiedUser();
+        $this->assignRole($project, $member1, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $member2   = $this->createVerifiedUser();
+        $this->assignRole($project, $member2, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $task      = $this->createTask($activity, $member1);
         $item      = $this->createChecklistItem($task);
-        $member    = $this->createVerifiedUser();
-        $this->assignRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
 
-        $this->actingAs($member)
+        // Unassigned member cannot delete
+        $this->actingAs($member2)
             ->delete($this->checklistItemRoute($project, $committee, $activity, $task, $item))
             ->assertForbidden();
 
         $this->assertDatabaseHas('checklist_items', ['id' => $item->id]);
+
+        // Assigned member can delete
+        $this->actingAs($member1)
+            ->delete($this->checklistItemRoute($project, $committee, $activity, $task, $item))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('checklist_items', ['id' => $item->id]);
     }
 
     // =========================================================================

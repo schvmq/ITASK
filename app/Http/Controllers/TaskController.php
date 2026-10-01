@@ -41,7 +41,7 @@ class TaskController extends Controller
             'title' => $request->validated('title'),
             'description' => $request->validated('description'),
             'due_date' => $request->validated('due_date'),
-            'status' => $request->validated('status', Task::STATUS_TO_DO),
+            'status' => Task::STATUS_TO_DO,
             'assigned_to' => $request->validated('assigned_to'),
             'requires_review' => $request->boolean('requires_review', false),
         ]);
