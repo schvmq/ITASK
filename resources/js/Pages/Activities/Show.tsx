@@ -8,6 +8,7 @@ import { InputError } from '@/Components/InputError';
 import { Button } from '@/Components/Button';
 import {
     ArrowLeft,
+    Bell,
     Calendar,
     Check,
     CheckCircle2,
@@ -119,6 +120,7 @@ export interface ActivityData {
         createTask: boolean;
         submit?: boolean;
         review?: boolean;
+        sendReminder?: boolean;
     };
     tasks: TaskItem[];
 }
@@ -288,6 +290,49 @@ export default function ActivityShow({
         action: 'complete' as 'complete' | 'return_for_revision',
         review_feedback: '',
     });
+
+    // Send Activity Reminder Form
+    const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+    const [reminderServerError, setReminderServerError] = useState<string | null>(null);
+    const {
+        data: reminderData,
+        setData: setReminderData,
+        post: postReminder,
+        processing: reminderProcessing,
+        errors: reminderErrors,
+        reset: resetReminderForm,
+        clearErrors: clearReminderErrors,
+    } = useForm({
+        message: '',
+    });
+
+    const handleOpenReminderModal = () => {
+        clearReminderErrors();
+        setReminderServerError(null);
+        resetReminderForm();
+        setIsReminderModalOpen(true);
+    };
+
+    const handleSendReminderSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setReminderServerError(null);
+        postReminder(
+            `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/remind`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setIsReminderModalOpen(false);
+                    resetReminderForm();
+                    setReminderServerError(null);
+                },
+                onError: (errs) => {
+                    if (errs && typeof errs === 'object' && 'error' in errs) {
+                        setReminderServerError(String(errs.error));
+                    }
+                },
+            }
+        );
+    };
 
     const handleOpenCreateTask = () => {
         resetTaskForm();
@@ -1006,6 +1051,19 @@ export default function ActivityShow({
                                 <Calendar className="w-3.5 h-3.5 text-slate-500" />
                                 <span>View in Timeline</span>
                             </Link>
+
+                            {/* Send Reminder Action (Authorized Project Leader & Staff only) */}
+                            {activity.can.sendReminder && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleOpenReminderModal}
+                                    leftIcon={<Bell className="w-3.5 h-3.5 text-slate-500" />}
+                                >
+                                    Send Reminder
+                                </Button>
+                            )}
 
                             {/* Member Submit for Review button */}
                             {activity.can.submit && activity.status !== 'Returned for Revision' && (
@@ -2965,6 +3023,85 @@ export default function ActivityShow({
                             </Button>
                         </div>
                     </div>
+                </Modal>
+                {/* ── Send Activity Reminder Modal ── */}
+                <Modal
+                    isOpen={isReminderModalOpen}
+                    onClose={() => !reminderProcessing && setIsReminderModalOpen(false)}
+                    title="Send Reminder"
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleSendReminderSubmit} className="space-y-4 pt-1">
+                        {/* Activity Context Card */}
+                        <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                                Activity
+                            </span>
+                            <p className="text-sm font-bold text-slate-900 mt-1">
+                                {activity.title}
+                            </p>
+                        </div>
+
+                        {/* Recipient Scope Explanation */}
+                        <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                                Recipients
+                            </span>
+                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                                This reminder will be sent to personnel assigned to tasks under this activity.
+                            </p>
+                        </div>
+
+                        {/* Optional Message Field */}
+                        <div className="space-y-1.5">
+                            <Label htmlFor="activity-reminder-message" className="text-xs font-semibold text-slate-700">
+                                Optional Message
+                            </Label>
+                            <textarea
+                                id="activity-reminder-message"
+                                name="message"
+                                rows={3}
+                                value={reminderData.message}
+                                onChange={(e) => setReminderData('message', e.target.value)}
+                                disabled={reminderProcessing}
+                                maxLength={2000}
+                                className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-xl shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 disabled:opacity-60 disabled:bg-slate-50 resize-y"
+                                placeholder="Add a message for the assigned personnel (optional)"
+                            />
+                            {reminderErrors.message && (
+                                <p className="text-xs text-rose-600 font-medium mt-1">
+                                    {reminderErrors.message}
+                                </p>
+                            )}
+                            {reminderServerError && (
+                                <p className="text-xs text-rose-600 font-medium mt-1">
+                                    {reminderServerError}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Footer Action Buttons */}
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsReminderModalOpen(false)}
+                                disabled={reminderProcessing}
+                                className="rounded-xl py-2.5 font-semibold"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={reminderProcessing}
+                                disabled={reminderProcessing}
+                                className="rounded-xl py-2.5 font-semibold"
+                            >
+                                Send Reminder
+                            </Button>
+                        </div>
+                    </form>
                 </Modal>
             </div>
         </AppLayout>

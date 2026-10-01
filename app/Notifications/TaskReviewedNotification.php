@@ -32,7 +32,11 @@ class TaskReviewedNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        if ($this->status === Task::STATUS_RETURNED || $this->status === 'Returned') {
+            return ['database', 'mail'];
+        }
+
+        return ['database'];
     }
 
     /**

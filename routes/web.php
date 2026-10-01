@@ -112,6 +112,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/review', [\App\Http\Controllers\ActivityController::class, 'review'])->name('projects.committees.activities.review');
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/complete', [\App\Http\Controllers\ActivityController::class, 'markCompleted'])->name('projects.committees.activities.complete');
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/return', [\App\Http\Controllers\ActivityController::class, 'returnForRevision'])->name('projects.committees.activities.return');
+    Route::post('/projects/{project}/committees/{committee}/activities/{activity}/remind', [\App\Http\Controllers\ActivityController::class, 'sendReminder'])->name('projects.committees.activities.remind');
 
     // Tasks
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');

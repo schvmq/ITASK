@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { NotificationItem } from '@/types';
@@ -12,11 +12,16 @@ import {
     Send,
     ClipboardCheck,
     ExternalLink,
-    Filter,
+    FolderOpen,
+    Users,
 } from 'lucide-react';
 import { Button } from '@/Components/Button';
-import { Badge } from '@/Components/Badge';
 import { EmptyState } from '@/Components/EmptyState';
+
+// ─── Types & Constants ────────────────────────────────────────────────────────
+
+const CATEGORIES = ['All', 'Assignment', 'Deadline', 'Submission', 'Review', 'Completion'] as const;
+type NotificationCategory = typeof CATEGORIES[number];
 
 interface NotificationsPageProps {
     notifications: {
@@ -30,47 +35,105 @@ interface NotificationsPageProps {
     unreadCount: number;
 }
 
-function getNotificationIcon(type: string, status?: string) {
-    if (type === 'task_assigned') {
-        return <CheckSquare className="w-5 h-5 text-emerald-600" />;
+const CATEGORY_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+    Assignment: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
+    Deadline:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200' },
+    Submission: { bg: 'bg-sky-50',     text: 'text-sky-700',     border: 'border-sky-200' },
+    Review:     { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200' },
+    Completion: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+};
+
+function getNotificationCategory(item: NotificationItem): 'Assignment' | 'Deadline' | 'Submission' | 'Review' | 'Completion' {
+    const type = item.data.notification_type || '';
+    const status = (item.data.status || '').toLowerCase();
+    const title = (item.data.title || '').toLowerCase();
+
+    // Completion: approved/completed tasks or activities
+    if (status === 'completed' || title.includes('approved') || title.includes('completed')) {
+        return 'Completion';
     }
-    if (type === 'task_deadline_approaching') {
-        return <Clock className="w-5 h-5 text-amber-600" />;
+    // Deadline
+    if (type === 'task_deadline_approaching' || title.includes('deadline') || title.includes('due')) {
+        return 'Deadline';
     }
-    if (type === 'task_submitted_for_review') {
-        return <Send className="w-5 h-5 text-blue-600" />;
+    // Assignment
+    if (type === 'task_assigned' || title.includes('assigned')) {
+        return 'Assignment';
     }
-    if (type === 'task_reviewed') {
-        return status === 'Completed' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-        ) : (
-            <AlertCircle className="w-5 h-5 text-rose-600" />
-        );
+    // Submission
+    if (type.includes('submitted') || title.includes('submission')) {
+        return 'Submission';
     }
-    if (type === 'activity_submitted_for_review') {
-        return <ClipboardCheck className="w-5 h-5 text-indigo-600" />;
+    // Review: reviewed, returned for revision, review requested
+    if (type.includes('reviewed') || title.includes('returned') || title.includes('review')) {
+        return 'Review';
     }
-    if (type === 'activity_reviewed') {
-        return status === 'Completed' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-        ) : (
-            <AlertCircle className="w-5 h-5 text-rose-600" />
-        );
-    }
-    return <Bell className="w-5 h-5 text-[color:var(--color-brand-action-orange)]" />;
+    return 'Assignment';
 }
+
+function matchesCategory(item: NotificationItem, category: NotificationCategory): boolean {
+    if (category === 'All') return true;
+    const cat = getNotificationCategory(item);
+    if (cat === category) return true;
+
+    // Completed reviews also belong under Review
+    if (category === 'Review' && (item.data.notification_type?.includes('reviewed') || item.data.title?.toLowerCase().includes('review'))) {
+        return true;
+    }
+    return false;
+}
+
+function getCategoryIcon(category: string, status?: string) {
+    switch (category) {
+        case 'Assignment':
+            return <CheckSquare className="w-4 h-4 text-emerald-600" />;
+        case 'Deadline':
+            return <Clock className="w-4 h-4 text-amber-600" />;
+        case 'Submission':
+            return <Send className="w-4 h-4 text-sky-600" />;
+        case 'Review':
+            return status === 'Returned' ? (
+                <AlertCircle className="w-4 h-4 text-rose-600" />
+            ) : (
+                <ClipboardCheck className="w-4 h-4 text-purple-600" />
+            );
+        case 'Completion':
+            return <CheckCircle2 className="w-4 h-4 text-emerald-600" />;
+        default:
+            return <Bell className="w-4 h-4 text-[color:var(--color-brand-action-orange)]" />;
+    }
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function NotificationsIndex({
     notifications,
     unreadCount,
 }: NotificationsPageProps) {
-    const [filter, setFilter] = useState<'all' | 'unread'>('all');
+    const [selectedCategory, setSelectedCategory] = useState<NotificationCategory>('All');
+    const [unreadOnly, setUnreadOnly] = useState<boolean>(false);
     const [markingAll, setMarkingAll] = useState(false);
 
     const items = notifications.data || [];
-    const displayedItems = filter === 'unread'
-        ? items.filter((n) => !n.read_at)
-        : items;
+
+    // Filter items based on active category and unread toggle
+    const filteredItems = useMemo(() => {
+        return items.filter((item) => {
+            if (unreadOnly && item.read_at) return false;
+            return matchesCategory(item, selectedCategory);
+        });
+    }, [items, selectedCategory, unreadOnly]);
+
+    // Compute counts per category from current items
+    const categoryCounts = useMemo(() => {
+        const counts: Record<string, number> = { All: items.length };
+        CATEGORIES.forEach((cat) => {
+            if (cat !== 'All') {
+                counts[cat] = items.filter((item) => matchesCategory(item, cat)).length;
+            }
+        });
+        return counts;
+    }, [items]);
 
     const handleMarkAsRead = (id: string, actionUrl?: string) => {
         router.post(
@@ -100,76 +163,122 @@ export default function NotificationsIndex({
         );
     };
 
+    // Header Action: "Mark all as read" button aligned to the right of page header
+    const markAllReadAction = (
+        <button
+            type="button"
+            onClick={handleMarkAllRead}
+            disabled={unreadCount === 0 || markingAll}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs ${
+                unreadCount > 0 && !markingAll
+                    ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 cursor-pointer'
+                    : 'bg-slate-50 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
+            }`}
+        >
+            <Check className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Mark all as read</span>
+        </button>
+    );
+
     return (
         <AppLayout
             title="Notifications"
-            subtitle="Updates, task assignments, reviews, and reminders"
+            subtitle={
+                unreadCount > 0
+                    ? `${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'}`
+                    : 'All caught up · No unread notifications'
+            }
+            headerAction={markAllReadAction}
         >
-            <Head title="Notifications" />
+            <Head title="Notifications — ITASK" />
 
-            <div className="space-y-6 max-w-4xl mx-auto">
-                {/* ── Top Bar Controls ── */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-[color:var(--color-border-light)] shadow-xs">
-                    {/* Filter tabs */}
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+            <div className="w-full max-w-5xl mx-auto space-y-4">
+
+                {/* ── Category Filters Toolbar ── */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-[color:var(--color-border-light)] shadow-[0_1px_3px_0_rgb(0,0,0,0.03)]">
+                    {/* Compact Filter Buttons: All, Assignment, Deadline, Submission, Review, Completion */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {CATEGORIES.map((category) => {
+                            const isSelected = selectedCategory === category;
+                            const count = categoryCounts[category] ?? 0;
+
+                            return (
+                                <button
+                                    key={category}
+                                    type="button"
+                                    onClick={() => setSelectedCategory(category)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                                        isSelected
+                                            ? 'bg-[color:var(--color-brand-dark-green)] text-white shadow-xs'
+                                            : 'bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200'
+                                    }`}
+                                >
+                                    <span>{category}</span>
+                                    {count > 0 && (
+                                        <span
+                                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                                isSelected
+                                                    ? 'bg-white/20 text-white'
+                                                    : 'bg-slate-100 text-slate-600'
+                                            }`}
+                                        >
+                                            {count}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Unread Only Toggle */}
+                    <div className="flex items-center self-end sm:self-auto shrink-0">
                         <button
                             type="button"
-                            onClick={() => setFilter('all')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                                filter === 'all'
-                                    ? 'bg-white text-slate-800 shadow-xs'
-                                    : 'text-slate-500 hover:text-slate-800'
+                            onClick={() => setUnreadOnly(!unreadOnly)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                                unreadOnly
+                                    ? 'bg-[color:var(--color-brand-action-orange)] text-white shadow-xs'
+                                    : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 border border-transparent'
                             }`}
                         >
-                            All ({notifications.total})
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setFilter('unread')}
-                            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                                filter === 'unread'
-                                    ? 'bg-white text-slate-800 shadow-xs'
-                                    : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                        >
-                            Unread
+                            <span>Unread Only</span>
                             {unreadCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800">
+                                <span
+                                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        unreadOnly
+                                            ? 'bg-white/20 text-white'
+                                            : 'bg-orange-100 text-orange-800'
+                                    }`}
+                                >
                                     {unreadCount}
                                 </span>
                             )}
                         </button>
                     </div>
-
-                    {/* Actions */}
-                    {unreadCount > 0 && (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleMarkAllRead}
-                            disabled={markingAll}
-                            className="text-xs"
-                        >
-                            <Check className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-                            Mark all as read
-                        </Button>
-                    )}
                 </div>
 
                 {/* ── Notifications List ── */}
-                {displayedItems.length === 0 ? (
+                {filteredItems.length === 0 ? (
                     <EmptyState
-                        icon={<Bell className="w-6 h-6 text-slate-400" />}
-                        title={filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
+                        icon={<Bell className="w-7 h-7 text-slate-400" />}
+                        title={
+                            unreadOnly
+                                ? 'No unread notifications'
+                                : selectedCategory === 'All'
+                                ? 'No notifications yet'
+                                : `No ${selectedCategory.toLowerCase()} notifications`
+                        }
                         description={
-                            filter === 'unread'
-                                ? 'You have read all your notifications. Switch to "All" to review past updates.'
-                                : 'When tasks are assigned, reviewed, or deadlines approach, you will receive updates here.'
+                            unreadOnly
+                                ? 'You have read all notifications in this category. Toggle "Unread Only" to review all.'
+                                : selectedCategory === 'All'
+                                ? 'When tasks are assigned, reviewed, or deadlines approach, you will receive updates here.'
+                                : `There are currently no ${selectedCategory.toLowerCase()} updates on your account.`
                         }
                     />
                 ) : (
-                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] divide-y divide-[color:var(--color-border-light)] shadow-xs overflow-hidden">
-                        {displayedItems.map((item) => {
+                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] divide-y divide-slate-100 shadow-[0_1px_3px_0_rgb(0,0,0,0.03)] overflow-hidden">
+                        {filteredItems.map((item) => {
                             const isUnread = !item.read_at;
                             const title = item.data.title || 'Notification';
                             const message = item.data.message || '';
@@ -177,71 +286,110 @@ export default function NotificationsIndex({
                             const status = item.data.status;
                             const projectTitle = item.data.project?.title;
                             const committeeName = item.data.committee?.name;
+                            const category = getNotificationCategory(item);
+                            const badgeStyle = CATEGORY_STYLES[category] || CATEGORY_STYLES.Assignment;
 
                             return (
                                 <div
                                     key={item.id}
-                                    className={`p-4 sm:p-5 flex items-start gap-4 transition-colors ${
-                                        isUnread ? 'bg-orange-50/30' : 'bg-white'
+                                    className={`p-4 sm:p-4.5 flex items-start gap-3.5 transition-colors ${
+                                        isUnread
+                                            ? 'bg-orange-50/25 border-l-4 border-l-[color:var(--color-brand-action-orange)]'
+                                            : 'bg-white hover:bg-slate-50/70 border-l-4 border-l-transparent'
                                     }`}
                                 >
-                                    {/* Icon */}
-                                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                                        {getNotificationIcon(item.data.notification_type, status)}
+                                    {/* Notification Category Icon */}
+                                    <div
+                                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border ${
+                                            isUnread
+                                                ? 'bg-white shadow-2xs'
+                                                : 'bg-slate-50 border-slate-200/70'
+                                        }`}
+                                    >
+                                        {getCategoryIcon(category, status)}
                                     </div>
 
-                                    {/* Main Content */}
+                                    {/* Main Notification Body */}
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className={`text-sm ${isUnread ? 'font-bold text-slate-900' : 'font-semibold text-slate-800'}`}>
+                                        {/* Header Row: Title, Category Badge, Unread Dot, Timestamp */}
+                                        <div className="flex items-start justify-between gap-2.5">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                    <h3
+                                                        className={`text-xs sm:text-sm leading-snug ${
+                                                            isUnread
+                                                                ? 'font-bold text-slate-900'
+                                                                : 'font-semibold text-slate-700'
+                                                        }`}
+                                                    >
                                                         {title}
                                                     </h3>
+
+                                                    {/* Category / Type Badge */}
+                                                    <span
+                                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider ${badgeStyle.bg} ${badgeStyle.text} ${badgeStyle.border}`}
+                                                    >
+                                                        {category}
+                                                    </span>
+
+                                                    {/* Unread Indicator */}
                                                     {isUnread && (
-                                                        <span className="w-2 h-2 rounded-full bg-[color:var(--color-brand-action-orange)] shrink-0" />
+                                                        <span
+                                                            className="w-2 h-2 rounded-full bg-[color:var(--color-brand-action-orange)] shrink-0"
+                                                            title="Unread notification"
+                                                        />
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+
+                                                <p
+                                                    className={`text-xs leading-relaxed ${
+                                                        isUnread ? 'text-slate-800' : 'text-slate-500'
+                                                    }`}
+                                                >
                                                     {message}
                                                 </p>
                                             </div>
 
-                                            <span className="text-[11px] text-slate-400 shrink-0 whitespace-nowrap">
+                                            {/* Timestamp */}
+                                            <span className="text-[11px] text-slate-400 font-medium shrink-0 whitespace-nowrap pt-0.5">
                                                 {item.created_at_human || 'Recently'}
                                             </span>
                                         </div>
 
-                                        {/* Review feedback callout */}
+                                        {/* Reviewer Feedback Callout */}
                                         {item.data.review_feedback && (
-                                            <div className="mt-2.5 p-3 rounded-lg bg-rose-50 border border-rose-100 text-xs text-rose-800">
-                                                <p className="font-semibold text-[11px] uppercase tracking-wider text-rose-700 mb-0.5">
+                                            <div className="mt-2.5 p-2.5 rounded-lg bg-rose-50/80 border border-rose-100 text-xs text-rose-800">
+                                                <p className="font-bold text-[10px] uppercase tracking-wider text-rose-700 mb-0.5">
                                                     Reviewer Feedback
                                                 </p>
                                                 <p className="italic">"{item.data.review_feedback}"</p>
                                             </div>
                                         )}
 
-                                        {/* Metadata Tags & Actions */}
+                                        {/* Metadata Breadcrumbs & Action Buttons */}
                                         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                                                 {projectTitle && (
-                                                    <span className="bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-700">
-                                                        {projectTitle}
+                                                    <span className="inline-flex items-center gap-1 bg-slate-100/80 px-2 py-0.5 rounded font-medium text-slate-700">
+                                                        <FolderOpen className="w-3 h-3 text-slate-400" />
+                                                        <span className="truncate max-w-[160px]">{projectTitle}</span>
                                                     </span>
                                                 )}
                                                 {committeeName && (
-                                                    <span className="bg-slate-100 px-2 py-0.5 rounded font-medium text-slate-600">
-                                                        {committeeName}
+                                                    <span className="inline-flex items-center gap-1 bg-slate-100/80 px-2 py-0.5 rounded font-medium text-slate-600">
+                                                        <Users className="w-3 h-3 text-slate-400" />
+                                                        <span className="truncate max-w-[140px]">{committeeName}</span>
                                                     </span>
                                                 )}
                                                 {item.data.task?.due_date && (
-                                                    <span className="text-slate-500">
-                                                        Due: {item.data.task.due_date}
+                                                    <span className="inline-flex items-center gap-1 text-slate-500">
+                                                        <Clock className="w-3 h-3 text-slate-400" />
+                                                        <span>Due: {item.data.task.due_date}</span>
                                                     </span>
                                                 )}
                                             </div>
 
+                                            {/* Actions */}
                                             <div className="flex items-center gap-2">
                                                 {isUnread && (
                                                     <button
@@ -252,6 +400,7 @@ export default function NotificationsIndex({
                                                         Mark as read
                                                     </button>
                                                 )}
+
                                                 {actionUrl && (
                                                     <Button
                                                         variant="primary"
@@ -280,7 +429,7 @@ export default function NotificationsIndex({
 
                 {/* ── Pagination ── */}
                 {notifications.last_page > 1 && (
-                    <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-[color:var(--color-border-light)] text-xs text-slate-600">
+                    <div className="flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-[color:var(--color-border-light)] text-xs text-slate-600 shadow-2xs">
                         <span>
                             Page {notifications.current_page} of {notifications.last_page} ({notifications.total} total)
                         </span>
@@ -288,7 +437,7 @@ export default function NotificationsIndex({
                             {notifications.prev_page_url && (
                                 <Link
                                     href={notifications.prev_page_url}
-                                    className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 font-medium"
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700 transition-colors"
                                 >
                                     Previous
                                 </Link>
@@ -296,7 +445,7 @@ export default function NotificationsIndex({
                             {notifications.next_page_url && (
                                 <Link
                                     href={notifications.next_page_url}
-                                    className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 font-medium"
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 font-semibold text-slate-700 transition-colors"
                                 >
                                     Next
                                 </Link>
@@ -304,6 +453,7 @@ export default function NotificationsIndex({
                         </div>
                     </div>
                 )}
+
             </div>
         </AppLayout>
     );
