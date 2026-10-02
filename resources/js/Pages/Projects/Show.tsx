@@ -1281,14 +1281,18 @@ export default function ProjectShow({
                                                 <th className="px-4 py-3">Status</th>
                                                 <th className="px-4 py-3 hidden md:table-cell">Tasks</th>
                                                 <th className="px-4 py-3 hidden lg:table-cell">Due Date</th>
-                                                <th className="px-4 py-3 text-right">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-[color:var(--color-border-light)] text-[color:var(--color-text-main)]">
                                             {initialProject.activities.map((act) => (
                                                 <tr key={act.id} className="hover:bg-slate-50/60 transition-colors">
                                                     <td className="px-4 py-3.5">
-                                                        <div className="font-semibold text-slate-800">{act.title}</div>
+                                                        <Link
+                                                            href={`/projects/${initialProject.id}/committees/${act.committee.id}/activities/${act.id}`}
+                                                            className="font-semibold text-slate-800 hover:text-[color:var(--color-brand-action-orange)] hover:underline transition-colors block"
+                                                        >
+                                                            {act.title}
+                                                        </Link>
                                                         {act.description && (
                                                             <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{act.description}</p>
                                                         )}
@@ -1326,15 +1330,6 @@ export default function ProjectShow({
                                                     <td className="px-4 py-3.5 hidden lg:table-cell text-slate-500">
                                                         {act.due_date ?? <span className="text-slate-400 italic">No deadline</span>}
                                                     </td>
-                                                    <td className="px-4 py-3.5 text-right">
-                                                        <Link
-                                                            href={`/projects/${initialProject.id}/committees/${act.committee.id}/activities/${act.id}`}
-                                                            className="inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline"
-                                                        >
-                                                            <span>View Details</span>
-                                                            <ChevronRight className="w-3.5 h-3.5" />
-                                                        </Link>
-                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -1366,20 +1361,29 @@ export default function ProjectShow({
                                                 <th className="px-4 py-3 hidden md:table-cell">Assignee</th>
                                                 <th className="px-4 py-3">Status</th>
                                                 <th className="px-4 py-3 hidden lg:table-cell">Due Date</th>
-                                                <th className="px-4 py-3 text-right">Parent Activity</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-[color:var(--color-border-light)] text-[color:var(--color-text-main)]">
                                             {initialProject.tasks.map((task) => (
                                                 <tr key={task.id} className="hover:bg-slate-50/60 transition-colors">
                                                     <td className="px-4 py-3.5">
-                                                        <div className="font-semibold text-slate-800">{task.title}</div>
+                                                        <Link
+                                                            href={`/projects/${initialProject.id}/committees/${task.committee.id}/activities/${task.activity.id}`}
+                                                            className="font-semibold text-slate-800 hover:text-[color:var(--color-brand-action-orange)] hover:underline transition-colors block"
+                                                        >
+                                                            {task.title}
+                                                        </Link>
                                                         {task.description && (
                                                             <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{task.description}</p>
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-3.5 hidden sm:table-cell">
-                                                        <div className="font-medium text-slate-700">{task.activity.title}</div>
+                                                        <Link
+                                                            href={`/projects/${initialProject.id}/committees/${task.committee.id}/activities/${task.activity.id}`}
+                                                            className="font-medium text-slate-700 hover:text-[color:var(--color-brand-action-orange)] hover:underline transition-colors inline-block"
+                                                        >
+                                                            {task.activity.title}
+                                                        </Link>
                                                         <div className="text-[11px] text-slate-500">{task.committee.name}</div>
                                                     </td>
                                                     <td className="px-4 py-3.5 hidden md:table-cell">
@@ -1394,15 +1398,6 @@ export default function ProjectShow({
                                                     </td>
                                                     <td className="px-4 py-3.5 hidden lg:table-cell text-slate-500">
                                                         {task.due_date ?? <span className="text-slate-400 italic">No deadline</span>}
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right">
-                                                        <Link
-                                                            href={`/projects/${initialProject.id}/committees/${task.committee.id}/activities/${task.activity.id}`}
-                                                            className="inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline"
-                                                        >
-                                                            <span>View Activity</span>
-                                                            <ChevronRight className="w-3.5 h-3.5" />
-                                                        </Link>
                                                     </td>
                                                 </tr>
                                             ))}
