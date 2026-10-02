@@ -443,8 +443,7 @@ class ActivityAndTaskFoundationTest extends TestCase
 
         $updateData = [
             'title' => 'Updated Task Title',
-            'description' => 'Task marked as completed by staff.',
-            'status' => Task::STATUS_COMPLETED,
+            'description' => 'Task description updated by staff.',
             'due_date' => now()->addDays(2)->format('Y-m-d'),
         ];
 
@@ -456,7 +455,7 @@ class ActivityAndTaskFoundationTest extends TestCase
         $this->assertDatabaseHas('tasks', [
             'id' => $task->id,
             'title' => 'Updated Task Title',
-            'status' => Task::STATUS_COMPLETED,
+            'description' => 'Task description updated by staff.',
         ]);
     }
 

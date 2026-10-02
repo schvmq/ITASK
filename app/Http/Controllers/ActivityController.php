@@ -205,7 +205,7 @@ class ActivityController extends Controller
                 'can' => [
                     'update'          => $user ? Gate::forUser($user)->allows('update', $task) : false,
                     'delete'          => $user ? Gate::forUser($user)->allows('delete', $task) : false,
-                    'updateStatus'    => $user ? (Gate::forUser($user)->allows('update', $task) || ((int) $task->assigned_to === (int) $user->id && $committee->roleAssignments()->where('user_id', $user->id)->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists())) : false,
+                    'updateStatus'    => $user ? Gate::forUser($user)->allows('updateStatus', $task) : false,
                     'manageChecklist' => $user ? Gate::forUser($user)->allows('create', [ChecklistItem::class, $task]) : false,
                     'uploadEvidence'  => $user ? Gate::forUser($user)->allows('uploadEvidence', $task) : false,
                     'submitReview'    => $user ? Gate::forUser($user)->allows('submitReview', $task) && $task->requires_review && in_array($task->status, [Task::STATUS_TO_DO, Task::STATUS_IN_PROGRESS], true) : false,

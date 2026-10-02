@@ -60,13 +60,20 @@ class UpdateTaskRequest extends FormRequest
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
 
-        // If not Staff/Leader, user is assigned member and forbidden from management fields
-        if (! $isLeader && ! $isStaff) {
-            if ($this->hasAny(['title', 'description', 'due_date', 'assigned_to', 'requires_review'])) {
+        $isAssignee = $task->assigned_to && (int) $task->assigned_to === (int) $user->id;
+
+        // 1. Task Status Modification: ONLY the assigned personnel can change execution status!
+        if ($this->has('status')) {
+            if (! $isAssignee) {
                 return false;
             }
+        }
 
-            return $this->has('status');
+        // 2. Task Configuration Modification: ONLY Project Leader or Committee Staff can change config!
+        if ($this->hasAny(['title', 'description', 'due_date', 'assigned_to', 'requires_review'])) {
+            if (! $isLeader && ! $isStaff) {
+                return false;
+            }
         }
 
         return true;
@@ -86,7 +93,7 @@ class UpdateTaskRequest extends FormRequest
         $projectId = $task instanceof Task ? $task->activity?->project_id : null;
         $user = $this->user();
 
-        $isLeader = null;
+        $isLeader = false;
         if ($task && $user) {
             $isLeader = $task->activity->committee->project->roleAssignments()
                 ->where('user_id', $user->id)
@@ -94,24 +101,30 @@ class UpdateTaskRequest extends FormRequest
                 ->exists();
         }
 
-        $isStaff = $task && $user && $task->activity->committee->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-            ->exists();
-
-        if (! $isLeader && ! $isStaff) {
-            return [
-                'status' => ['required', 'string', Rule::in(Task::STATUSES)],
-            ];
+        $isStaff = false;
+        if ($task && $user) {
+            $isStaff = $task->activity->committee->roleAssignments()
+                ->where('user_id', $user->id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+                ->exists();
         }
 
-        return [
-            'title' => ['sometimes', 'required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'due_date' => ['nullable', 'date'],
-            'status' => ['sometimes', 'required', 'string', Rule::in(Task::STATUSES)],
-            'requires_review' => ['sometimes', 'boolean'],
-            'assigned_to' => [
+        $isAssignee = $task && $user && $task->assigned_to && (int) $task->assigned_to === (int) $user->id;
+
+        $rules = [];
+
+        // Execution status is validated for the assigned personnel
+        if ($isAssignee) {
+            $rules['status'] = ['sometimes', 'required', 'string', Rule::in(Task::STATUSES)];
+        }
+
+        // Configuration fields are validated for Leader or Staff
+        if ($isLeader || $isStaff) {
+            $rules['title'] = ['sometimes', 'required', 'string', 'max:255'];
+            $rules['description'] = ['nullable', 'string'];
+            $rules['due_date'] = ['nullable', 'date'];
+            $rules['requires_review'] = ['sometimes', 'boolean'];
+            $rules['assigned_to'] = [
                 'nullable',
                 'integer',
                 'exists:users,id',
@@ -136,8 +149,10 @@ class UpdateTaskRequest extends FormRequest
                         }
                     }
                 },
-            ],
-        ];
+            ];
+        }
+
+        return $rules;
     }
 
     /**
@@ -155,28 +170,13 @@ class UpdateTaskRequest extends FormRequest
                 return;
             }
 
-            $user = $this->user();
-            if (! $user) {
-                return;
-            }
-
-            $isLeader = $task->activity->committee->project->roleAssignments()
-                ->where('user_id', $user->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-                ->exists();
-
-            $isStaff = $task->activity->committee->roleAssignments()
-                ->where('user_id', $user->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-                ->exists();
-
             $newStatus = $this->input('status');
 
-            // Status transition rules for assigned Project Members
-            if (! $isLeader && ! $isStaff && $newStatus) {
-                // 1. Members cannot return tasks
+            // Status transition rules for assigned personnel
+            if ($newStatus) {
+                // 1. Cannot set status to Returned directly (only reviewers can return via /return)
                 if ($newStatus === Task::STATUS_RETURNED) {
-                    $validator->errors()->add('status', 'Project members cannot return tasks for revision.');
+                    $validator->errors()->add('status', 'Tasks cannot be set to Returned directly.');
                     return;
                 }
 
@@ -186,15 +186,23 @@ class UpdateTaskRequest extends FormRequest
                     return;
                 }
 
-                // 3. For review-required tasks:
+                // 3. Tasks under review cannot change status directly via PATCH
+                if ($task->status === Task::STATUS_UNDER_REVIEW && $newStatus !== Task::STATUS_UNDER_REVIEW) {
+                    $validator->errors()->add('status', 'Tasks under review cannot change status directly.');
+                    return;
+                }
+
+                // 4. For review-required tasks:
                 if ($task->requires_review) {
+                    // Cannot be marked Completed directly (must be approved via /approve)
                     if ($newStatus === Task::STATUS_COMPLETED) {
                         $validator->errors()->add('status', 'This task requires review and cannot be marked completed directly.');
                         return;
                     }
 
-                    if ($task->status === Task::STATUS_UNDER_REVIEW && $newStatus === Task::STATUS_COMPLETED) {
-                        $validator->errors()->add('status', 'Project members cannot approve their own work.');
+                    // Cannot be set to Under Review directly via PATCH (must use /submit endpoint)
+                    if ($newStatus === Task::STATUS_UNDER_REVIEW) {
+                        $validator->errors()->add('status', 'Tasks requiring review must be submitted via the submit endpoint.');
                         return;
                     }
                 }
