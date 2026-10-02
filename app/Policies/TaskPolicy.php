@@ -64,17 +64,16 @@ class TaskPolicy
     }
 
     /**
-     * Determine whether the user can update the task.
-     * Allowed for:
-     * - Project Leader of the project (full management)
-     * - Project Staff who heads this committee (full management)
-     * - Assigned Project Member in this committee (status updates only — enforced in UpdateTaskRequest)
+     * Determine whether the user can update the task (configuration or execution).
+     *
+     * - Task configuration: Project Leader or Committee Staff
+     * - Task execution (status): Assigned personnel
      */
     public function update(User $user, Task $task): bool
     {
         $project = $task->activity->committee->project;
 
-        // 1. Project Leader
+        // 1. Project Leader (configuration management)
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
@@ -84,7 +83,7 @@ class TaskPolicy
             return true;
         }
 
-        // 2. Project Staff heading this committee
+        // 2. Project Staff heading this committee (configuration management)
         $isStaff = $task->activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
@@ -94,23 +93,36 @@ class TaskPolicy
             return true;
         }
 
-        // 3. Assigned Project Member in this committee (limited update — status only)
-        if ((int) $task->assigned_to === (int) $user->id) {
-            return $task->activity->committee->roleAssignments()
-                ->where('user_id', $user->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-                ->exists();
+        // 3. Assigned personnel (status execution updates)
+        if ($task->assigned_to && (int) $task->assigned_to === (int) $user->id) {
+            return $this->isAssignedUserAuthorizedInCommittee($user, $task);
         }
 
         return false;
     }
 
+    /**
+     * Determine whether the user can update the execution status of the task.
+     * Allowed ONLY for the personnel assigned to the task.
+     */
+    public function updateStatus(User $user, Task $task): bool
+    {
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
+            return false;
+        }
+
+        return $this->isAssignedUserAuthorizedInCommittee($user, $task);
+    }
 
     /**
      * Determine whether the user can delete the task.
      * Allowed for:
      * - Project Leader of the project
      * - Project Staff assigned to this committee
+     *
+     * Safeguards:
+     * - Task must be in initial 'To Do' state (cannot delete started, under review, returned, or completed tasks)
+     * - Task must have no attached evidence
      */
     public function delete(User $user, Task $task): bool
     {
@@ -121,30 +133,40 @@ class TaskPolicy
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
             ->exists();
 
-        if ($isLeader) {
-            return true;
-        }
-
-        return $task->activity->committee->roleAssignments()
+        $isStaff = $task->activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
+
+        if (! $isLeader && ! $isStaff) {
+            return false;
+        }
+
+        // Deletion safeguards:
+        // 1. Task cannot be deleted once started (must be strictly 'To Do')
+        if ($task->status !== Task::STATUS_TO_DO) {
+            return false;
+        }
+
+        // 2. Task cannot be deleted if any evidence exists
+        if ($task->evidences()->exists()) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
      * Determine whether the user can submit the task for staff review.
-     * Allowed only for the assigned Project Member in this committee.
+     * Allowed only for the assigned personnel on the task.
      */
     public function submitReview(User $user, Task $task): bool
     {
-        if ((int) $task->assigned_to !== (int) $user->id) {
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
             return false;
         }
 
-        return $task->activity->committee->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-            ->exists();
+        return $this->isAssignedUserAuthorizedInCommittee($user, $task);
     }
 
     /**
@@ -161,60 +183,41 @@ class TaskPolicy
 
     /**
      * Determine whether the user can resubmit a returned task.
-     * Allowed only for the assigned Project Member in this committee.
+     * Allowed only for the assigned personnel on the task.
      */
     public function resubmit(User $user, Task $task): bool
     {
-        if ((int) $task->assigned_to !== (int) $user->id) {
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
             return false;
         }
 
-        return $task->activity->committee->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-            ->exists();
+        return $this->isAssignedUserAuthorizedInCommittee($user, $task);
     }
 
     /**
      * Determine whether the user can upload evidence to the task.
-     * Allowed for:
-     * - Project Leader of the project
-     * - Project Staff assigned to this committee
-     * - Assigned Project Member in this committee
+     * Allowed ONLY for the assigned personnel on the task, and only while the task
+     * is in an editable execution state (To Do, In Progress, Returned).
+     * Read-only in Under Review and Completed states.
      */
     public function uploadEvidence(User $user, Task $task): bool
     {
-        $project = $task->activity->committee->project;
-
-        // 1. Leader
-        $isLeader = $project->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-            ->exists();
-
-        if ($isLeader) {
-            return true;
+        // 1. Only the assigned personnel can upload evidence
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
+            return false;
         }
 
-        // 2. Staff assigned to this committee
-        $isStaff = $task->activity->committee->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-            ->exists();
-
-        if ($isStaff) {
-            return true;
+        // 2. Assigned personnel must be authorized in committee/project
+        if (! $this->isAssignedUserAuthorizedInCommittee($user, $task)) {
+            return false;
         }
 
-        // 3. Assigned Project Member in this committee
-        if ((int) $task->assigned_to === (int) $user->id) {
-            return $task->activity->committee->roleAssignments()
-                ->where('user_id', $user->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-                ->exists();
-        }
-
-        return false;
+        // 3. Evidence is only editable in To Do, In Progress, Returned
+        return in_array($task->status, [
+            Task::STATUS_TO_DO,
+            Task::STATUS_IN_PROGRESS,
+            Task::STATUS_RETURNED,
+        ], true);
     }
 
     /**
@@ -228,16 +231,44 @@ class TaskPolicy
 
     /**
      * Determine whether the user can delete task evidence.
-     * Allowed for:
-     * - Project Leader of the project
-     * - Project Staff assigned to this committee
-     * - The user who uploaded the evidence (if in this committee)
+     * Allowed ONLY for the assigned personnel who uploaded the evidence,
+     * and only while the task is in an editable execution state (To Do, In Progress, Returned).
+     * Supervisors cannot delete an assignee's evidence.
      */
     public function deleteEvidence(User $user, Task $task, ?\App\Models\TaskEvidence $evidence = null): bool
     {
-        $project = $task->activity->committee->project;
+        // 1. Only the assigned personnel can delete evidence
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
+            return false;
+        }
 
-        // 1. Leader
+        // 2. Must be the original uploader
+        if ($evidence && (int) $evidence->uploaded_by !== (int) $user->id) {
+            return false;
+        }
+
+        // 3. Must be authorized in committee/project
+        if (! $this->isAssignedUserAuthorizedInCommittee($user, $task)) {
+            return false;
+        }
+
+        // 4. Evidence is only editable in To Do, In Progress, Returned
+        return in_array($task->status, [
+            Task::STATUS_TO_DO,
+            Task::STATUS_IN_PROGRESS,
+            Task::STATUS_RETURNED,
+        ], true);
+    }
+
+    /**
+     * Check if the assigned user is authorized within the committee/project.
+     */
+    protected function isAssignedUserAuthorizedInCommittee(User $user, Task $task): bool
+    {
+        $committee = $task->activity->committee;
+        $project = $committee->project;
+
+        // Project Leader assigned to task
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
@@ -247,24 +278,10 @@ class TaskPolicy
             return true;
         }
 
-        // 2. Staff assigned to this committee
-        $isStaff = $task->activity->committee->roleAssignments()
+        // Staff or Member in committee
+        return $committee->roleAssignments()
             ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
-
-        if ($isStaff) {
-            return true;
-        }
-
-        // 3. Uploader
-        if ($evidence && (int) $evidence->uploaded_by === (int) $user->id) {
-            return $task->activity->committee->roleAssignments()
-                ->where('user_id', $user->id)
-                ->exists();
-        }
-
-        return false;
     }
 }
 

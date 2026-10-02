@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class CommitteeMemberAssignmentTest extends TestCase
@@ -587,5 +588,127 @@ class CommitteeMemberAssignmentTest extends TestCase
             'committee_id' => null,
         ]);
         $this->assertEquals(0, $committee->fresh()->memberAssignments->count());
+    }
+
+    public function test_project_member_can_belong_to_multiple_committees_within_same_project(): void
+    {
+        $leader = $this->createVerifiedUser();
+        $member = $this->createVerifiedUser();
+        $project = $this->createProjectWithLeader($leader);
+
+        // Assign member to project
+        $this->assignProjectRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER);
+
+        $committee1 = $this->createCommittee($project, ['name' => 'Logistics Committee']);
+        $committee2 = $this->createCommittee($project, ['name' => 'Marketing Committee']);
+
+        // 1. Assign to Committee 1
+        $response1 = $this->actingAs($leader)->post(route('projects.committees.members.store', [$project, $committee1]), [
+            'user_id' => $member->id,
+        ]);
+        $response1->assertRedirect();
+
+        // 2. Assign to Committee 2
+        $response2 = $this->actingAs($leader)->post(route('projects.committees.members.store', [$project, $committee2]), [
+            'user_id' => $member->id,
+        ]);
+        $response2->assertRedirect();
+
+        // Verify member belongs to both committees
+        $this->assertDatabaseHas('project_role_assignments', [
+            'project_id' => $project->id,
+            'user_id' => $member->id,
+            'committee_id' => $committee1->id,
+        ]);
+        $this->assertDatabaseHas('project_role_assignments', [
+            'project_id' => $project->id,
+            'user_id' => $member->id,
+            'committee_id' => $committee2->id,
+        ]);
+
+        $this->assertEquals(1, $committee1->fresh()->memberAssignments->count());
+        $this->assertEquals(1, $committee2->fresh()->memberAssignments->count());
+    }
+
+    public function test_contextual_indicators_appear_for_members_assigned_to_other_committees(): void
+    {
+        $leader = $this->createVerifiedUser();
+        $memberSingle = $this->createVerifiedUser();
+        $memberMulti = $this->createVerifiedUser();
+        $project = $this->createProjectWithLeader($leader);
+
+        $this->assignProjectRole($project, $memberSingle, ProjectRoleAssignment::ROLE_PROJECT_MEMBER);
+        $this->assignProjectRole($project, $memberMulti, ProjectRoleAssignment::ROLE_PROJECT_MEMBER);
+
+        $logistics = $this->createCommittee($project, ['name' => 'Logistics']);
+        $marketing = $this->createCommittee($project, ['name' => 'Marketing']);
+        $finance = $this->createCommittee($project, ['name' => 'Finance']);
+
+        // Assign memberSingle to Logistics
+        $this->actingAs($leader)->post(route('projects.committees.members.store', [$project, $logistics]), [
+            'user_id' => $memberSingle->id,
+        ]);
+
+        // Assign memberMulti to Logistics and Marketing
+        $this->actingAs($leader)->post(route('projects.committees.members.store', [$project, $logistics]), [
+            'user_id' => $memberMulti->id,
+        ]);
+        $this->actingAs($leader)->post(route('projects.committees.members.store', [$project, $marketing]), [
+            'user_id' => $memberMulti->id,
+        ]);
+
+        // View Finance committee
+        $response = $this->actingAs($leader)->get(route('projects.committees.show', [$project, $finance]));
+        $response->assertStatus(200);
+
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Committees/Show')
+            ->has('availableMembers', 2)
+            ->where('availableMembers', function ($members) use ($memberSingle, $memberMulti) {
+                $single = collect($members)->firstWhere('id', $memberSingle->id);
+                $multi = collect($members)->firstWhere('id', $memberMulti->id);
+
+                return $single['context'] === 'Already assigned to Logistics'
+                    && $multi['context'] === 'Currently assigned to 2 other committees';
+            })
+        );
+    }
+
+    public function test_removing_member_from_one_committee_preserves_membership_in_other_committees(): void
+    {
+        $leader = $this->createVerifiedUser();
+        $member = $this->createVerifiedUser();
+        $project = $this->createProjectWithLeader($leader);
+
+        $this->assignProjectRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER);
+
+        $committee1 = $this->createCommittee($project, ['name' => 'Logistics']);
+        $committee2 = $this->createCommittee($project, ['name' => 'Marketing']);
+
+        // Assign to both
+        $this->actingAs($leader)->post(route('projects.committees.members.store', [$project, $committee1]), [
+            'user_id' => $member->id,
+        ]);
+        $this->actingAs($leader)->post(route('projects.committees.members.store', [$project, $committee2]), [
+            'user_id' => $member->id,
+        ]);
+
+        // Remove from committee1
+        $removeResponse = $this->actingAs($leader)->delete(route('projects.committees.members.destroy', [$project, $committee1, $member]));
+        $removeResponse->assertRedirect();
+
+        // Committee 1 membership removed
+        $this->assertDatabaseMissing('project_role_assignments', [
+            'project_id' => $project->id,
+            'user_id' => $member->id,
+            'committee_id' => $committee1->id,
+        ]);
+
+        // Committee 2 membership strictly preserved!
+        $this->assertDatabaseHas('project_role_assignments', [
+            'project_id' => $project->id,
+            'user_id' => $member->id,
+            'committee_id' => $committee2->id,
+        ]);
     }
 }

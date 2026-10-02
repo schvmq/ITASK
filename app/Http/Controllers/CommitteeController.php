@@ -39,12 +39,22 @@ class CommitteeController extends Controller
 
             // Assign the selected Project Staff member as head of this committee if provided
             if ($request->filled('user_id')) {
+                $staffUserId = (int) $request->validated('user_id');
                 $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
-                    ->where('user_id', $request->validated('user_id'))
+                    ->where('user_id', $staffUserId)
                     ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-                    ->firstOrFail();
+                    ->first();
 
-                $staffAssignment->update(['committee_id' => $committee->id]);
+                if ($staffAssignment) {
+                    $staffAssignment->update(['committee_id' => $committee->id]);
+                } else {
+                    ProjectRoleAssignment::create([
+                        'project_id' => $project->id,
+                        'user_id' => $staffUserId,
+                        'committee_id' => $committee->id,
+                        'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                    ]);
+                }
             }
 
             return $committee;
@@ -77,29 +87,53 @@ class CommitteeController extends Controller
         $user = Auth::user();
         $canManage = $user ? Gate::forUser($user)->allows('manageMembers', $committee) : false;
 
+        $alreadyInCommitteeMemberIds = ProjectRoleAssignment::where('project_id', $project->id)
+            ->where('committee_id', $committee->id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+            ->pluck('user_id');
+
         // Retrieve available Project Members in this project who are not yet in this committee
         $availableMembers = $canManage
             ? ProjectRoleAssignment::where('project_id', $project->id)
                 ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-                ->where(function ($q) use ($committee) {
-                    $q->whereNull('committee_id')
-                        ->orWhere('committee_id', '!=', $committee->id);
-                })
+                ->whereNotIn('user_id', $alreadyInCommitteeMemberIds)
                 ->whereHas('user', function ($q) {
                     $q->whereNotNull('email_verified_at');
                 })
                 ->with('user')
                 ->get()
-                ->map(fn ($assignment) => [
-                    'id' => $assignment->user->id,
-                    'name' => $assignment->user->name,
-                    'email' => $assignment->user->email,
-                ])
+                ->unique('user_id')
+                ->map(function ($assignment) use ($project, $committee) {
+                    $otherCommittees = ProjectRoleAssignment::where('project_id', $project->id)
+                        ->where('user_id', $assignment->user_id)
+                        ->whereNotNull('committee_id')
+                        ->where('committee_id', '!=', $committee->id)
+                        ->with('committee:id,name')
+                        ->get()
+                        ->pluck('committee.name')
+                        ->filter()
+                        ->values();
+
+                    $context = null;
+                    if ($otherCommittees->count() === 1) {
+                        $context = "Already assigned to {$otherCommittees[0]}";
+                    } elseif ($otherCommittees->count() > 1) {
+                        $context = "Currently assigned to {$otherCommittees->count()} other committees";
+                    }
+
+                    return [
+                        'id' => $assignment->user->id,
+                        'name' => $assignment->user->name,
+                        'email' => $assignment->user->email,
+                        'context' => $context,
+                        'other_committees_count' => $otherCommittees->count(),
+                    ];
+                })
                 ->values()
                 ->all()
             : [];
 
-        // Available Project Staff in this project for changing committee head
+        // Available Project Staff in this project for changing committee staff
         $availableStaff = $canManage
             ? ProjectRoleAssignment::where('project_id', $project->id)
                 ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
@@ -108,6 +142,7 @@ class CommitteeController extends Controller
                 })
                 ->with(['user', 'committee'])
                 ->get()
+                ->unique('user_id')
                 ->map(fn ($assignment) => [
                     'id' => $assignment->user->id,
                     'name' => $assignment->user->name,
@@ -121,6 +156,43 @@ class CommitteeController extends Controller
 
         $committeeProgress = $this->progressService->calculateCommitteeProgress($committee);
 
+        $allCommitteeTasks = $committee->activities->flatMap(fn ($act) => $act->tasks);
+
+        $headData = null;
+        if ($committee->staffAssignment?->user) {
+            $headUser = $committee->staffAssignment->user;
+            $headTasks = $allCommitteeTasks->where('assigned_to', $headUser->id);
+            $headTasksCount = $headTasks->count();
+            $headCompletedCount = $headTasks->where('status', Task::STATUS_COMPLETED)->count();
+            $headProgress = $headTasksCount > 0 ? (int) round(($headCompletedCount / $headTasksCount) * 100) : 0;
+
+            $headData = [
+                'id' => $headUser->id,
+                'name' => $headUser->name,
+                'email' => $headUser->email,
+                'tasks_count' => $headTasksCount,
+                'completed_tasks_count' => $headCompletedCount,
+                'progress' => $headProgress,
+            ];
+        }
+
+        $membersData = $committee->memberAssignments->map(function ($assignment) use ($allCommitteeTasks) {
+            $memberTasks = $allCommitteeTasks->where('assigned_to', $assignment->user->id);
+            $tasksCount = $memberTasks->count();
+            $completedCount = $memberTasks->where('status', Task::STATUS_COMPLETED)->count();
+            $progress = $tasksCount > 0 ? (int) round(($completedCount / $tasksCount) * 100) : 0;
+
+            return [
+                'id' => $assignment->user->id,
+                'name' => $assignment->user->name,
+                'email' => $assignment->user->email,
+                'assigned_at' => $assignment->updated_at?->format('F d, Y'),
+                'tasks_count' => $tasksCount,
+                'completed_tasks_count' => $completedCount,
+                'progress' => $progress,
+            ];
+        })->values()->all();
+
         $committeeData = [
             'id' => (string) $committee->id,
             'name' => $committee->name,
@@ -131,40 +203,41 @@ class CommitteeController extends Controller
                 'title' => $project->title,
                 'status' => $project->status,
             ],
-            'head' => $committee->staffAssignment?->user ? [
-                'id' => $committee->staffAssignment->user->id,
-                'name' => $committee->staffAssignment->user->name,
-                'email' => $committee->staffAssignment->user->email,
-            ] : null,
-            'members' => $committee->memberAssignments->map(fn ($assignment) => [
-                'id' => $assignment->user->id,
-                'name' => $assignment->user->name,
-                'email' => $assignment->user->email,
-                'assigned_at' => $assignment->updated_at?->format('F d, Y'),
-            ])->values()->all(),
+            'head' => $headData,
+            'members' => $membersData,
             'can' => [
                 'update' => $user ? Gate::forUser($user)->allows('update', $committee) : false,
                 'delete' => $user ? Gate::forUser($user)->allows('delete', $committee) : false,
                 'manageMembers' => $canManage,
                 'createActivity' => $user ? Gate::forUser($user)->allows('create', [Activity::class, $committee]) : false,
             ],
-            'activities' => $committee->activities->map(fn ($act) => [
-                'id' => (string) $act->id,
-                'title' => $act->title,
-                'description' => $act->description,
-                'status' => $act->status,
-                'progress' => $this->progressService->calculateActivityProgress($act)['progress'],
-                'start_date' => $act->start_date?->format('M d, Y'),
-                'start_date_raw' => $act->start_date?->format('Y-m-d'),
-                'due_date' => $act->due_date?->format('M d, Y'),
-                'due_date_raw' => $act->due_date?->format('Y-m-d'),
-                'tasks_count' => $act->tasks->count(),
-                'completed_tasks_count' => $act->tasks->where('status', Task::STATUS_COMPLETED)->count(),
-                'creator' => $act->creator ? [
-                    'id' => $act->creator->id,
-                    'name' => $act->creator->name,
-                ] : null,
-            ])->values()->all(),
+            'activities' => $committee->activities->map(function ($act) {
+                $assigneeNames = $act->tasks
+                    ->map(fn ($t) => $t->assignee?->name)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => (string) $act->id,
+                    'title' => $act->title,
+                    'description' => $act->description,
+                    'status' => $act->status,
+                    'progress' => $this->progressService->calculateActivityProgress($act)['progress'],
+                    'start_date' => $act->start_date?->format('M d, Y'),
+                    'start_date_raw' => $act->start_date?->format('Y-m-d'),
+                    'due_date' => $act->due_date?->format('M d, Y'),
+                    'due_date_raw' => $act->due_date?->format('Y-m-d'),
+                    'tasks_count' => $act->tasks->count(),
+                    'completed_tasks_count' => $act->tasks->where('status', Task::STATUS_COMPLETED)->count(),
+                    'creator' => $act->creator ? [
+                        'id' => $act->creator->id,
+                        'name' => $act->creator->name,
+                    ] : null,
+                    'assignee_names' => $assigneeNames,
+                ];
+            })->values()->all(),
         ];
 
         $userRole = ($user && $project)
@@ -204,19 +277,30 @@ class CommitteeController extends Controller
             if ($request->has('user_id')) {
                 $newStaffUserId = $request->validated('user_id') ? (int) $request->validated('user_id') : null;
 
-                // Clear previous head's committee assignment if different or if unassigning
+                // Clear previous staff's committee assignment if different or if unassigning
                 ProjectRoleAssignment::where('project_id', $project->id)
                     ->where('committee_id', $committee->id)
                     ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
                     ->when($newStaffUserId, fn ($q) => $q->where('user_id', '!=', $newStaffUserId))
                     ->update(['committee_id' => null]);
 
-                // Assign new staff head if provided
+                // Assign new staff if provided
                 if ($newStaffUserId) {
-                    ProjectRoleAssignment::where('project_id', $project->id)
+                    $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
                         ->where('user_id', $newStaffUserId)
                         ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-                        ->update(['committee_id' => $committee->id]);
+                        ->first();
+
+                    if ($staffAssignment) {
+                        $staffAssignment->update(['committee_id' => $committee->id]);
+                    } else {
+                        ProjectRoleAssignment::create([
+                            'project_id' => $project->id,
+                            'user_id' => $newStaffUserId,
+                            'committee_id' => $committee->id,
+                            'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                        ]);
+                    }
                 }
             }
         });
@@ -269,10 +353,29 @@ class CommitteeController extends Controller
         $userIds = $request->validatedUserIds();
 
         DB::transaction(function () use ($project, $committee, $userIds) {
-            ProjectRoleAssignment::where('project_id', $project->id)
-                ->whereIn('user_id', $userIds)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-                ->update(['committee_id' => $committee->id]);
+            foreach ($userIds as $userId) {
+                // Check if user has an unassigned member role (committee_id is null) in this project
+                $unassigned = ProjectRoleAssignment::where('project_id', $project->id)
+                    ->where('user_id', $userId)
+                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+                    ->whereNull('committee_id')
+                    ->first();
+
+                if ($unassigned) {
+                    $unassigned->update(['committee_id' => $committee->id]);
+                } else {
+                    ProjectRoleAssignment::firstOrCreate(
+                        [
+                            'project_id' => $project->id,
+                            'user_id' => $userId,
+                            'committee_id' => $committee->id,
+                        ],
+                        [
+                            'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+                        ]
+                    );
+                }
+            }
         });
 
         $message = count($userIds) > 1
@@ -302,7 +405,16 @@ class CommitteeController extends Controller
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
             ->firstOrFail();
 
-        $assignment->update(['committee_id' => null]);
+        $otherAssignments = ProjectRoleAssignment::where('project_id', $project->id)
+            ->where('user_id', $user->id)
+            ->where('id', '!=', $assignment->id)
+            ->exists();
+
+        if ($otherAssignments) {
+            $assignment->delete();
+        } else {
+            $assignment->update(['committee_id' => null]);
+        }
 
         return redirect()->route('projects.committees.show', [
             'project' => $project->id,

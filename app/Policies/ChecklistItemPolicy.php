@@ -11,63 +11,54 @@ class ChecklistItemPolicy
 {
     /**
      * Determine whether the user can create a checklist item under the task.
-     * Allowed for:
-     * - Project Leader of the project
-     * - Project Staff assigned to this committee
+     * Allowed ONLY for the assigned personnel on the task.
      */
     public function create(User $user, Task $task): bool
     {
-        $project = $task->activity->committee->project;
-
-        $isLeader = $project->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-            ->exists();
-
-        if ($isLeader) {
-            return true;
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
+            return false;
         }
 
-        return $task->activity->committee->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-            ->exists();
+        return $this->isAssignedUserAuthorizedInCommittee($user, $task);
     }
 
     /**
      * Determine whether the user can update a checklist item.
-     * Allowed for:
-     * - Project Leader of the project
-     * - Project Staff assigned to this committee
+     * Allowed ONLY for the assigned personnel on the task.
      */
     public function update(User $user, ChecklistItem $item): bool
     {
-        $project = $item->task->activity->committee->project;
+        $task = $item->task;
 
-        $isLeader = $project->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-            ->exists();
-
-        if ($isLeader) {
-            return true;
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
+            return false;
         }
 
-        return $item->task->activity->committee->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-            ->exists();
+        return $this->isAssignedUserAuthorizedInCommittee($user, $task);
     }
 
     /**
      * Determine whether the user can delete a checklist item.
-     * Allowed for:
-     * - Project Leader of the project
-     * - Project Staff assigned to this committee
+     * Allowed ONLY for the assigned personnel on the task.
      */
     public function delete(User $user, ChecklistItem $item): bool
     {
-        $project = $item->task->activity->committee->project;
+        $task = $item->task;
+
+        if (! $task->assigned_to || (int) $task->assigned_to !== (int) $user->id) {
+            return false;
+        }
+
+        return $this->isAssignedUserAuthorizedInCommittee($user, $task);
+    }
+
+    /**
+     * Verify the assigned user has an active role in the committee/project.
+     */
+    protected function isAssignedUserAuthorizedInCommittee(User $user, Task $task): bool
+    {
+        $committee = $task->activity->committee;
+        $project = $committee->project;
 
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
@@ -78,9 +69,8 @@ class ChecklistItemPolicy
             return true;
         }
 
-        return $item->task->activity->committee->roleAssignments()
+        return $committee->roleAssignments()
             ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
     }
 }

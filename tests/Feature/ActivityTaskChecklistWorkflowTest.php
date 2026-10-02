@@ -184,7 +184,7 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
             ->where('activity.tasks.0.id', (string) $task->id)
             ->where('activity.tasks.0.title', 'Build Database Migrations')
             ->where('activity.tasks.0.status', Task::STATUS_IN_PROGRESS)
-            ->where('activity.tasks.0.can.manageChecklist', true)
+            ->where('activity.tasks.0.can.manageChecklist', false)
             ->where('activity.tasks.0.can.update', true)
             ->has('activity.tasks.0.checklist_items', 2)
             ->where('activity.tasks.0.checklist_items.0.id', (string) $item1->id)
@@ -193,7 +193,7 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
             ->where('activity.tasks.0.checklist_items.1.is_completed', false)
         );
 
-        // 2. Member perspective: can update status (assigned), but cannot manageChecklist
+        // 2. Member perspective: can update status (assigned), and CAN manageChecklist (assigned)
         $memberResponse = $this->actingAs($member)->get(
             route('projects.committees.activities.show', [$project, $committee, $activity])
         );
@@ -202,7 +202,7 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
         $memberResponse->assertInertia(fn (Assert $page) => $page
             ->component('Activities/Show')
             ->where('activity.tasks.0.can.updateStatus', true)
-            ->where('activity.tasks.0.can.manageChecklist', false)
+            ->where('activity.tasks.0.can.manageChecklist', true)
         );
     }
 
@@ -216,10 +216,12 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
         $leader = $this->createVerifiedUser(['name' => 'Leader Maria']);
         $staff  = $this->createVerifiedUser(['name' => 'Staff Juan']);
         $member = $this->createVerifiedUser(['name' => 'Member Pedro']);
+        $otherMember = $this->createVerifiedUser(['name' => 'Other Member Ana']);
 
         $project = $this->createProjectWithLeader($leader, ['title' => 'Capstone ITASK 2026']);
         $committee = $this->createCommitteeWithStaff($project, $staff);
         $this->assignRole($project, $member, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
+        $this->assignRole($project, $otherMember, ProjectRoleAssignment::ROLE_PROJECT_MEMBER, $committee->id);
 
         // Step 2: Staff creates Activity with start_date and due_date
         $activityPayload = [
@@ -272,20 +274,20 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
 
         $task = Task::where('title', 'Connect Checklist UI')->firstOrFail();
 
-        // Step 4: Staff adds 3 Checklist Items to the Task
-        $item1Response = $this->actingAs($staff)->post(
+        // Step 4: Assigned Member adds 3 Checklist Items to their Task
+        $item1Response = $this->actingAs($member)->post(
             route('projects.committees.activities.tasks.checklist.store', [$project, $committee, $activity, $task]),
             ['content' => 'Implement Modal']
         );
         $item1Response->assertRedirect();
 
-        $item2Response = $this->actingAs($staff)->post(
+        $item2Response = $this->actingAs($member)->post(
             route('projects.committees.activities.tasks.checklist.store', [$project, $committee, $activity, $task]),
             ['content' => 'Connect Toggle Inertia Form']
         );
         $item2Response->assertRedirect();
 
-        $item3Response = $this->actingAs($staff)->post(
+        $item3Response = $this->actingAs($member)->post(
             route('projects.committees.activities.tasks.checklist.store', [$project, $committee, $activity, $task]),
             ['content' => 'Verify 5 Status Transitions']
         );
@@ -297,8 +299,8 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
         $item2 = ChecklistItem::where('task_id', $task->id)->where('content', 'Connect Toggle Inertia Form')->firstOrFail();
         $item3 = ChecklistItem::where('task_id', $task->id)->where('content', 'Verify 5 Status Transitions')->firstOrFail();
 
-        // Step 5: Toggle checklist item completion
-        $patchResponse = $this->actingAs($staff)->patch(
+        // Step 5: Assigned Member toggles checklist item completion
+        $patchResponse = $this->actingAs($member)->patch(
             route('projects.committees.activities.tasks.checklist.update', [$project, $committee, $activity, $task, $item1]),
             ['is_completed' => true]
         );
@@ -309,7 +311,7 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
             'is_completed' => true,
         ]);
 
-        // Step 6: Assigned Member updates status: To Do -> In Progress -> Under Review
+        // Step 6: Assigned Member updates status: To Do -> In Progress -> Completed (no review required)
         $status1Response = $this->actingAs($member)->patch(
             route('projects.committees.activities.tasks.update', [$project, $committee, $activity, $task]),
             ['status' => Task::STATUS_IN_PROGRESS]
@@ -319,35 +321,33 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
 
         $status2Response = $this->actingAs($member)->patch(
             route('projects.committees.activities.tasks.update', [$project, $committee, $activity, $task]),
-            ['status' => Task::STATUS_UNDER_REVIEW]
-        );
-        $status2Response->assertRedirect();
-        $this->assertEquals(Task::STATUS_UNDER_REVIEW, $task->fresh()->status);
-
-        // Step 7: Project Leader returns task for revision (Returned)
-        $returnResponse = $this->actingAs($leader)->patch(
-            route('projects.committees.activities.tasks.update', [$project, $committee, $activity, $task]),
-            ['status' => Task::STATUS_RETURNED]
-        );
-        $returnResponse->assertRedirect();
-        $this->assertEquals(Task::STATUS_RETURNED, $task->fresh()->status);
-
-        // Step 8: Project Leader completes task (Completed)
-        $completeResponse = $this->actingAs($leader)->patch(
-            route('projects.committees.activities.tasks.update', [$project, $committee, $activity, $task]),
             ['status' => Task::STATUS_COMPLETED]
         );
-        $completeResponse->assertRedirect();
+        $status2Response->assertRedirect();
         $this->assertEquals(Task::STATUS_COMPLETED, $task->fresh()->status);
 
-        // Step 9: Verify Member cannot modify checklist items (403 Forbidden)
-        $forbiddenChecklistCreate = $this->actingAs($member)->post(
+        // Step 7: Verify Staff cannot directly modify assigned member's status (403 Forbidden)
+        $staffStatusPatch = $this->actingAs($staff)->patch(
+            route('projects.committees.activities.tasks.update', [$project, $committee, $activity, $task]),
+            ['status' => Task::STATUS_IN_PROGRESS]
+        );
+        $staffStatusPatch->assertStatus(403);
+
+        // Step 8: Verify Leader cannot directly modify assigned member's status (403 Forbidden)
+        $leaderStatusPatch = $this->actingAs($leader)->patch(
+            route('projects.committees.activities.tasks.update', [$project, $committee, $activity, $task]),
+            ['status' => Task::STATUS_IN_PROGRESS]
+        );
+        $leaderStatusPatch->assertStatus(403);
+
+        // Step 9: Verify Unassigned Member cannot modify checklist items (403 Forbidden)
+        $forbiddenChecklistCreate = $this->actingAs($otherMember)->post(
             route('projects.committees.activities.tasks.checklist.store', [$project, $committee, $activity, $task]),
             ['content' => 'Unauthorized item']
         );
         $forbiddenChecklistCreate->assertStatus(403);
 
-        $forbiddenChecklistDelete = $this->actingAs($member)->delete(
+        $forbiddenChecklistDelete = $this->actingAs($otherMember)->delete(
             route('projects.committees.activities.tasks.checklist.destroy', [$project, $committee, $activity, $task, $item3])
         );
         $forbiddenChecklistDelete->assertStatus(403);

@@ -100,7 +100,13 @@ class AssignCommitteeMemberRequest extends FormRequest
             return;
         }
 
-        if ((int) $memberAssignment->committee_id === (int) $committeeId) {
+        $alreadyInCommittee = ProjectRoleAssignment::where('project_id', $projectId)
+            ->where('committee_id', $committeeId)
+            ->where('user_id', $id)
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+            ->exists();
+
+        if ($alreadyInCommittee) {
             $fail('The user is already assigned to this committee.');
         }
     }

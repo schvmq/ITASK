@@ -65,6 +65,7 @@ class ProjectController extends Controller
                     'startDate' => $project->start_date ? $project->start_date->format('F d, Y') : null,
                     'committeesCount' => $project->committees()->count(),
                     'tasksCount' => $projectProgress['total_tasks'],
+                    'activitiesCount' => $project->activities()->count(),
                 ];
             });
 
