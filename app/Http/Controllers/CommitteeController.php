@@ -156,6 +156,43 @@ class CommitteeController extends Controller
 
         $committeeProgress = $this->progressService->calculateCommitteeProgress($committee);
 
+        $allCommitteeTasks = $committee->activities->flatMap(fn ($act) => $act->tasks);
+
+        $headData = null;
+        if ($committee->staffAssignment?->user) {
+            $headUser = $committee->staffAssignment->user;
+            $headTasks = $allCommitteeTasks->where('assigned_to', $headUser->id);
+            $headTasksCount = $headTasks->count();
+            $headCompletedCount = $headTasks->where('status', Task::STATUS_COMPLETED)->count();
+            $headProgress = $headTasksCount > 0 ? (int) round(($headCompletedCount / $headTasksCount) * 100) : 0;
+
+            $headData = [
+                'id' => $headUser->id,
+                'name' => $headUser->name,
+                'email' => $headUser->email,
+                'tasks_count' => $headTasksCount,
+                'completed_tasks_count' => $headCompletedCount,
+                'progress' => $headProgress,
+            ];
+        }
+
+        $membersData = $committee->memberAssignments->map(function ($assignment) use ($allCommitteeTasks) {
+            $memberTasks = $allCommitteeTasks->where('assigned_to', $assignment->user->id);
+            $tasksCount = $memberTasks->count();
+            $completedCount = $memberTasks->where('status', Task::STATUS_COMPLETED)->count();
+            $progress = $tasksCount > 0 ? (int) round(($completedCount / $tasksCount) * 100) : 0;
+
+            return [
+                'id' => $assignment->user->id,
+                'name' => $assignment->user->name,
+                'email' => $assignment->user->email,
+                'assigned_at' => $assignment->updated_at?->format('F d, Y'),
+                'tasks_count' => $tasksCount,
+                'completed_tasks_count' => $completedCount,
+                'progress' => $progress,
+            ];
+        })->values()->all();
+
         $committeeData = [
             'id' => (string) $committee->id,
             'name' => $committee->name,
@@ -166,40 +203,41 @@ class CommitteeController extends Controller
                 'title' => $project->title,
                 'status' => $project->status,
             ],
-            'head' => $committee->staffAssignment?->user ? [
-                'id' => $committee->staffAssignment->user->id,
-                'name' => $committee->staffAssignment->user->name,
-                'email' => $committee->staffAssignment->user->email,
-            ] : null,
-            'members' => $committee->memberAssignments->map(fn ($assignment) => [
-                'id' => $assignment->user->id,
-                'name' => $assignment->user->name,
-                'email' => $assignment->user->email,
-                'assigned_at' => $assignment->updated_at?->format('F d, Y'),
-            ])->values()->all(),
+            'head' => $headData,
+            'members' => $membersData,
             'can' => [
                 'update' => $user ? Gate::forUser($user)->allows('update', $committee) : false,
                 'delete' => $user ? Gate::forUser($user)->allows('delete', $committee) : false,
                 'manageMembers' => $canManage,
                 'createActivity' => $user ? Gate::forUser($user)->allows('create', [Activity::class, $committee]) : false,
             ],
-            'activities' => $committee->activities->map(fn ($act) => [
-                'id' => (string) $act->id,
-                'title' => $act->title,
-                'description' => $act->description,
-                'status' => $act->status,
-                'progress' => $this->progressService->calculateActivityProgress($act)['progress'],
-                'start_date' => $act->start_date?->format('M d, Y'),
-                'start_date_raw' => $act->start_date?->format('Y-m-d'),
-                'due_date' => $act->due_date?->format('M d, Y'),
-                'due_date_raw' => $act->due_date?->format('Y-m-d'),
-                'tasks_count' => $act->tasks->count(),
-                'completed_tasks_count' => $act->tasks->where('status', Task::STATUS_COMPLETED)->count(),
-                'creator' => $act->creator ? [
-                    'id' => $act->creator->id,
-                    'name' => $act->creator->name,
-                ] : null,
-            ])->values()->all(),
+            'activities' => $committee->activities->map(function ($act) {
+                $assigneeNames = $act->tasks
+                    ->map(fn ($t) => $t->assignee?->name)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => (string) $act->id,
+                    'title' => $act->title,
+                    'description' => $act->description,
+                    'status' => $act->status,
+                    'progress' => $this->progressService->calculateActivityProgress($act)['progress'],
+                    'start_date' => $act->start_date?->format('M d, Y'),
+                    'start_date_raw' => $act->start_date?->format('Y-m-d'),
+                    'due_date' => $act->due_date?->format('M d, Y'),
+                    'due_date_raw' => $act->due_date?->format('Y-m-d'),
+                    'tasks_count' => $act->tasks->count(),
+                    'completed_tasks_count' => $act->tasks->where('status', Task::STATUS_COMPLETED)->count(),
+                    'creator' => $act->creator ? [
+                        'id' => $act->creator->id,
+                        'name' => $act->creator->name,
+                    ] : null,
+                    'assignee_names' => $assigneeNames,
+                ];
+            })->values()->all(),
         ];
 
         $userRole = ($user && $project)
