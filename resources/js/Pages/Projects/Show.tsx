@@ -800,6 +800,17 @@ export default function ProjectShow({
 
                             {/* Header Actions */}
                             <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                                {canCreateCommittee && (
+                                    <Button
+                                        type="button"
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={handleOpenCreateCommittee}
+                                    >
+                                        + Add Committee
+                                    </Button>
+                                )}
+
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button
@@ -1125,29 +1136,6 @@ export default function ProjectShow({
                     {activeTab === 'committees' && (
                         <div className="space-y-6">
                             <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <div className="flex items-center justify-between gap-3 mb-5">
-                                    <div>
-                                        <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
-                                            Committees
-                                        </h3>
-                                        <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                            {displayCommittees.length} {displayCommittees.length === 1 ? 'committee' : 'committees'} established
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {canCreateCommittee && (
-                                            <Button
-                                                type="button"
-                                                variant="primary"
-                                                size="sm"
-                                                onClick={handleOpenCreateCommittee}
-                                            >
-                                                + Add Committee
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-
                                 {displayCommittees.length > 0 ? (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {displayCommittees.map((committee) => {
