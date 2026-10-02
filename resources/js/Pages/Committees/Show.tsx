@@ -499,8 +499,7 @@ export default function CommitteeShow({
 
     return (
         <AppLayout
-            title={committee.name}
-            subtitle={`Committee within ${project.title}`}
+            hidePageHeadingBanner={true}
             currentProject={{
                 title: project.title,
                 role: project.role ?? undefined,
