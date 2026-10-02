@@ -705,147 +705,58 @@ export default function ProjectShow({
 
             <div className="-mx-4 sm:-mx-6 -mt-6">
 
-                {/* ── Project Header & Tabs (Flat page structure) ── */}
+                {/* ── Project Workspace Navigation & Breadcrumb ── */}
                 <div className="bg-white border-b border-[color:var(--color-border-light)]">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-0">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3.5 pb-0">
 
-                        {/* Breadcrumb */}
-                        <div className="flex items-center gap-1.5 text-xs text-[color:var(--color-text-muted)] mb-3">
-                            <Link
-                                href="/projects"
-                                className="hover:text-[color:var(--color-brand-action-orange)] transition-colors font-medium"
-                            >
-                                Projects
-                            </Link>
-                            <ChevronRight className="w-3 h-3 text-slate-300" />
-                            <span className="text-[color:var(--color-text-main)] font-semibold truncate max-w-xs">
-                                {project.title}
-                            </span>
-                        </div>
-
-                        {/* Title row */}
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-
-                            {/* Left: title + single status + viewer role (if not leader) + meta + progress */}
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2.5 flex-wrap">
-                                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[color:var(--color-text-main)] leading-snug">
-                                        {project.title}
-                                    </h1>
-                                    <ProjectStatusBadge status={project.status} />
-                                    {project.role && project.role !== 'Project Leader' && (
+                        {/* Minimal project context line with Leader options */}
+                        <div className="flex items-center justify-between gap-3 text-xs mb-2.5">
+                            <div className="flex items-center gap-1.5 min-w-0 text-[color:var(--color-text-muted)]">
+                                <Link
+                                    href="/projects"
+                                    className="hover:text-[color:var(--color-brand-action-orange)] transition-colors font-medium shrink-0"
+                                >
+                                    Projects
+                                </Link>
+                                <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+                                <span className="text-[color:var(--color-text-main)] font-semibold truncate max-w-xs sm:max-w-md" title={project.title}>
+                                    {project.title}
+                                </span>
+                                {project.role && project.role !== 'Project Leader' && (
+                                    <span className="hidden sm:inline-flex ml-1 shrink-0">
                                         <ProjectRoleBadge role={project.role} />
-                                    )}
-                                    {project.userCommittee && (
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border bg-slate-50 text-slate-600 border-slate-200">
-                                            {project.userCommittee.name}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Project metadata: Leader + Dates */}
-                                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[color:var(--color-text-muted)] mt-1.5">
-                                    <div>
-                                        <span>Project Leader: </span>
-                                        {project.hasLeader ? (
-                                            <span className="font-semibold text-[color:var(--color-text-main)]">{project.leaderName}</span>
-                                        ) : (
-                                            <span className="text-slate-400 italic">Unassigned</span>
-                                        )}
-                                    </div>
-                                    {project.startDate && (
-                                        <div className="flex items-center gap-1.5">
-                                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            <span>
-                                                Started <span className="font-semibold text-[color:var(--color-text-main)]">{project.startDate}</span>
-                                            </span>
-                                        </div>
-                                    )}
-                                    {project.deadline && (
-                                        <div className="flex items-center gap-1.5">
-                                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            <span>
-                                                Deadline <span className="font-semibold text-[color:var(--color-text-main)]">{project.deadline}</span>
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Description (concise/line-clamp) */}
-                                {project.description && (
-                                    <p className="text-xs sm:text-sm text-[color:var(--color-text-muted)] mt-2 leading-relaxed max-w-3xl line-clamp-2" title={project.description}>
-                                        {project.description}
-                                    </p>
+                                    </span>
                                 )}
-
-                                {/* Slim progress bar */}
-                                <div className="flex items-center gap-3 mt-3 mb-1">
-                                    <div className="w-48 sm:w-64 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all duration-500"
-                                            style={{
-                                                width: `${project.progress}%`,
-                                                backgroundColor: 'var(--color-brand-action-orange)',
-                                            }}
-                                        />
-                                    </div>
-                                    <span className="text-xs font-bold text-[color:var(--color-brand-action-orange)] tabular-nums">
-                                        {Math.round(project.progress)}%
+                                {project.userCommittee && (
+                                    <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border bg-slate-50 text-slate-600 border-slate-200 shrink-0">
+                                        {project.userCommittee.name}
                                     </span>
-                                    <span className="text-xs text-[color:var(--color-text-muted)]">
-                                        complete
-                                    </span>
-                                </div>
+                                )}
                             </div>
 
-                            {/* Header Actions */}
-                            <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setActiveTab('timeline')}
-                                >
-                                    View Timeline
-                                </Button>
-
-                                {canCreateCommittee && (
-                                    <Button
-                                        type="button"
-                                        variant="primary"
-                                        size="sm"
-                                        leftIcon={<span className="font-bold text-base leading-none mr-0.5">+</span>}
-                                        onClick={handleOpenCreateCommittee}
-                                    >
-                                        Add Committee
-                                    </Button>
-                                )}
-
+                            {/* Minimal Leader Options (Edit / Archive) */}
+                            {isLeader && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button
+                                        <button
                                             type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className="px-2"
+                                            className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                                             title="More options"
                                             aria-label="More project options"
                                         >
-                                            <MoreHorizontal className="w-4 h-4 text-slate-500" />
-                                        </Button>
+                                            <MoreHorizontal className="w-4 h-4" />
+                                        </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-44">
-                                        {isLeader && (
-                                            <DropdownMenuItem
-                                                onClick={handleOpenEditModal}
-                                                className="gap-2 text-xs cursor-pointer"
-                                            >
-                                                <Edit3 className="w-3.5 h-3.5 text-slate-500" />
-                                                Edit Project
-                                            </DropdownMenuItem>
-                                        )}
+                                        <DropdownMenuItem
+                                            onClick={handleOpenEditModal}
+                                            className="gap-2 text-xs cursor-pointer"
+                                        >
+                                            <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                                            Edit Project
+                                        </DropdownMenuItem>
 
-                                        {isLeader && project.status !== 'Archived' && (
+                                        {project.status !== 'Archived' && (
                                             <>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem
@@ -859,11 +770,11 @@ export default function ProjectShow({
                                         )}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
-                            </div>
+                            )}
                         </div>
 
                         {/* Underline Tabs */}
-                        <nav className="flex space-x-1 sm:space-x-2 mt-3 -mb-px overflow-x-auto scrollbar-none" aria-label="Project tabs">
+                        <nav className="flex space-x-1 sm:space-x-2 -mb-px overflow-x-auto scrollbar-none" aria-label="Project tabs">
                             {tabs.map((tab) => {
                                 const isActive = activeTab === tab.key;
                                 const count =
@@ -921,20 +832,64 @@ export default function ProjectShow({
                     {activeTab === 'overview' && (
                         <div className="space-y-6">
 
-                            {/* Project Progress card */}
-                            <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 sm:p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-5">
-                                    <h3 className="text-sm font-bold text-[color:var(--color-text-main)]">
-                                        Project Progress
-                                    </h3>
-                                    <p className="text-xs text-[color:var(--color-text-muted)]">
-                                        Task status, based on {allTasks.length} {allTasks.length === 1 ? 'task' : 'tasks'}
-                                    </p>
+                            {/* Project Overview & Progress card */}
+                            <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 sm:p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-5">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                    <div className="space-y-2 max-w-3xl flex-1">
+                                        <div className="flex items-center gap-2.5 flex-wrap">
+                                            <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
+                                                Project Overview
+                                            </h3>
+                                            <ProjectStatusBadge status={project.status} />
+                                        </div>
+                                        {project.description && (
+                                            <p className="text-xs text-[color:var(--color-text-muted)] leading-relaxed">
+                                                {project.description}
+                                            </p>
+                                        )}
+                                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-[color:var(--color-text-muted)] pt-1">
+                                            <div>
+                                                <span>Project Leader: </span>
+                                                {project.hasLeader ? (
+                                                    <span className="font-semibold text-[color:var(--color-text-main)]">{project.leaderName}</span>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Unassigned</span>
+                                                )}
+                                            </div>
+                                            {project.startDate && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                    <span>
+                                                        Started <span className="font-semibold text-[color:var(--color-text-main)]">{project.startDate}</span>
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {project.deadline && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                    <span>
+                                                        Deadline <span className="font-semibold text-[color:var(--color-text-main)]">{project.deadline}</span>
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                                <ProjectProgressDonut
-                                    progress={project.progress}
-                                    tasks={allTasks}
-                                />
+
+                                <div className="pt-4 border-t border-slate-100">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-xs font-semibold text-[color:var(--color-text-subtle)] uppercase tracking-wider">
+                                            Task Breakdown
+                                        </span>
+                                        <span className="text-xs text-[color:var(--color-text-muted)]">
+                                            {allTasks.length} {allTasks.length === 1 ? 'task' : 'tasks'} total
+                                        </span>
+                                    </div>
+                                    <ProjectProgressDonut
+                                        progress={project.progress}
+                                        tasks={allTasks}
+                                    />
+                                </div>
                             </div>
 
                             {/* Committees preview */}
@@ -1047,7 +1002,7 @@ export default function ProjectShow({
                                                 ? 'Functional committees and working groups will appear here once created.'
                                                 : 'This project currently has no committees established.'
                                         }
-                                        actionLabel={canCreateCommittee ? '+ Create Committee' : undefined}
+                                        actionLabel={canCreateCommittee ? '+ Add Committee' : undefined}
                                         onAction={canCreateCommittee ? handleOpenCreateCommittee : undefined}
                                     />
                                 )}
@@ -1146,16 +1101,16 @@ export default function ProjectShow({
                     {activeTab === 'committees' && (
                         <div className="space-y-6">
                             <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+                                <div className="flex items-center justify-between gap-3 mb-5">
                                     <div>
                                         <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
-                                            Project Committees
+                                            Committees
                                         </h3>
                                         <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
-                                            Form functional committees, designate staff leads, and assign working groups
+                                            {displayCommittees.length} {displayCommittees.length === 1 ? 'committee' : 'committees'} established
                                         </p>
                                     </div>
-                                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                                    <div className="flex items-center gap-2">
                                         {canCreateCommittee && (
                                             <Button
                                                 type="button"
@@ -1163,7 +1118,7 @@ export default function ProjectShow({
                                                 size="sm"
                                                 onClick={handleOpenCreateCommittee}
                                             >
-                                                + Create Committee
+                                                + Add Committee
                                             </Button>
                                         )}
                                     </div>
@@ -1290,7 +1245,7 @@ export default function ProjectShow({
                                                     size="sm"
                                                     onClick={handleOpenCreateCommittee}
                                                 >
-                                                    + Create Committee
+                                                    + Add Committee
                                                 </Button>
                                             </div>
                                         )}
