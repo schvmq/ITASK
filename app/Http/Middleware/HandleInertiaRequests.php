@@ -67,6 +67,27 @@ class HandleInertiaRequests extends Middleware
                         ];
                     }) : [],
             ],
+            'unread_messages_count' => $request->user() ? \App\Models\ConversationParticipant::query()
+                ->where('user_id', $request->user()->id)
+                ->whereHas('conversation.messages', function ($q) use ($request) {
+                    $q->where('sender_id', '!=', $request->user()->id);
+                })
+                ->get()
+                ->filter(function ($p) use ($request) {
+                    return $p->conversation->messages()
+                        ->where('sender_id', '!=', $request->user()->id)
+                        ->when($p->last_read_message_id, fn ($q) => $q->where('id', '>', $p->last_read_message_id))
+                        ->when(! $p->last_read_message_id && $p->last_read_at, fn ($q) => $q->where('created_at', '>', $p->last_read_at))
+                        ->exists();
+                })
+                ->count() : 0,
+            'my_tasks_count' => $request->user() ? \App\Models\Task::query()
+                ->where(function ($q) use ($request) {
+                    $q->where('assigned_to', $request->user()->id)
+                      ->orWhereHas('assignees', fn ($uq) => $uq->where('user_id', $request->user()->id));
+                })
+                ->where('status', '!=', \App\Models\Task::STATUS_COMPLETED)
+                ->count() : 0,
         ];
     }
 }

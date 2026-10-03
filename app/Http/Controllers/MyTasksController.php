@@ -57,6 +57,7 @@ class MyTasksController extends Controller
 
         $taskQuery = Task::query()->with([
             'assignee',
+            'assignees',
             'activity.committee.project',
             'activity.committee.staffAssignment.user',
             'checklistItems',
@@ -72,11 +73,15 @@ class MyTasksController extends Controller
             $taskQuery->where(function ($q) use ($staffCommitteeIds, $userId) {
                 $q->whereHas('activity', function ($aq) use ($staffCommitteeIds) {
                     $aq->whereIn('committee_id', $staffCommitteeIds);
-                })->orWhere('assigned_to', $userId);
+                })->orWhere('assigned_to', $userId)
+                  ->orWhereHas('assignees', fn ($uq) => $uq->where('user_id', $userId));
             });
         } else {
             // Members: only their own assigned tasks
-            $taskQuery->where('assigned_to', $userId);
+            $taskQuery->where(function ($q) use ($userId) {
+                $q->where('assigned_to', $userId)
+                  ->orWhereHas('assignees', fn ($uq) => $uq->where('user_id', $userId));
+            });
         }
 
         $tasks = $taskQuery->get()->map(function (Task $task) use ($userId, $today) {
@@ -86,22 +91,27 @@ class MyTasksController extends Controller
 
             $checklistTotal     = $task->checklistItems->count();
             $checklistCompleted = $task->checklistItems->where('is_completed', true)->count();
+            $isMine = ($task->assigned_to === $userId) || $task->assignees->contains('id', $userId);
 
             return [
                 'id'              => (string) $task->id,
                 'title'           => $task->title,
                 'description'     => $task->description,
                 'status'          => $task->status,
+                'priority'        => $task->priority ?? 'Medium',
                 'due_date'        => $task->due_date?->format('Y-m-d'),
                 'due_date_formatted' => $task->due_date ? $task->due_date->format('M d, Y') : null,
                 'requires_review' => (bool) $task->requires_review,
                 'is_overdue'      => (bool) $isOverdue,
                 'is_approaching'  => (bool) $isApproaching,
-                'is_mine'         => $task->assigned_to === $userId,
+                'is_mine'         => $isMine,
                 'assignee'        => $task->assignee ? [
                     'id'   => $task->assignee->id,
                     'name' => $task->assignee->name,
-                ] : null,
+                ] : ($task->assignees->first() ? [
+                    'id'   => $task->assignees->first()->id,
+                    'name' => $task->assignees->first()->name,
+                ] : null),
                 'project'  => [
                     'id'    => (string) $task->activity->project_id,
                     'title' => $task->activity->project->title,

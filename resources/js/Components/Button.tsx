@@ -10,22 +10,23 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
+    // Accessibility: text on orange buttons is charcoal (#2A2A2A), not white, for readable contrast
     primary:
-        'bg-[#F68233] hover:bg-[#E06D1F] active:bg-[#C85E17] text-white shadow-xs focus-visible:ring-2 focus-visible:ring-[#F68233]/40 focus-visible:ring-offset-2 border border-transparent',
+        'bg-[#EC7505] hover:bg-[#D96904] active:bg-[#C25D03] text-[#2A2A2A] font-bold shadow-xs border border-transparent',
     secondary:
-        'bg-[#003300] hover:bg-[#002600] active:bg-[#001A00] text-white shadow-xs focus-visible:ring-2 focus-visible:ring-[#003300]/40 focus-visible:ring-offset-2 border border-transparent',
+        'bg-[var(--card)] hover:bg-[var(--tint-neutral)] active:opacity-90 text-[var(--ink)] shadow-xs border border-[var(--border)] font-semibold',
     outline:
-        'bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-800 border border-slate-300 shadow-xs focus-visible:ring-2 focus-visible:ring-[#F68233]/30 focus-visible:ring-offset-1',
+        'bg-transparent hover:bg-[var(--tint-neutral)] text-[var(--ink)] border border-[var(--border)] shadow-xs font-semibold',
     danger:
-        'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs focus-visible:ring-2 focus-visible:ring-rose-500/40 focus-visible:ring-offset-2 border border-transparent',
+        'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs border border-transparent font-semibold',
     ghost:
-        'bg-transparent hover:bg-slate-100 active:bg-slate-200 text-slate-700 focus-visible:ring-2 focus-visible:ring-slate-300 border border-transparent',
+        'bg-transparent hover:bg-[var(--tint-neutral)] text-[var(--ink)] border border-transparent font-medium',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-    sm: 'text-xs px-2.5 py-1.5 rounded-md gap-1.5 font-medium',
-    md: 'text-sm px-4 py-2 rounded-lg gap-2 font-medium',
-    lg: 'text-base px-5 py-2.5 rounded-lg gap-2.5 font-semibold',
+    sm: 'text-xs px-3 py-1.5 rounded-lg gap-1.5',
+    md: 'text-[14px] px-4 py-2 rounded-xl gap-2',
+    lg: 'text-[15px] px-5 py-2.5 rounded-xl gap-2.5',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -49,7 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             <button
                 ref={ref}
                 disabled={isDisabled}
-                className={`inline-flex items-center justify-center transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none focus:outline-hidden ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+                className={`inline-flex items-center justify-center transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
                 {...props}
             >
                 {isLoading ? (

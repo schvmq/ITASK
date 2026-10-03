@@ -14,12 +14,14 @@ class ConversationParticipant extends Model
         'conversation_id',
         'user_id',
         'last_read_at',
+        'last_read_message_id',
     ];
 
     protected function casts(): array
     {
         return [
             'last_read_at' => 'datetime',
+            'last_read_message_id' => 'integer',
         ];
     }
 
@@ -31,5 +33,10 @@ class ConversationParticipant extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function lastReadMessage(): BelongsTo
+    {
+        return $this->belongsTo(Message::class, 'last_read_message_id');
     }
 }

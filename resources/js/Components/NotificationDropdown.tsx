@@ -23,32 +23,32 @@ import {
 
 function getNotificationIcon(type: string, status?: string) {
     if (type === 'task_assigned') {
-        return <CheckSquare className="w-4 h-4 text-emerald-600" />;
+        return <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />;
     }
     if (type === 'task_deadline_approaching') {
-        return <Clock className="w-4 h-4 text-amber-600" />;
+        return <Clock className="w-4 h-4 text-[#FFBB00]" />;
     }
     if (type === 'task_submitted_for_review') {
-        return <Send className="w-4 h-4 text-blue-600" />;
+        return <Send className="w-4 h-4 text-blue-500" />;
     }
     if (type === 'task_reviewed') {
         return status === 'Completed' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
         ) : (
-            <AlertCircle className="w-4 h-4 text-rose-600" />
+            <AlertCircle className="w-4 h-4 text-rose-500" />
         );
     }
     if (type === 'activity_submitted_for_review') {
-        return <ClipboardCheck className="w-4 h-4 text-indigo-600" />;
+        return <ClipboardCheck className="w-4 h-4 text-indigo-500" />;
     }
     if (type === 'activity_reviewed') {
         return status === 'Completed' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
         ) : (
-            <AlertCircle className="w-4 h-4 text-rose-600" />
+            <AlertCircle className="w-4 h-4 text-rose-500" />
         );
     }
-    return <Bell className="w-4 h-4 text-[color:var(--color-brand-action-orange)]" />;
+    return <Bell className="w-4 h-4 text-[#EC7505]" />;
 }
 
 export function NotificationDropdown() {
@@ -95,30 +95,29 @@ export function NotificationDropdown() {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="relative p-2 rounded-lg text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-surface-muted)] transition-colors cursor-pointer"
+                    className="relative p-2 rounded-xl text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--tint-neutral)] transition-colors cursor-pointer"
                     aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
                 >
                     <Bell className="w-4.5 h-4.5" />
+                    {/* Orange unread indicator dot per design spec */}
                     {unreadCount > 0 && (
                         <span
-                            className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white rounded-full ring-2 ring-white"
-                            style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
-                        >
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
+                            className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[#EC7505] ring-2 ring-[var(--card)]"
+                            title={`${unreadCount} unread`}
+                        />
                     )}
                 </button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-80 sm:w-96 p-0 shadow-lg border border-[color:var(--color-border-light)] bg-white rounded-xl">
+            <DropdownMenuContent align="end" className="w-80 sm:w-96 p-0 shadow-xl border border-[var(--border)] bg-[var(--card)] rounded-2xl overflow-hidden">
                 {/* ── Header ── */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[color:var(--color-border-light)] bg-[color:var(--color-surface-subtle)] rounded-t-xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--tint-neutral)]/40">
                     <div className="flex items-center gap-2">
-                        <span className="font-semibold text-xs text-[color:var(--color-text-main)]">
+                        <span className="font-bold text-xs text-[var(--ink)]">
                             Notifications
                         </span>
                         {unreadCount > 0 && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-orange-100 text-orange-800 rounded-full">
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-[#EC7505] text-[#2A2A2A] rounded-full">
                                 {unreadCount} new
                             </span>
                         )}
@@ -128,7 +127,7 @@ export function NotificationDropdown() {
                             type="button"
                             onClick={handleMarkAllAsRead}
                             disabled={isMarkingAll}
-                            className="text-[11px] font-medium text-[color:var(--color-brand-action-orange)] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            className="text-[11px] font-semibold text-[var(--link-orange)] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
                         >
                             <Check className="w-3 h-3" />
                             Mark all read
@@ -137,13 +136,13 @@ export function NotificationDropdown() {
                 </div>
 
                 {/* ── Notification List ── */}
-                <div className="max-h-80 overflow-y-auto divide-y divide-[color:var(--color-border-light)]">
+                <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
                     {items.length === 0 ? (
                         <div className="py-8 px-4 text-center">
-                            <Bell className="w-6 h-6 mx-auto text-slate-300 mb-2" />
-                            <p className="text-xs font-medium text-slate-500">No notifications yet</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                                You'll be notified of task assignments and reviews here.
+                            <Bell className="w-6 h-6 mx-auto text-[var(--muted)]/50 mb-2" />
+                            <p className="text-xs font-semibold text-[var(--ink)]">You're up to date</p>
+                            <p className="text-[11px] text-[var(--muted)] mt-0.5">
+                                Task updates and feedback will show here.
                             </p>
                         </div>
                     ) : (
@@ -165,37 +164,37 @@ export function NotificationDropdown() {
                                         }
                                         setIsOpen(false);
                                     }}
-                                    className={`px-4 py-3 flex items-start gap-3 hover:bg-[color:var(--color-surface-subtle)] transition-colors cursor-pointer group ${
-                                        isUnread ? 'bg-orange-50/40' : 'bg-white'
+                                    className={`px-4 py-3 flex items-start gap-3 hover:bg-[var(--tint-neutral)] transition-colors cursor-pointer group ${
+                                        isUnread ? 'bg-[var(--tint-orange)]/30' : 'bg-transparent'
                                     }`}
                                 >
-                                    <div className="mt-0.5 shrink-0 w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
+                                    <div className="mt-0.5 shrink-0 w-7 h-7 rounded-lg bg-[var(--tint-neutral)] flex items-center justify-center">
                                         {getNotificationIcon(item.data.notification_type, status)}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-1">
-                                            <p className={`text-xs truncate ${isUnread ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
+                                            <p className={`text-xs truncate ${isUnread ? 'font-bold text-[var(--ink)]' : 'font-medium text-[var(--ink)]'}`}>
                                                 {title}
                                             </p>
                                             {isUnread && (
-                                                <span className="w-2 h-2 rounded-full bg-[color:var(--color-brand-action-orange)] shrink-0" />
+                                                <span className="w-2 h-2 rounded-full bg-[#EC7505] shrink-0" />
                                             )}
                                         </div>
-                                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
+                                        <p className="text-[11px] text-[var(--muted)] line-clamp-2 mt-0.5 leading-snug">
                                             {message}
                                         </p>
                                         {item.data.review_feedback && (
-                                            <p className="text-[10px] text-rose-600 bg-rose-50 rounded px-1.5 py-0.5 mt-1 border border-rose-100 italic">
+                                            <p className="text-[10px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 rounded px-1.5 py-0.5 mt-1 border border-rose-200 dark:border-rose-900 italic">
                                                 "{item.data.review_feedback}"
                                             </p>
                                         )}
                                         <div className="flex items-center justify-between mt-1.5">
-                                            <span className="text-[10px] text-slate-400">
+                                            <span className="text-[10px] text-[var(--muted)]">
                                                 {item.created_at_human || 'Recently'}
                                             </span>
                                             {actionUrl && (
-                                                <span className="text-[10px] text-[color:var(--color-brand-action-orange)] font-medium flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    View <ExternalLink className="w-2.5 h-2.5" />
+                                                <span className="text-[10px] text-[var(--link-orange)] font-semibold flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    View details
                                                 </span>
                                             )}
                                         </div>
@@ -207,11 +206,11 @@ export function NotificationDropdown() {
                 </div>
 
                 {/* ── Footer ── */}
-                <div className="px-4 py-2.5 border-t border-[color:var(--color-border-light)] bg-white text-center rounded-b-xl">
+                <div className="px-4 py-2.5 border-t border-[var(--border)] bg-[var(--card)] text-center">
                     <Link
                         href="/notifications"
                         onClick={() => setIsOpen(false)}
-                        className="text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline inline-block"
+                        className="text-xs font-semibold text-[var(--link-orange)] hover:underline inline-block"
                     >
                         View all notifications
                     </Link>

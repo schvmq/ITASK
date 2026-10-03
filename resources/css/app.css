@@ -9,134 +9,404 @@
 @source '../**/*.ts';
 
 @theme {
-    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --font-sans: 'Figtree', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 
-    /* Core Brand Colors */
-    --color-primary: #F68233;
-    --color-primary-hover: #E06D1F;
-    --color-primary-active: #C85E17;
-    --color-primary-50: #FFF7ED;
-    --color-primary-100: #FFEDD5;
-    --color-primary-200: #FED7AA;
+    /* Brand Core Palette */
+    --color-brand-yellow: #FFBB00;
+    --color-brand-orange: #EC7505;
+    --color-brand-cream: #F3F1E2;
+    --color-brand-charcoal: #2A2A2A;
+    --color-brand-dark-gray: #393939;
 
-    --color-secondary: #003300;
-    --color-secondary-hover: #002600;
-    --color-secondary-50: #F0FDF4;
-    --color-secondary-100: #DCFCE7;
+    /* Theme Token Variables */
+    --color-bg-page: var(--bg);
+    --color-bg-card: var(--card);
+    --color-ink: var(--ink);
+    --color-ink-muted: var(--muted);
+    --color-border-token: var(--border);
 
-    /* Neutral Surface and Text */
-    --color-surface: #FFFFFF;
-    --color-surface-subtle: #F9FAFB;
-    --color-surface-muted: #F3F4F6;
+    --color-tint-yellow: var(--tint-yellow);
+    --color-tint-orange: var(--tint-orange);
+    --color-tint-neutral: var(--tint-neutral);
+    --color-tint-amber: var(--tint-amber);
+    --color-amber-text: var(--amber-text);
+    --color-link-orange: var(--link-orange);
 
-    --color-border-light: #E5E7EB;
-    --color-border-subtle: #F3F4F6;
-    --color-border-dark: #D1D5DB;
+    /* Mappings for component compatibility */
+    --color-primary: #EC7505;
+    --color-primary-hover: #D96904;
+    --color-primary-active: #C25D03;
+    --color-secondary: #2A2A2A;
 
-    --color-text-main: #111827;
-    --color-text-muted: #6B7280;
-    --color-text-subtle: #9CA3AF;
-
-    /* ITASK Brand Palette */
-    --color-brand-dark-green: #003300;
-    --color-brand-orange: #E8752F;
-    --color-brand-action-orange: #F68233;
-    --color-brand-active-warm-orange: #FFF1E8;
-    --color-brand-project-darker-orange: #D9692B;
-
-    /* Shadcn Semantic Colors linked to ITASK Tokens */
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
+    --color-background: var(--bg);
+    --color-foreground: var(--ink);
     --color-card: var(--card);
-    --color-card-foreground: var(--card-foreground);
-    --color-popover: var(--popover);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-muted: var(--muted);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-accent: var(--accent);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-destructive: var(--destructive);
-    --color-destructive-foreground: var(--destructive-foreground);
+    --color-card-foreground: var(--ink);
+    --color-popover: var(--card);
+    --color-popover-foreground: var(--ink);
+    --color-muted: var(--tint-neutral);
+    --color-muted-foreground: var(--muted);
     --color-border: var(--border);
-    --color-input: var(--input);
-    --color-ring: var(--ring);
+    --color-input: var(--border);
+    --color-ring: #EC7505;
 
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 4px);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 18px;
+    --radius-2xl: 20px;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS (LIGHT MODE DEFAULT)
+   ───────────────────────────────────────────────────────────────────────────── */
+:root, [data-theme="light"] {
+    --bg: #F3F1E2;
+    --card: #FFFEF9;
+    --ink: #2A2A2A;
+    --muted: #5C5A50;
+    --border: #E1DDC6;
+
+    --tint-yellow: #FFF1C2;
+    --tint-orange: #FDE5CC;
+    --tint-neutral: #E9E7D6;
+    --tint-amber: #FFE9A8;
+    --amber-text: #8A5A00;
+    --link-orange: #B35400;
+
+    --shadow-card: 0 1px 2px rgba(42, 42, 42, 0.06), 0 8px 24px -12px rgba(42, 42, 42, 0.22);
+    --shadow-sm: 0 1px 2px rgba(42, 42, 42, 0.05);
+
+    /* Sidebar specifics */
+    --sidebar-grad-from: #393939;
+    --sidebar-grad-to: #2A2A2A;
+    --sidebar-text: #F3F1E2;
+    --sidebar-text-muted: #B9B6A3;
+    --sidebar-active-pill: #F3F1E2;
+    --sidebar-active-text: #2A2A2A;
+    --sidebar-active-marker: #FFBB00;
+    --sidebar-border: rgba(243, 241, 226, 0.12);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN TOKENS (DARK MODE)
+   ───────────────────────────────────────────────────────────────────────────── */
+[data-theme="dark"], html.dark {
+    --bg: #1E1E1E;
+    --card: #2A2A2A;
+    --ink: #F3F1E2;
+    --muted: #B9B6A3;
+    --border: #3D3D3D;
+
+    --tint-yellow: #3A3210;
+    --tint-orange: #3D2610;
+    --tint-neutral: #393939;
+    --tint-amber: #3A3210;
+    --amber-text: #FFBB00;
+    --link-orange: #EC7505;
+
+    --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -12px rgba(0, 0, 0, 0.7);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+
+    /* Sidebar specifics */
+    --sidebar-grad-from: #262626;
+    --sidebar-grad-to: #181818;
+    --sidebar-text: #F3F1E2;
+    --sidebar-text-muted: #8E8B7A;
+    --sidebar-active-pill: #383838;
+    --sidebar-active-text: #FFFEF9;
+    --sidebar-active-marker: #FFBB00;
+    --sidebar-border: rgba(255, 255, 255, 0.08);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ANIMATION & TIMING TOKENS (Section 5)
+   ───────────────────────────────────────────────────────────────────────────── */
 :root {
-    --background: var(--color-surface);
-    --foreground: var(--color-text-main);
-
-    --card: var(--color-surface);
-    --card-foreground: var(--color-text-main);
-
-    --popover: var(--color-surface);
-    --popover-foreground: var(--color-text-main);
-
-    --primary: var(--color-primary);
-    --primary-foreground: #FFFFFF;
-
-    --secondary: var(--color-secondary);
-    --secondary-foreground: #FFFFFF;
-
-    --muted: var(--color-surface-muted);
-    --muted-foreground: var(--color-text-muted);
-
-    --accent: var(--color-brand-active-warm-orange);
-    --accent-foreground: var(--color-primary-active);
-
-    --destructive: #EF4444;
-    --destructive-foreground: #FFFFFF;
-
-    --border: var(--color-border-light);
-    --input: var(--color-border-light);
-    --ring: var(--color-primary);
-
-    --radius: 0.5rem;
+    --dur-fast: 150ms;
+    --dur-base: 250ms;
+    --dur-slow: 400ms;
+    --ease-in: cubic-bezier(.2, .8, .2, 1);
+    --ease-out: cubic-bezier(.4, 0, 1, 1);
 }
 
-.dark {
-    --background: #111827;
-    --foreground: #F9FAFB;
+/* ─────────────────────────────────────────────────────────────────────────────
+   ACCESSIBILITY & BASE STYLES
+   ───────────────────────────────────────────────────────────────────────────── */
 
-    --card: #1F2937;
-    --card-foreground: #F9FAFB;
-
-    --popover: #1F2937;
-    --popover-foreground: #F9FAFB;
-
-    --primary: var(--color-primary);
-    --primary-foreground: #FFFFFF;
-
-    --secondary: #004D00;
-    --secondary-foreground: #FFFFFF;
-
-    --muted: #1F2937;
-    --muted-foreground: #9CA3AF;
-
-    --accent: #2D1E16;
-    --accent-foreground: #FED7AA;
-
-    --destructive: #7F1D1D;
-    --destructive-foreground: #FEE2E2;
-
-    --border: #374151;
-    --input: #374151;
-    --ring: var(--color-primary);
+/* Visible keyboard focus ring: 3px orange outline, 2px offset */
+*:focus-visible {
+    outline: 3px solid #EC7505 !important;
+    outline-offset: 2px !important;
 }
 
-@layer base {
-    * {
-        border-color: var(--color-border-light);
+/* Theme switch: 200ms color transition on background, text, borders only */
+body, header, aside, main {
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+body {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    background-color: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+
+/* Typography Scale Specifications */
+.page-title {
+    font-size: 32px;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.section-title {
+    font-size: 18px;
+    line-height: 1.3;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+}
+
+.body-text {
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ink);
+}
+
+.muted-text {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+/* Primary orange button rule: charcoal text (#2A2A2A) */
+.btn-primary-orange {
+    background-color: #EC7505;
+    color: #2A2A2A;
+    font-weight: 700;
+}
+.btn-primary-orange:hover {
+    background-color: #D96904;
+}
+.btn-primary-orange:active {
+    background-color: #C25D03;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   SMOOTH 60FPS ANIMATIONS
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* 1. Page load stagger items (fade and slide up 8px) */
+@keyframes fadeInUp8 {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
     }
-    body {
-        color: var(--color-text-main);
-        background-color: #FFFFFF;
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-stagger-item {
+    animation: fadeInUp8 var(--dur-base) var(--ease-in) backwards;
+}
+.stagger-1 { animation-delay: 40ms; }
+.stagger-2 { animation-delay: 80ms; }
+.stagger-3 { animation-delay: 120ms; }
+.stagger-4 { animation-delay: 160ms; }
+.stagger-5 { animation-delay: 200ms; }
+.stagger-6 { animation-delay: 240ms; }
+.stagger-7 { animation-delay: 280ms; }
+.stagger-8 { animation-delay: 320ms; }
+
+/* 3. Badge Pop (scale 0.8 -> 1) */
+@keyframes badgePop {
+    0% { transform: scale(0.8); }
+    100% { transform: scale(1); }
+}
+.animate-badge-pop {
+    animation: badgePop var(--dur-fast) var(--ease-in);
+}
+
+/* 4. Card Lift on Hover (touch-safe) */
+@media (hover: hover) and (pointer: fine) {
+    .card-hover {
+        transition: transform var(--dur-fast) var(--ease-in), box-shadow var(--dur-fast) var(--ease-in);
+    }
+    .card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px -4px rgba(42, 42, 42, 0.15);
+    }
+}
+
+/* 5. Button Press Feedback (scale .97) */
+.btn-press {
+    transition: transform var(--dur-fast) var(--ease-in);
+}
+.btn-press:active {
+    transform: scale(0.97);
+}
+
+/* 7. Modal & Popover scale/fade + backdrop */
+@keyframes modalScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+.animate-modal-in {
+    animation: modalScaleIn var(--dur-fast) var(--ease-in) forwards;
+}
+
+@keyframes backdropFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.animate-backdrop-in {
+    animation: backdropFadeIn var(--dur-fast) var(--ease-in) forwards;
+}
+
+/* 8. Toast Slide In & Undo Shrinking Progress Line */
+@keyframes toastSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.animate-toast-in {
+    animation: toastSlideIn var(--dur-base) var(--ease-in) forwards;
+}
+
+@keyframes progressShrink {
+    from { width: 100%; }
+    to { width: 0%; }
+}
+.animate-progress-shrink {
+    animation: progressShrink 5s linear forwards;
+}
+
+/* 9. Message Slide In & Typing Dots Bounce */
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.animate-message-in {
+    animation: messageSlideIn var(--dur-fast) var(--ease-in) forwards;
+}
+
+@keyframes typingDotBounce {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-4px);
+    }
+}
+.typing-dot-1 {
+    animation: typingDotBounce 1.2s infinite ease-in-out;
+    animation-delay: 0ms;
+}
+.typing-dot-2 {
+    animation: typingDotBounce 1.2s infinite ease-in-out;
+    animation-delay: 150ms;
+}
+.typing-dot-3 {
+    animation: typingDotBounce 1.2s infinite ease-in-out;
+    animation-delay: 300ms;
+}
+
+/* 10. Task Card Highlight Fade (1.5s yellow tint fade) */
+@keyframes taskHighlightFade {
+    0% {
+        background-color: var(--tint-yellow);
+    }
+    100% {
+        background-color: var(--card);
+    }
+}
+.animate-task-highlight {
+    animation: taskHighlightFade 1.5s var(--ease-in) forwards;
+}
+
+/* 11. Skeleton Shimmer */
+@keyframes shimmerAnim {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+.skeleton-shimmer {
+    background: linear-gradient(
+        90deg,
+        var(--tint-neutral) 25%,
+        var(--card) 50%,
+        var(--tint-neutral) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmerAnim 1.6s infinite ease-in-out;
+}
+
+/* 13. Empty State Gentle Float Once */
+@keyframes floatOnce {
+    0% {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(-4px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.animate-float-once {
+    animation: floatOnce 600ms var(--ease-in) forwards;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ACCESSIBILITY: PREFERS-REDUCED-MOTION
+   ───────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .skeleton-shimmer {
+        animation: none !important;
+    }
+    .typing-dot-1,
+    .typing-dot-2,
+    .typing-dot-3 {
+        animation: none !important;
     }
 }

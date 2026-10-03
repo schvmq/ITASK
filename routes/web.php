@@ -82,7 +82,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Chat / Messaging System
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+    Route::get('/messages', [ChatController::class, 'index'])->name('messages.index');
     Route::post('/chat/{conversation}/messages', [ChatController::class, 'store'])->name('chat.messages.store');
+    Route::post('/chat/{conversation}/messages/{message}/delete', [ChatController::class, 'destroyMessage'])->name('chat.messages.destroy');
+    Route::post('/chat/{conversation}/messages/{messageId}/restore', [ChatController::class, 'restoreMessage'])->name('chat.messages.restore');
+    Route::post('/chat/{conversation}/tasks', [ChatController::class, 'createTask'])->name('chat.tasks.store');
     Route::post('/chat/direct/{recipient}', [ChatController::class, 'startDirectMessage'])->name('chat.direct.start');
     Route::post('/chat/{conversation}/read', [ChatController::class, 'markAsRead'])->name('chat.markAsRead');
     Route::get('/chat/attachments/{message}', [ChatController::class, 'downloadAttachment'])->name('chat.attachments.download');
