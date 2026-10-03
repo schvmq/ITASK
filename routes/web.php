@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\CommitteeController;
 use App\Http\Controllers\MyTasksController;
@@ -78,6 +79,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications.index');
     Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/mark-all-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
+
+    // Chat / Messaging System
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+    Route::post('/chat/{conversation}/messages', [ChatController::class, 'store'])->name('chat.messages.store');
+    Route::post('/chat/direct/{recipient}', [ChatController::class, 'startDirectMessage'])->name('chat.direct.start');
+    Route::post('/chat/{conversation}/read', [ChatController::class, 'markAsRead'])->name('chat.markAsRead');
+    Route::get('/chat/attachments/{message}', [ChatController::class, 'downloadAttachment'])->name('chat.attachments.download');
 
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');

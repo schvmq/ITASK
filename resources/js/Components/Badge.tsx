@@ -41,7 +41,7 @@ export const Badge: React.FC<BadgeProps> = ({
     className = '',
     dot = false,
 }) => {
-    const style = variantStyles[variant];
+    const style = variantStyles[variant] || variantStyles.neutral;
 
     return (
         <span
