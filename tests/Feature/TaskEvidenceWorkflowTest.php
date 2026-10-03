@@ -123,7 +123,7 @@ class TaskEvidenceWorkflowTest extends TestCase
         Storage::disk('local')->assertExists($evidence->file_path);
     }
 
-    public function test_project_staff_and_leader_can_also_upload_evidence(): void
+    public function test_project_staff_and_leader_cannot_upload_evidence_to_another_members_task(): void
     {
         $staffFile = UploadedFile::fake()->create('staff_guidelines.docx', 300, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 
@@ -136,11 +136,10 @@ class TaskEvidenceWorkflowTest extends TestCase
             ]),
             ['file' => $staffFile]
         );
-        $responseStaff->assertRedirect();
-        $this->assertDatabaseHas('task_evidences', [
+        $responseStaff->assertForbidden();
+        $this->assertDatabaseMissing('task_evidences', [
             'task_id' => $this->task->id,
             'uploaded_by' => $this->staff->id,
-            'original_name' => 'staff_guidelines.docx',
         ]);
 
         $leaderFile = UploadedFile::fake()->create('leader_memo.png', 400, 'image/png');
@@ -153,11 +152,10 @@ class TaskEvidenceWorkflowTest extends TestCase
             ]),
             ['file' => $leaderFile]
         );
-        $responseLeader->assertRedirect();
-        $this->assertDatabaseHas('task_evidences', [
+        $responseLeader->assertForbidden();
+        $this->assertDatabaseMissing('task_evidences', [
             'task_id' => $this->task->id,
             'uploaded_by' => $this->leader->id,
-            'original_name' => 'leader_memo.png',
         ]);
     }
 
@@ -294,7 +292,7 @@ class TaskEvidenceWorkflowTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_uploader_and_staff_can_delete_evidence(): void
+    public function test_uploader_can_delete_own_evidence_but_staff_cannot(): void
     {
         $file = UploadedFile::fake()->create('to_delete.pdf', 100, 'application/pdf');
         $stored = Storage::disk('local')->putFile('task_evidences', $file);
@@ -320,7 +318,20 @@ class TaskEvidenceWorkflowTest extends TestCase
         $failRes->assertForbidden();
         $this->assertDatabaseHas('task_evidences', ['id' => $evidence->id]);
 
-        // Uploader can delete
+        // Staff cannot delete another person's evidence
+        $staffFailRes = $this->actingAs($this->staff)->delete(
+            route('projects.committees.activities.tasks.evidence.destroy', [
+                'project' => $this->project->id,
+                'committee' => $this->committee->id,
+                'activity' => $this->activity->id,
+                'task' => $this->task->id,
+                'evidence' => $evidence->id,
+            ])
+        );
+        $staffFailRes->assertForbidden();
+        $this->assertDatabaseHas('task_evidences', ['id' => $evidence->id]);
+
+        // Uploader can delete their own evidence while task is editable
         $successRes = $this->actingAs($this->member1)->delete(
             route('projects.committees.activities.tasks.evidence.destroy', [
                 'project' => $this->project->id,

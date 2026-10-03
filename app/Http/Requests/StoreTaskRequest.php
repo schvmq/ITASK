@@ -56,7 +56,7 @@ class StoreTaskRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'due_date' => ['nullable', 'date'],
-            'status' => ['sometimes', 'string', Rule::in(Task::STATUSES)],
+            'status' => ['sometimes', 'string', Rule::in([Task::STATUS_TO_DO])],
             'requires_review' => ['nullable', 'boolean'],
             'assigned_to' => [
                 'nullable',

@@ -6,17 +6,13 @@ import { Modal } from '@/Components/Modal';
 import { FormField } from '@/Components/FormField';
 import { Label } from '@/Components/Label';
 import { InputError } from '@/Components/InputError';
-import { Button } from '@/Components/Button';
-import { ProjectRoleBadge } from '@/Components/ProjectRoleBadge';
+import { Button } from '@/Components/ui/button';
 import {
     FolderOpen,
     Plus,
     Search,
-    Calendar,
-    AlertTriangle,
     RotateCcw,
     ArrowUpRight,
-    ChevronRight,
     Info,
     X,
     FileText,
@@ -24,7 +20,6 @@ import {
     List,
     Archive,
 } from 'lucide-react';
-import { Skeleton } from '@/Components/ui/skeleton';
 
 // ─── Project Item Data Model ────────────────────────────────────────────────
 export interface ProjectItem {
@@ -38,20 +33,72 @@ export interface ProjectItem {
     startDate?: string | null;
     committeesCount: number;
     tasksCount: number;
+    activitiesCount?: number;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function getSimplifiedRole(role: string): string {
+    if (!role) return 'Member';
+    const lower = role.toLowerCase();
+    if (lower.includes('leader')) return 'Leader';
+    if (lower.includes('staff')) return 'Staff';
+    if (lower.includes('member')) return 'Member';
+    return role;
+}
+
+function formatDeadline(deadline: string | null | undefined): string {
+    if (!deadline || deadline === 'No deadline') return 'No deadline';
+    try {
+        const date = new Date(deadline);
+        if (isNaN(date.getTime())) return deadline;
+        const month = date.toLocaleDateString('en-US', { month: 'short' });
+        const day = date.getDate();
+        const year = date.getFullYear();
+        return `Ends ${month} ${day}, ${year}`;
+    } catch {
+        return `Ends ${deadline}`;
+    }
 }
 
 // ─── Project Card Component ──────────────────────────────────────────────────
-// Only displays: Project Name, Your Role, Progress, Deadline, and Open action.
+// Matches the card layout from Image 1 using ITASK Global CSS design tokens:
+// - Title and status badge (• Active)
+// - Short description of the project
+// - Progress bar with percentage
+// - 3-box statistics (Role, Committees, Activities)
+// - Ends date & Archive action
 interface ProjectCardProps {
     project: ProjectItem;
     onSelect: (project: ProjectItem) => void;
+    onArchive?: (project: ProjectItem) => void;
 }
 
-function ProjectCard({ project, onSelect }: ProjectCardProps) {
-    const isCompletedOrArchived =
-        project.status === 'Completed' ||
-        project.status === 'Archived' ||
-        project.progress === 100;
+function ProjectCard({ project, onSelect, onArchive }: ProjectCardProps) {
+    const simplifiedRole = getSimplifiedRole(project.role);
+    const formattedDeadline = formatDeadline(project.deadline);
+    const activitiesCount = project.activitiesCount ?? project.tasksCount ?? 0;
+    const isCompleted = project.status === 'Completed' || project.progress === 100;
+
+    const statusLabel =
+        project.status === 'Archived'
+            ? 'Archived'
+            : project.status === 'Planning'
+            ? 'Draft'
+            : 'Active';
+
+    const statusColorClass =
+        project.status === 'Archived'
+            ? 'text-[color:var(--color-text-muted)]'
+            : project.status === 'Planning'
+            ? 'text-[color:var(--color-brand-action-orange)]'
+            : 'text-emerald-700';
+
+    const dotColorClass =
+        project.status === 'Archived'
+            ? 'bg-slate-400'
+            : project.status === 'Planning'
+            ? 'bg-[color:var(--color-brand-action-orange)]'
+            : 'bg-emerald-500';
 
     return (
         <div
@@ -64,30 +111,31 @@ function ProjectCard({ project, onSelect }: ProjectCardProps) {
                     onSelect(project);
                 }
             }}
-            className="group relative bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:shadow-md hover:border-[color:var(--color-brand-action-orange)]/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
+            className="group relative bg-white rounded-2xl border border-[color:var(--color-border-light)] p-5 sm:p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:shadow-md hover:border-[color:var(--color-brand-action-orange)]/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
         >
-            {/* Top row: Role */}
             <div>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                    <ProjectRoleBadge role={project.role} />
-                </div>
-
-                {/* Project Title */}
-                <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-base font-bold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug line-clamp-2">
+                {/* Header: Title and Status badge */}
+                <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-base font-bold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug line-clamp-1">
                         {project.title}
                     </h3>
-                    <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-[color:var(--color-brand-action-orange)] transition-colors shrink-0 mt-0.5" />
+                    <div
+                        className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold ${statusColorClass} pt-0.5`}
+                    >
+                        <span className={`w-2 h-2 rounded-full ${dotColorClass}`} />
+                        <span>{statusLabel}</span>
+                    </div>
                 </div>
-            </div>
 
-            <div>
-                {/* Progress bar */}
-                <div className="mt-5 pt-3.5 border-t border-[color:var(--color-border-light)]">
+                {/* Short Description */}
+                <p className="text-xs text-[color:var(--color-text-muted)] leading-relaxed mt-2 line-clamp-2 min-h-[2.5rem]">
+                    {project.description ? project.description : 'No description provided.'}
+                </p>
+
+                {/* Progress Bar */}
+                <div className="mt-5">
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                        <span className="text-[11px] font-medium text-[color:var(--color-text-muted)]">
-                            Progress
-                        </span>
+                        <span className="text-[11px] font-medium text-[color:var(--color-text-muted)]">Progress</span>
                         <span className="text-xs font-bold text-[color:var(--color-text-main)]">
                             {project.progress}%
                         </span>
@@ -97,7 +145,7 @@ function ProjectCard({ project, onSelect }: ProjectCardProps) {
                             className="h-full rounded-full transition-all duration-500"
                             style={{
                                 width: `${project.progress}%`,
-                                backgroundColor: isCompletedOrArchived
+                                backgroundColor: isCompleted
                                     ? '#10b981'
                                     : 'var(--color-brand-action-orange)',
                             }}
@@ -105,52 +153,84 @@ function ProjectCard({ project, onSelect }: ProjectCardProps) {
                     </div>
                 </div>
 
-                {/* Bottom row: Deadline & Open action */}
-                <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-[color:var(--color-text-subtle)]">
-                    <div className="flex items-center gap-1.5" title={`Deadline: ${project.deadline}`}>
-                        <Calendar className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                        <span className="truncate text-slate-600 font-medium">
-                            {project.deadline}
-                        </span>
+                {/* 3 Stats Boxes */}
+                <div className="grid grid-cols-3 gap-2 mt-5">
+                    <div className="bg-[color:var(--color-surface-subtle)] rounded-xl py-2.5 px-2 text-center border border-[color:var(--color-border-light)]">
+                        <div className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] leading-tight">
+                            {simplifiedRole}
+                        </div>
+                        <div className="text-[11px] text-[color:var(--color-text-muted)] font-medium mt-0.5">
+                            Role
+                        </div>
                     </div>
-
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[color:var(--color-brand-action-orange)] group-hover:translate-x-0.5 transition-transform shrink-0">
-                        <span>Open</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
+                    <div className="bg-[color:var(--color-surface-subtle)] rounded-xl py-2.5 px-2 text-center border border-[color:var(--color-border-light)]">
+                        <div className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] leading-tight">
+                            {project.committeesCount ?? 0}
+                        </div>
+                        <div className="text-[11px] text-[color:var(--color-text-muted)] font-medium mt-0.5">
+                            Committees
+                        </div>
+                    </div>
+                    <div className="bg-[color:var(--color-surface-subtle)] rounded-xl py-2.5 px-2 text-center border border-[color:var(--color-border-light)]">
+                        <div className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] leading-tight">
+                            {activitiesCount}
+                        </div>
+                        <div className="text-[11px] text-[color:var(--color-text-muted)] font-medium mt-0.5">
+                            Activities
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            {/* Card Footer: Ends Date & Archive */}
+            <div className="mt-5 pt-3 border-t border-[color:var(--color-border-subtle)] flex items-center justify-between text-xs">
+                <span className="text-[color:var(--color-text-muted)] font-normal">{formattedDeadline}</span>
+                {project.status !== 'Archived' && onArchive && (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onArchive(project);
+                        }}
+                        className="text-[color:var(--color-brand-action-orange)] hover:text-[color:var(--color-primary-hover)] transition-colors cursor-pointer text-xs font-semibold"
+                    >
+                        Archive
+                    </button>
+                )}
             </div>
         </div>
     );
 }
 
 // ─── Project List Component ──────────────────────────────────────────────────
-// Only displays columns: Project Name, Your Role, Progress, Deadline, Action.
 interface ProjectListProps {
     projects: ProjectItem[];
     onSelect: (project: ProjectItem) => void;
+    onArchive?: (project: ProjectItem) => void;
 }
 
-function ProjectList({ projects, onSelect }: ProjectListProps) {
+function ProjectList({ projects, onSelect, onArchive }: ProjectListProps) {
     return (
-        <div className="w-full bg-white rounded-xl border border-[color:var(--color-border-light)] shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] overflow-hidden">
+        <div className="w-full bg-white rounded-xl border border-[color:var(--color-border-light)] shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[640px]">
+                <table className="w-full text-left border-collapse min-w-[720px]">
                     <thead>
-                        <tr className="border-b border-[color:var(--color-border-light)] bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            <th className="px-5 py-3">Project Name</th>
-                            <th className="px-4 py-3">Your Role</th>
-                            <th className="px-4 py-3">Progress</th>
-                            <th className="px-4 py-3">Deadline</th>
-                            <th className="px-5 py-3 text-right">Action</th>
+                        <tr className="border-b border-[color:var(--color-border-light)] bg-[color:var(--color-surface-subtle)] text-[11px] font-bold text-[color:var(--color-text-muted)] uppercase tracking-wider">
+                            <th className="px-5 py-3.5">Project</th>
+                            <th className="px-4 py-3.5">Role</th>
+                            <th className="px-4 py-3.5">Progress</th>
+                            <th className="px-4 py-3.5 text-center">Committees</th>
+                            <th className="px-4 py-3.5 text-center">Activities</th>
+                            <th className="px-4 py-3.5">Deadline</th>
+                            <th className="px-5 py-3.5 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs">
                         {projects.map((project) => {
-                            const isCompletedOrArchived =
-                                project.status === 'Completed' ||
-                                project.status === 'Archived' ||
-                                project.progress === 100;
+                            const simplifiedRole = getSimplifiedRole(project.role);
+                            const formattedDeadline = formatDeadline(project.deadline);
+                            const activitiesCount = project.activitiesCount ?? project.tasksCount ?? 0;
+                            const isCompleted = project.status === 'Completed' || project.progress === 100;
                             return (
                                 <tr
                                     key={project.id}
@@ -165,49 +245,61 @@ function ProjectList({ projects, onSelect }: ProjectListProps) {
                                     }}
                                     className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
                                 >
-                                    {/* Project Name */}
-                                    <td className="px-5 py-3.5 max-w-sm">
-                                        <div className="font-semibold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors">
+                                    {/* Project Name & Short Description */}
+                                    <td className="px-5 py-4 max-w-xs">
+                                        <div className="font-bold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-tight">
                                             {project.title}
+                                        </div>
+                                        <div className="text-[11px] text-[color:var(--color-text-muted)] truncate mt-0.5">
+                                            {project.description || 'No description provided.'}
                                         </div>
                                     </td>
 
-                                    {/* Your Role */}
-                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                        <ProjectRoleBadge role={project.role} />
+                                    {/* Role */}
+                                    <td className="px-4 py-4 whitespace-nowrap">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[color:var(--color-surface-muted)] text-[color:var(--color-text-main)]">
+                                            {simplifiedRole}
+                                        </span>
                                     </td>
 
                                     {/* Progress */}
-                                    <td className="px-4 py-3.5 whitespace-nowrap">
+                                    <td className="px-4 py-4 whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             <div className="w-20 sm:w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                 <div
                                                     className="h-full rounded-full transition-all duration-300"
                                                     style={{
                                                         width: `${project.progress}%`,
-                                                        backgroundColor: isCompletedOrArchived
+                                                        backgroundColor: isCompleted
                                                             ? '#10b981'
                                                             : 'var(--color-brand-action-orange)',
                                                     }}
                                                 />
                                             </div>
-                                            <span className="text-[11px] font-medium text-slate-700 w-8">
+                                            <span className="text-[11px] font-medium text-[color:var(--color-text-main)] w-8">
                                                 {project.progress}%
                                             </span>
                                         </div>
                                     </td>
 
+                                    {/* Committees */}
+                                    <td className="px-4 py-4 whitespace-nowrap text-center font-semibold text-[color:var(--color-text-main)]">
+                                        {project.committeesCount ?? 0}
+                                    </td>
+
+                                    {/* Activities */}
+                                    <td className="px-4 py-4 whitespace-nowrap text-center font-semibold text-[color:var(--color-text-main)]">
+                                        {activitiesCount}
+                                    </td>
+
                                     {/* Deadline */}
-                                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">
-                                        <div className="flex items-center gap-1.5 text-[11px]">
-                                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                            <span className="font-medium">{project.deadline}</span>
-                                        </div>
+                                    <td className="px-4 py-4 whitespace-nowrap text-[color:var(--color-text-muted)] text-[11px]">
+                                        {formattedDeadline}
                                     </td>
 
                                     {/* Action */}
-                                    <td className="px-5 py-3.5 whitespace-nowrap text-right">
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold text-[color:var(--color-brand-action-orange)] group-hover:bg-orange-50/80 transition-colors">
+                                    <td className="px-5 py-4 whitespace-nowrap text-right">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-[color:var(--color-brand-action-orange)] group-hover:bg-orange-50 transition-colors">
                                             <span>Open</span>
                                             <ArrowUpRight className="w-3.5 h-3.5" />
                                         </span>
@@ -222,62 +314,9 @@ function ProjectList({ projects, onSelect }: ProjectListProps) {
     );
 }
 
-// ─── Loading Skeleton Grid ───────────────────────────────────────────────────
-function ProjectsLoadingSkeleton() {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {[1, 2, 3].map((key) => (
-                <div
-                    key={key}
-                    className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-4"
-                >
-                    <div className="flex items-center justify-between">
-                        <Skeleton className="h-5 w-24 rounded-md" />
-                    </div>
-                    <Skeleton className="h-6 w-3/4" />
-                    <div className="pt-4 border-t border-slate-100 space-y-2">
-                        <div className="flex justify-between">
-                            <Skeleton className="h-3.5 w-16" />
-                            <Skeleton className="h-3.5 w-8" />
-                        </div>
-                        <Skeleton className="h-2 w-full rounded-full" />
-                    </div>
-                    <div className="flex justify-between pt-2">
-                        <Skeleton className="h-3.5 w-28" />
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-// ─── Error State Component ───────────────────────────────────────────────────
-function ProjectsErrorState({ onRetry }: { onRetry: () => void }) {
-    return (
-        <div className="flex flex-col items-center justify-center p-8 sm:p-12 rounded-xl border border-rose-200 bg-rose-50/50 text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-3">
-                <AlertTriangle className="w-6 h-6" />
-            </div>
-            <h3 className="text-base font-bold text-rose-900">Unable to load projects</h3>
-            <p className="text-xs text-rose-700 max-w-sm mt-1 mb-5 leading-relaxed">
-                There was a problem communicating with the ITASK project service. Please check
-                your connection and try again.
-            </p>
-            <button
-                type="button"
-                onClick={onRetry}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
-            >
-                <RotateCcw className="w-3.5 h-3.5" />
-                Retry
-            </button>
-        </div>
-    );
-}
-
 // ─── Empty State Component ───────────────────────────────────────────────────
 interface ProjectsEmptyStateProps {
-    activeTab: 'ongoing' | 'archived';
+    activeTab: 'active' | 'drafts' | 'archived';
     isFiltered: boolean;
     searchTerm: string;
     onResetFilters?: () => void;
@@ -293,32 +332,28 @@ function ProjectsEmptyState({
 }: ProjectsEmptyStateProps) {
     if (isFiltered) {
         return (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-xl border border-dashed border-[color:var(--color-border-dark)] bg-[color:var(--color-surface-subtle)]">
-                <div className="w-12 h-12 rounded-xl bg-white border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-xs">
-                    <Search className="w-5 h-5 text-slate-400" />
+            <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-dark)] bg-white shadow-2xs">
+                <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
+                    <Search className="w-5 h-5" />
                 </div>
                 <h4 className="text-base font-semibold text-[color:var(--color-text-main)]">
                     No matching projects found
                 </h4>
                 <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 mb-4 leading-relaxed">
-                    {searchTerm ? (
-                        <>
-                            No {activeTab === 'archived' ? 'archived' : 'ongoing'} projects match the search query{' '}
-                            <span className="font-semibold text-slate-700">"{searchTerm}"</span> or selected role filter.
-                        </>
-                    ) : (
-                        `No ${activeTab === 'archived' ? 'archived' : 'ongoing'} projects match the selected filter criteria.`
-                    )}
+                    No projects match the search query{' '}
+                    <span className="font-semibold text-[color:var(--color-text-main)]">"{searchTerm}"</span>.
                 </p>
                 {onResetFilters && (
-                    <button
+                    <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={onResetFilters}
-                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-brand-dark-green)] bg-[color:var(--color-brand-active-warm-orange)] hover:bg-orange-100 transition-colors cursor-pointer border border-orange-200"
+                        className="text-[color:var(--color-brand-action-orange)] border-[color:var(--color-brand-action-orange)]/40 hover:bg-[color:var(--color-brand-active-warm-orange)]"
                     >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Clear Filters</span>
-                    </button>
+                        <span>Clear Search</span>
+                    </Button>
                 )}
             </div>
         );
@@ -326,13 +361,11 @@ function ProjectsEmptyState({
 
     if (activeTab === 'archived') {
         return (
-            <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-white">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 mb-3 shadow-xs">
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-white shadow-2xs">
+                <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
                     <Archive className="w-6 h-6" />
                 </div>
-                <h4 className="text-base font-bold text-[color:var(--color-text-main)]">
-                    No archived projects
-                </h4>
+                <h4 className="text-base font-bold text-[color:var(--color-text-main)]">No archived projects</h4>
                 <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 leading-relaxed">
                     Completed and archived projects will appear here for historical records.
                 </p>
@@ -340,27 +373,38 @@ function ProjectsEmptyState({
         );
     }
 
-    return (
-        <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-white">
-            <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-muted)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-xs">
-                <FolderOpen className="w-6 h-6 text-slate-400" />
+    if (activeTab === 'drafts') {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-white shadow-2xs">
+                <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
+                    <FileText className="w-6 h-6" />
+                </div>
+                <h4 className="text-base font-bold text-[color:var(--color-text-main)]">No draft projects</h4>
+                <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 leading-relaxed">
+                    Projects in the planning or draft stage will appear here before activation.
+                </p>
             </div>
-            <h4 className="text-base font-bold text-[color:var(--color-text-main)]">
-                No ongoing projects
-            </h4>
+        );
+    }
+
+    return (
+        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-white shadow-2xs">
+            <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
+                <FolderOpen className="w-6 h-6" />
+            </div>
+            <h4 className="text-base font-bold text-[color:var(--color-text-main)]">No active projects</h4>
             <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 mb-5 leading-relaxed">
-                You do not have any ongoing projects. Start a new project to get underway.
+                You do not have any active projects yet. Start a new project to get underway.
             </p>
             {onCreateClick && (
-                <button
+                <Button
                     type="button"
                     onClick={onCreateClick}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer hover:opacity-95"
-                    style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
+                    className="bg-[color:var(--color-brand-action-orange)] hover:bg-[color:var(--color-primary-hover)] text-white shadow-xs font-semibold gap-1.5"
                 >
                     <Plus className="w-4 h-4" />
                     <span>+ Create Project</span>
-                </button>
+                </Button>
             )}
         </div>
     );
@@ -372,17 +416,14 @@ interface ProjectsIndexProps {
 
 // ─── Main Projects Page Component ─────────────────────────────────────────────
 export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
-    // Top-level organization:
-    // 1. "My Projects" (ongoing) - all non-archived, non-completed projects
-    // 2. "Archived" - completed and archived projects
-    const [activeTab, setActiveTab] = useState<'ongoing' | 'archived'>('ongoing');
+    // Top-level tabs matching Image 1: Active | Drafts | Archived
+    const [activeTab, setActiveTab] = useState<'active' | 'drafts' | 'archived'>('active');
 
     // View mode state (Card vs List)
     const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
 
-    // Search and filter state
+    // Search query state
     const [searchTerm, setSearchTerm] = useState('');
-    const [roleFilter, setRoleFilter] = useState<string>('ALL');
 
     // Modal / Notice feedback state
     const [activeNotice, setActiveNotice] = useState<{
@@ -448,39 +489,32 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
         });
     };
 
-    // Calculate counts for the two primary categories: My Projects (ongoing) and Archived (completed/archived)
-    const ongoingCount = useMemo(() => {
-        return projects.filter(
-            (p) => p.status !== 'Archived' && p.status !== 'Completed'
-        ).length;
-    }, [projects]);
+    const handleProjectCardSelect = (project: ProjectItem) => {
+        router.visit(`/projects/${project.id}`);
+    };
 
-    const archivedCount = useMemo(() => {
-        return projects.filter(
-            (p) => p.status === 'Archived' || p.status === 'Completed'
-        ).length;
-    }, [projects]);
-
-    const tabs: { key: 'ongoing' | 'archived'; label: string; count: number }[] = [
-        { key: 'ongoing', label: 'My Projects', count: ongoingCount },
-        { key: 'archived', label: 'Archived', count: archivedCount },
-    ];
+    const handleArchiveProject = (project: ProjectItem) => {
+        if (confirm(`Are you sure you want to archive "${project.title}"?`)) {
+            router.post(
+                `/projects/${project.id}/archive`,
+                {},
+                {
+                    preserveScroll: true,
+                }
+            );
+        }
+    };
 
     // Client-side filtering of projects
     const filteredProjects = useMemo(() => {
         return projects.filter((project) => {
-            const isArchivedOrCompleted =
-                project.status === 'Archived' || project.status === 'Completed';
+            const isArchived = project.status === 'Archived' || project.status === 'Completed';
+            const isDraft = project.status === 'Planning' || project.status === 'Draft';
+            const isActive = !isArchived && !isDraft;
 
-            // Tab filter:
-            // "ongoing" = all ongoing / non-archived projects
-            // "archived" = completed & archived projects
-            if (activeTab === 'ongoing' && isArchivedOrCompleted) {
-                return false;
-            }
-            if (activeTab === 'archived' && !isArchivedOrCompleted) {
-                return false;
-            }
+            if (activeTab === 'active' && !isActive) return false;
+            if (activeTab === 'drafts' && !isDraft) return false;
+            if (activeTab === 'archived' && !isArchived) return false;
 
             // Search Term
             if (searchTerm.trim() !== '') {
@@ -490,53 +524,29 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                 if (!matchesTitle && !matchesDesc) return false;
             }
 
-            // Role Filter
-            if (roleFilter !== 'ALL' && project.role !== roleFilter) {
-                return false;
-            }
-
             return true;
         });
-    }, [projects, activeTab, searchTerm, roleFilter]);
+    }, [projects, activeTab, searchTerm]);
 
-    const isFiltered = searchTerm.trim() !== '' || roleFilter !== 'ALL';
+    const isFiltered = searchTerm.trim() !== '';
 
     const handleResetFilters = () => {
         setSearchTerm('');
-        setRoleFilter('ALL');
     };
-
-    const handleProjectCardSelect = (project: ProjectItem) => {
-        router.visit(`/projects/${project.id}`);
-    };
-
-    // Header Action Button: + Create Project
-    const createProjectButton = (
-        <button
-            type="button"
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-white shadow-xs transition-all duration-150 cursor-pointer hover:opacity-95 active:scale-98"
-            style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
-            title="Create a new CCIS project"
-        >
-            <Plus className="w-4 h-4 shrink-0" strokeWidth={2.4} />
-            <span>+ Create Project</span>
-        </button>
-    );
 
     return (
         <AppLayout
             title="My Projects"
             subtitle={`${projects.length} total ${projects.length === 1 ? 'project' : 'projects'}`}
-            headerAction={createProjectButton}
+            hidePageHeadingBanner={true}
         >
             <Head title="My Projects — ITASK" />
 
-            <div className="space-y-5">
+            <div className="space-y-6 max-w-7xl mx-auto pb-10">
 
                 {/* ── Notice Banner Modal / Alert ── */}
                 {activeNotice && (
-                    <div className="p-4 rounded-xl border border-orange-200 bg-[color:var(--color-brand-active-warm-orange)]/60 flex items-start justify-between gap-3 text-xs animate-in fade-in duration-200">
+                    <div className="p-4 rounded-xl border border-orange-200 bg-[color:var(--color-brand-active-warm-orange)] flex items-start justify-between gap-3 text-xs animate-in fade-in duration-200">
                         <div className="flex items-start gap-2.5">
                             <Info className="w-4 h-4 text-[color:var(--color-brand-action-orange)] shrink-0 mt-0.5" />
                             <div>
@@ -559,130 +569,111 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                     </div>
                 )}
 
-                {/* ── Search and Filter Controls Toolbar ── */}
-                <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-3.5 sm:p-4 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-3.5">
-                    
-                    {/* Primary Organization Tabs: My Projects vs Archived */}
-                    <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none border-b border-[color:var(--color-border-light)]">
-                        {tabs.map((tab) => {
-                            const isActive = activeTab === tab.key;
-                            return (
-                                <button
-                                    key={tab.key}
-                                    type="button"
-                                    onClick={() => setActiveTab(tab.key)}
-                                    className={`relative flex items-center gap-2 px-4 py-2.5 text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors border-b-2 -mb-[1px] ${
-                                        isActive
-                                            ? 'border-[color:var(--color-brand-action-orange)] text-[color:var(--color-brand-dark-green)]'
-                                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-200'
-                                    }`}
-                                >
-                                    <span>{tab.label}</span>
-                                    <span
-                                        className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                            isActive
-                                                ? 'bg-[color:var(--color-brand-active-warm-orange)] text-[color:var(--color-brand-action-orange)]'
-                                                : 'bg-slate-100 text-slate-600'
-                                        }`}
-                                    >
-                                        {tab.count}
-                                    </span>
-                                </button>
-                            );
-                        })}
+                {/* ── Page Header: My Projects + Create Project button ── */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-[color:var(--color-text-main)] leading-tight">
+                            My Projects
+                        </h1>
+                        <p className="text-xs text-[color:var(--color-text-muted)] mt-1 font-normal">
+                            {projects.length} total {projects.length === 1 ? 'project' : 'projects'}
+                        </p>
                     </div>
 
-                    {/* Search & Role Filter & View Switcher Row */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-0.5">
-                        
-                        {/* Search Projects input */}
-                        <div className="relative flex-1 min-w-[200px]">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search projects by title or description…"
-                                className="w-full pl-9 pr-8 py-2 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] rounded-lg border border-[color:var(--color-border-light)] placeholder:text-slate-400 focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] focus:ring-2 focus:ring-[color:var(--color-brand-action-orange)]/20 transition-all"
-                            />
-                            {searchTerm && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearchTerm('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
-                                    aria-label="Clear search"
-                                >
-                                    <X className="w-3.5 h-3.5" />
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Filter Controls + View Switcher */}
-                        <div className="flex flex-wrap items-center gap-2.5 justify-between sm:justify-end">
-                            
-                            <div className="flex items-center gap-2">
-                                {/* Role Filter */}
-                                <div className="flex items-center gap-1.5">
-                                    <select
-                                        value={roleFilter}
-                                        onChange={(e) => setRoleFilter(e.target.value)}
-                                        className="h-8 px-2.5 text-xs text-[color:var(--color-text-main)] bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] rounded-lg focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] cursor-pointer"
-                                        aria-label="Filter by your role"
-                                    >
-                                        <option value="ALL">All Roles</option>
-                                        <option value="Project Leader">Project Leader</option>
-                                        <option value="Project Staff">Project Staff</option>
-                                        <option value="Project Member">Project Member</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* View Switcher: Cards vs List */}
-                            <div className="flex items-center p-0.5 rounded-lg border border-[color:var(--color-border-light)] bg-slate-100/80">
-                                <button
-                                    type="button"
-                                    onClick={() => setViewMode('card')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                                        viewMode === 'card'
-                                            ? 'bg-white text-[color:var(--color-text-main)] shadow-2xs font-semibold'
-                                            : 'text-slate-500 hover:text-slate-800'
-                                    }`}
-                                    title="Card view"
-                                    aria-label="Switch to Card view"
-                                >
-                                    <LayoutGrid className="w-3.5 h-3.5" />
-                                    <span className="hidden sm:inline">Cards</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setViewMode('list')}
-                                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
-                                        viewMode === 'list'
-                                            ? 'bg-white text-[color:var(--color-text-main)] shadow-2xs font-semibold'
-                                            : 'text-slate-500 hover:text-slate-800'
-                                    }`}
-                                    title="List view"
-                                    aria-label="Switch to List view"
-                                >
-                                    <List className="w-3.5 h-3.5" />
-                                    <span className="hidden sm:inline">List</span>
-                                </button>
-                            </div>
-
-                        </div>
-                    </div>
+                    <Button
+                        type="button"
+                        onClick={handleOpenCreateModal}
+                        className="bg-[color:var(--color-brand-action-orange)] hover:bg-[color:var(--color-primary-hover)] text-white shadow-xs font-semibold gap-1.5 cursor-pointer"
+                        title="Create a new project"
+                    >
+                        <Plus className="w-4 h-4 shrink-0" strokeWidth={2.4} />
+                        <span>+ Create Project</span>
+                    </Button>
                 </div>
 
-                {/* ── Archived Notice Banner (when viewing archived tab) ── */}
-                {activeTab === 'archived' && filteredProjects.length > 0 && (
-                    <div className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-600">
-                        <Archive className="w-4 h-4 text-slate-500 shrink-0" />
-                        <div>
-                            <span className="font-semibold text-slate-800">Project Archive Records</span>
-                            <span className="text-slate-500 ml-1.5">— Completed and archived projects remain preserved and accessible for historical records and documentation.</span>
-                        </div>
+                {/* ── Filter Tabs: Active, Drafts, Archived ── */}
+                <div className="flex items-center gap-8 border-b border-[color:var(--color-border-light)]">
+                    {(['active', 'drafts', 'archived'] as const).map((tab) => {
+                        const isActive = activeTab === tab;
+                        const labels: Record<string, string> = {
+                            active: 'Active',
+                            drafts: 'Drafts',
+                            archived: 'Archived',
+                        };
+                        return (
+                            <button
+                                key={tab}
+                                type="button"
+                                onClick={() => setActiveTab(tab)}
+                                className={`pb-3 text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${
+                                    isActive
+                                        ? 'text-[color:var(--color-brand-dark-green)] font-bold'
+                                        : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)]'
+                                }`}
+                            >
+                                <span>{labels[tab]}</span>
+                                {isActive && (
+                                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--color-brand-action-orange)] rounded-full" />
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* ── Separated Search Bar and View Switcher Row ── */}
+                <div className="flex items-center justify-between gap-4">
+                    {/* Standalone Search Projects input */}
+                    <div className="relative w-full max-w-xs sm:max-w-sm">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--color-text-subtle)] pointer-events-none" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search projects..."
+                            className="w-full pl-8.5 pr-8 py-2 text-xs bg-white rounded-lg border border-[color:var(--color-border-light)] placeholder:text-[color:var(--color-text-subtle)] focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] focus:ring-2 focus:ring-[color:var(--color-brand-action-orange)]/20 shadow-2xs transition-all text-[color:var(--color-text-main)]"
+                        />
+                        {searchTerm && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchTerm('')}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--color-text-subtle)] hover:text-[color:var(--color-text-main)] cursor-pointer p-0.5"
+                                aria-label="Clear search"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
                     </div>
-                )}
+
+                    {/* View Switcher: Grid vs List */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('card')}
+                            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                                viewMode === 'card'
+                                    ? 'bg-[color:var(--color-brand-dark-green)] text-white shadow-2xs'
+                                    : 'text-[color:var(--color-text-subtle)] hover:text-[color:var(--color-text-main)] hover:bg-[color:var(--color-surface-muted)]'
+                            }`}
+                            title="Grid view"
+                            aria-label="Switch to Card view"
+                        >
+                            <LayoutGrid className="w-4 h-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                                viewMode === 'list'
+                                    ? 'bg-[color:var(--color-brand-dark-green)] text-white shadow-2xs'
+                                    : 'text-[color:var(--color-text-subtle)] hover:text-[color:var(--color-text-main)] hover:bg-[color:var(--color-surface-muted)]'
+                            }`}
+                            title="List view"
+                            aria-label="Switch to List view"
+                        >
+                            <List className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
 
                 {/* ── Content Area: Dynamic based on filters ── */}
                 {filteredProjects.length === 0 ? (
@@ -695,28 +686,15 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                     />
                 ) : (
                     <div>
-                        {/* Projects counter row */}
-                        <div className="flex items-center justify-between mb-3 px-1">
-                            <p className="text-xs text-[color:var(--color-text-muted)]">
-                                Showing{' '}
-                                <span className="font-bold text-[color:var(--color-text-main)]">
-                                    {filteredProjects.length}
-                                </span>{' '}
-                                {filteredProjects.length === 1 ? 'project' : 'projects'}
-                            </p>
-                            <p className="text-[11px] text-[color:var(--color-text-subtle)] hidden sm:block">
-                                Click any project to open its workspace
-                            </p>
-                        </div>
-
                         {/* Projects Display: Card Grid vs List View */}
                         {viewMode === 'card' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {filteredProjects.map((project) => (
                                     <ProjectCard
                                         key={project.id}
                                         project={project}
                                         onSelect={handleProjectCardSelect}
+                                        onArchive={handleArchiveProject}
                                     />
                                 ))}
                             </div>
@@ -724,6 +702,7 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                             <ProjectList
                                 projects={filteredProjects}
                                 onSelect={handleProjectCardSelect}
+                                onArchive={handleArchiveProject}
                             />
                         )}
                     </div>
@@ -758,7 +737,7 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                                 rows={3}
                                 value={data.description}
                                 onChange={(e) => setData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-white border border-[color:var(--color-border-dark)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--color-brand-action-orange)]/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-[color:var(--color-text-subtle)]"
                                 placeholder="Brief project charter, scope, or background..."
                             />
                             <InputError message={errors.description} />
@@ -790,15 +769,15 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                             <Label htmlFor="create-project-document" required>
                                 Approval / Supporting Document
                             </Label>
-                            <div className="p-3 border border-dashed border-slate-300 rounded-lg bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                            <div className="p-3 border border-dashed border-[color:var(--color-border-dark)] rounded-lg bg-[color:var(--color-surface-subtle)] hover:bg-[color:var(--color-surface-muted)] transition-colors">
                                 {data.approval_document ? (
-                                    <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-md border border-slate-200">
+                                    <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-md border border-[color:var(--color-border-light)]">
                                         <div className="flex items-center gap-2 min-w-0">
                                             <FileText className="w-4 h-4 text-[color:var(--color-brand-action-orange)] shrink-0" />
-                                            <span className="text-xs font-medium text-slate-800 truncate">
+                                            <span className="text-xs font-medium text-[color:var(--color-text-main)] truncate">
                                                 {data.approval_document.name}
                                             </span>
-                                            <span className="text-[10px] text-slate-400 shrink-0">
+                                            <span className="text-[10px] text-[color:var(--color-text-subtle)] shrink-0">
                                                 ({(data.approval_document.size / 1024).toFixed(0)} KB)
                                             </span>
                                         </div>
@@ -824,12 +803,12 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                                         />
                                         <label
                                             htmlFor="create-project-document"
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-[color:var(--color-brand-active-warm-orange)] border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
                                             <span>Attach Official Document</span>
                                         </label>
-                                        <p className="text-[11px] text-slate-500 mt-1.5">
+                                        <p className="text-[11px] text-[color:var(--color-text-muted)] mt-1.5">
                                             Approved memo, activity design, or letter (PDF, Word, Image · max 10MB)
                                         </p>
                                     </div>
@@ -838,7 +817,7 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                             <InputError message={errors.approval_document} />
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--color-border-light)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -849,9 +828,8 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
                             </Button>
                             <Button
                                 type="submit"
-                                variant="primary"
-                                isLoading={processing}
                                 disabled={processing}
+                                className="bg-[color:var(--color-brand-action-orange)] hover:bg-[color:var(--color-primary-hover)] text-white shadow-xs font-semibold"
                             >
                                 Create Project
                             </Button>
