@@ -32,6 +32,7 @@ class Task extends Model
         'title',
         'description',
         'status',
+        'priority',
         'due_date',
         'requires_review',
     ];
@@ -52,6 +53,16 @@ class Task extends Model
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_to');
+    }
+
+    public function assignees(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'task_assignees')->withTimestamps();
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
     }
 
     public function checklistItems(): HasMany

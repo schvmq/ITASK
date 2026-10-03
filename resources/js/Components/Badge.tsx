@@ -10,28 +10,28 @@ export interface BadgeProps {
 
 const variantStyles: Record<BadgeVariant, { badge: string; dot: string }> = {
     primary: {
-        badge: 'bg-[#FFF7ED] text-[#F68233] border-[#FED7AA]',
-        dot: 'bg-[#F68233]',
+        badge: 'bg-[var(--tint-orange)] text-[var(--link-orange)] border-[#FDE5CC] dark:border-[#573516]',
+        dot: 'bg-[#EC7505]',
     },
     secondary: {
-        badge: 'bg-[#F0FDF4] text-[#003300] border-[#BBF7D0]',
-        dot: 'bg-[#003300]',
+        badge: 'bg-[var(--tint-neutral)] text-[var(--ink)] border-[var(--border)]',
+        dot: 'bg-[#2A2A2A] dark:bg-[#F3F1E2]',
     },
     success: {
-        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
         dot: 'bg-emerald-500',
     },
     warning: {
-        badge: 'bg-amber-50 text-amber-800 border-amber-200',
-        dot: 'bg-amber-500',
+        badge: 'bg-[var(--tint-yellow)] text-[var(--amber-text)] border-[#FFE9A8] dark:border-[#524410]',
+        dot: 'bg-[#FFBB00]',
     },
     danger: {
-        badge: 'bg-rose-50 text-rose-700 border-rose-200',
+        badge: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20',
         dot: 'bg-rose-500',
     },
     neutral: {
-        badge: 'bg-slate-50 text-slate-700 border-slate-200',
-        dot: 'bg-slate-400',
+        badge: 'bg-[var(--tint-neutral)] text-[var(--muted)] border-[var(--border)]',
+        dot: 'bg-[var(--muted)]',
     },
 };
 
@@ -41,7 +41,7 @@ export const Badge: React.FC<BadgeProps> = ({
     className = '',
     dot = false,
 }) => {
-    const style = variantStyles[variant];
+    const style = variantStyles[variant] || variantStyles.neutral;
 
     return (
         <span
