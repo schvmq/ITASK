@@ -64,10 +64,8 @@ export function ThemeToggle() {
     };
 
     useEffect(() => {
-        // Apply on mount
         applyTheme(theme);
 
-        // System preference change listener
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handleChange = () => {
             try {
@@ -90,55 +88,59 @@ export function ThemeToggle() {
     }, [theme]);
 
     const accessibleLabel = resolvedDark
-        ? 'Theme settings. Currently dark mode. Switch to light mode.'
-        : 'Theme settings. Currently light mode. Switch to dark mode.';
+        ? 'Theme settings. Dark mode active. Click to switch theme.'
+        : 'Theme settings. Light mode active. Click to switch theme.';
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="p-2 rounded-xl text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--tint-neutral)] transition-colors cursor-pointer relative"
+                    className="p-2 rounded-[8px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer relative focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                     aria-label={accessibleLabel}
                     title={accessibleLabel}
                 >
                     {resolvedDark ? (
-                        <Moon className="w-4.5 h-4.5 text-[#FFBB00]" />
+                        <Moon className="w-[18px] h-[18px] stroke-[2px] text-[color:var(--text)]" />
                     ) : (
-                        <Sun className="w-4.5 h-4.5 text-[#EC7505]" />
+                        <Sun className="w-[18px] h-[18px] stroke-[2px] text-[color:var(--text)]" />
                     )}
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36 p-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg">
+            <DropdownMenuContent
+                align="end"
+                className="w-36 p-1 bg-[color:var(--card)] border border-[color:var(--border)] rounded-[10px] text-[color:var(--text)]"
+                style={{ boxShadow: 'none' }}
+            >
                 <DropdownMenuItem
                     onClick={() => applyTheme('light')}
-                    className="flex items-center justify-between text-xs font-semibold px-2.5 py-1.5 rounded-lg text-[var(--ink)] hover:bg-[var(--tint-neutral)] cursor-pointer"
+                    className="flex items-center justify-between text-[13px] px-2.5 py-1.5 rounded-[6px] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] cursor-pointer"
                 >
                     <span className="flex items-center gap-2">
-                        <Sun className="w-3.5 h-3.5 text-[#EC7505]" />
+                        <Sun className="w-[16px] h-[16px] stroke-[2px]" />
                         Light
                     </span>
-                    {theme === 'light' && <Check className="w-3.5 h-3.5 text-[#EC7505]" />}
+                    {theme === 'light' && <Check className="w-4 h-4 text-[color:var(--primary)]" />}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={() => applyTheme('dark')}
-                    className="flex items-center justify-between text-xs font-semibold px-2.5 py-1.5 rounded-lg text-[var(--ink)] hover:bg-[var(--tint-neutral)] cursor-pointer"
+                    className="flex items-center justify-between text-[13px] px-2.5 py-1.5 rounded-[6px] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] cursor-pointer"
                 >
                     <span className="flex items-center gap-2">
-                        <Moon className="w-3.5 h-3.5 text-[#FFBB00]" />
+                        <Moon className="w-[16px] h-[16px] stroke-[2px]" />
                         Dark
                     </span>
-                    {theme === 'dark' && <Check className="w-3.5 h-3.5 text-[#FFBB00]" />}
+                    {theme === 'dark' && <Check className="w-4 h-4 text-[color:var(--primary)]" />}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={() => applyTheme('system')}
-                    className="flex items-center justify-between text-xs font-semibold px-2.5 py-1.5 rounded-lg text-[var(--ink)] hover:bg-[var(--tint-neutral)] cursor-pointer"
+                    className="flex items-center justify-between text-[13px] px-2.5 py-1.5 rounded-[6px] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] cursor-pointer"
                 >
                     <span className="flex items-center gap-2">
-                        <Laptop className="w-3.5 h-3.5 text-[var(--muted)]" />
+                        <Laptop className="w-[16px] h-[16px] stroke-[2px]" />
                         System
                     </span>
-                    {theme === 'system' && <Check className="w-3.5 h-3.5 text-[var(--ink)]" />}
+                    {theme === 'system' && <Check className="w-4 h-4 text-[color:var(--primary)]" />}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

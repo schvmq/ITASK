@@ -55,13 +55,15 @@ class MyTasksController extends Controller
 
         // ── Build tasks based on primary role scope ──────────────────────────
 
-        $taskQuery = Task::query()->with([
-            'assignee',
-            'assignees',
-            'activity.committee.project',
-            'activity.committee.staffAssignment.user',
-            'checklistItems',
-        ]);
+        $taskQuery = Task::query()
+            ->whereHas('activity.project')
+            ->with([
+                'assignee',
+                'assignees',
+                'activity.committee.project',
+                'activity.committee.staffAssignment.user',
+                'checklistItems',
+            ]);
 
         if ($isLeader) {
             // All tasks in projects they lead

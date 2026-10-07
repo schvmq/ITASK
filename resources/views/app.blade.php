@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title inertia>{{ config('app.name', 'ITASK') }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
     <script>
         (function() {
             try {
@@ -26,7 +26,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.tsx'])
     @inertiaHead
 </head>
-<body class="font-sans antialiased text-[color:var(--ink)] bg-[color:var(--bg)] min-h-screen selection:bg-[#EC7505] selection:text-[#2A2A2A]">
+<body class="font-sans antialiased text-[color:var(--text)] bg-[color:var(--background)] min-h-screen selection:bg-[color:var(--primary)] selection:text-white">
     @inertia
 </body>
 </html>

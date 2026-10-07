@@ -13,6 +13,8 @@ import {
     type ActivityTimelineItem,
     type TaskTimelineItem,
 } from '@/types';
+import { Button } from '@/Components/Button';
+import { Card } from '@/Components/Card';
 
 export interface GanttTimelineProps {
     timeline?: ProjectTimelineData | null;
@@ -54,39 +56,39 @@ interface StatusTheme {
 const STATUS_THEMES: Record<string, StatusTheme> = {
     Completed: {
         label: 'Completed',
-        dotColor: 'bg-emerald-500',
-        barFill: 'bg-emerald-500',
-        textColor: 'text-emerald-700',
+        dotColor: 'bg-[color:var(--status-success)]',
+        barFill: 'bg-[color:var(--status-success)]',
+        textColor: 'text-[color:var(--status-success-text)]',
     },
     'Under Review': {
         label: 'Under Review',
-        dotColor: 'bg-amber-400',
-        barFill: 'bg-amber-400',
-        textColor: 'text-amber-700',
+        dotColor: 'bg-[color:var(--secondary)]',
+        barFill: 'bg-[color:var(--secondary)]',
+        textColor: 'text-[color:var(--secondary)]',
     },
     'In Progress': {
         label: 'In Progress',
-        dotColor: 'bg-blue-500',
-        barFill: 'bg-[#7C88F7]',
-        textColor: 'text-blue-700',
+        dotColor: 'bg-[color:var(--primary)]',
+        barFill: 'bg-[color:var(--primary)]',
+        textColor: 'text-[color:var(--primary)]',
     },
     Returned: {
         label: 'Returned',
-        dotColor: 'bg-rose-500',
-        barFill: 'bg-rose-500',
-        textColor: 'text-rose-700',
+        dotColor: 'bg-[color:var(--status-danger)]',
+        barFill: 'bg-[color:var(--status-danger)]',
+        textColor: 'text-[color:var(--status-danger-text)]',
     },
     'To Do': {
         label: 'To Do',
-        dotColor: 'bg-slate-400',
-        barFill: 'bg-slate-300',
-        textColor: 'text-slate-600',
+        dotColor: 'bg-[color:var(--muted)]',
+        barFill: 'bg-[color:var(--muted)]',
+        textColor: 'text-[color:var(--muted)]',
     },
     Submitted: {
         label: 'Submitted',
         dotColor: 'bg-purple-500',
         barFill: 'bg-purple-500',
-        textColor: 'text-purple-700',
+        textColor: 'text-purple-600 dark:text-purple-400',
     },
 };
 
@@ -96,9 +98,9 @@ function getStatusTheme(status: string): StatusTheme {
     if (status === 'Planning') return STATUS_THEMES['To Do'];
     return {
         label: status || 'To Do',
-        dotColor: 'bg-slate-400',
-        barFill: 'bg-slate-300',
-        textColor: 'text-slate-600',
+        dotColor: 'bg-[color:var(--muted)]',
+        barFill: 'bg-[color:var(--muted)]',
+        textColor: 'text-[color:var(--muted)]',
     };
 }
 
@@ -168,211 +170,148 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
         setExpandedIds(new Set());
     };
 
-    // 4. Filter projects based on dropdowns
+    // 4. Filtered dataset based on dropdowns
     const filteredProjects = useMemo(() => {
-        let result = allProjects;
+        return allProjects
+            .filter((p) => {
+                if (selectedProjectId !== 'all' && String(p.id) !== selectedProjectId) {
+                    return false;
+                }
+                return true;
+            })
+            .map((p) => {
+                // Filter committees & activities by status if requested
+                if (selectedStatus === 'all') return p;
 
-        if (selectedProjectId !== 'all') {
-            result = result.filter((p) => p.id === selectedProjectId);
-        }
-
-        if (selectedStatus !== 'all') {
-            result = result.map((p) => {
                 const filteredCommittees = (p.committees || []).map((c) => {
-                    const filteredActivities = (c.activities || []).map((a) => {
-                        const filteredTasks = (a.tasks || []).filter((t) => t.status === selectedStatus);
-                        return {
-                            ...a,
-                            tasks: filteredTasks,
-                            matchesStatus: a.status === selectedStatus || filteredTasks.length > 0,
-                        };
-                    }).filter((a) => a.matchesStatus);
+                    const filteredActivities = (c.activities || []).filter(
+                        (a) => a.status === selectedStatus
+                    );
+                    return { ...c, activities: filteredActivities };
+                });
 
-                    return {
-                        ...c,
-                        activities: filteredActivities,
-                        matchesStatus:
-                            (selectedStatus === 'Completed' && c.progress === 100) ||
-                            (selectedStatus === 'In Progress' && c.progress > 0 && c.progress < 100) ||
-                            filteredActivities.length > 0,
-                    };
-                }).filter((c) => c.matchesStatus);
-
-                return {
-                    ...p,
-                    committees: filteredCommittees,
-                    matchesStatus: p.status === selectedStatus || filteredCommittees.length > 0,
-                };
-            }).filter((p) => p.matchesStatus);
-        }
-
-        return result;
+                return { ...p, committees: filteredCommittees };
+            });
     }, [allProjects, selectedProjectId, selectedStatus]);
 
     // 5. Timeline Date Range & Column Calculations adapting to Day / Week / Month
     const { gridStart, gridEnd, totalMs, timeColumns, timelineTotalWidthPx } = useMemo(() => {
-        const dateTimestamps: number[] = [];
+        let minDate: Date | null = null;
+        let maxDate: Date | null = null;
 
-        const parseDate = (d?: string | null) => {
-            if (!d) return null;
-            const parsed = new Date(d);
-            return isNaN(parsed.getTime()) ? null : parsed;
+        const considerDate = (dateStr?: string | null) => {
+            if (!dateStr) return;
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return;
+            if (!minDate || d < minDate) minDate = d;
+            if (!maxDate || d > maxDate) maxDate = d;
         };
 
         allProjects.forEach((proj) => {
-            if (proj.start_date_raw) {
-                const d = parseDate(proj.start_date_raw);
-                if (d) dateTimestamps.push(d.getTime());
-            }
-            if (proj.end_date_raw) {
-                const d = parseDate(proj.end_date_raw);
-                if (d) dateTimestamps.push(d.getTime());
-            }
+            considerDate(proj.start_date_raw);
+            considerDate(proj.end_date_raw);
             (proj.committees || []).forEach((c) => {
-                if (c.start_date_raw) {
-                    const d = parseDate(c.start_date_raw);
-                    if (d) dateTimestamps.push(d.getTime());
-                }
-                if (c.end_date_raw) {
-                    const d = parseDate(c.end_date_raw);
-                    if (d) dateTimestamps.push(d.getTime());
-                }
+                considerDate(c.start_date_raw);
+                considerDate(c.end_date_raw);
                 (c.activities || []).forEach((a) => {
-                    if (a.start_date_raw) {
-                        const d = parseDate(a.start_date_raw);
-                        if (d) dateTimestamps.push(d.getTime());
-                    }
-                    if (a.due_date_raw) {
-                        const d = parseDate(a.due_date_raw);
-                        if (d) dateTimestamps.push(d.getTime());
-                    }
+                    considerDate(a.start_date_raw);
+                    considerDate(a.due_date_raw);
                     (a.tasks || []).forEach((t) => {
-                        if (t.due_date_raw) {
-                            const d = parseDate(t.due_date_raw);
-                            if (d) dateTimestamps.push(d.getTime());
-                        }
+                        considerDate(t.due_date_raw);
                     });
                 });
             });
         });
 
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
+        const today = new Date();
+        if (!minDate) {
+            minDate = new Date(today);
+            minDate.setDate(today.getDate() - 14);
+        }
+        if (!maxDate) {
+            maxDate = new Date(today);
+            maxDate.setDate(today.getDate() + 45);
+        }
 
-        let minDate: Date;
-        let maxDate: Date;
+        // Add padding buffers before and after
+        const start = new Date(minDate);
+        start.setHours(0, 0, 0, 0);
 
-        if (dateTimestamps.length > 0) {
-            minDate = new Date(Math.min(...dateTimestamps, now.getTime()));
-            maxDate = new Date(Math.max(...dateTimestamps, now.getTime()));
+        const end = new Date(maxDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Adjust boundaries according to scale
+        if (scale === 'day') {
+            start.setDate(start.getDate() - 3);
+            end.setDate(end.getDate() + 7);
+        } else if (scale === 'week') {
+            // align start to Sunday or Monday
+            const day = start.getDay();
+            start.setDate(start.getDate() - day - 7);
+            const endDay = end.getDay();
+            end.setDate(end.getDate() + (6 - endDay) + 14);
         } else {
-            minDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            maxDate = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+            // month scale: full month coverage
+            start.setDate(1);
+            start.setMonth(start.getMonth() - 1);
+            end.setMonth(end.getMonth() + 2);
+            end.setDate(0);
         }
 
         const cols: TimelineColumn[] = [];
-        let start: Date;
-        let end: Date;
+        const current = new Date(start);
 
         if (scale === 'day') {
-            // Day Scale: Exactly 14 days (2 weeks)
-            let s: Date;
-            if (now.getTime() >= minDate.getTime() && now.getTime() <= maxDate.getTime()) {
-                // Center around today: start at Monday of current week
-                s = new Date(now);
-                s.setHours(0, 0, 0, 0);
-                const day = s.getDay();
-                const diff = day === 0 ? -6 : 1 - day;
-                s.setDate(s.getDate() + diff);
-            } else {
-                s = new Date(minDate);
-                s.setHours(0, 0, 0, 0);
-                const day = s.getDay();
-                const diff = day === 0 ? -6 : 1 - day;
-                s.setDate(s.getDate() + diff);
-            }
+            const colWidth = 48;
+            while (current <= end) {
+                const dayLetter = current.toLocaleDateString('en-US', { weekday: 'narrow' });
+                const dayNum = current.getDate();
+                const monthStr = current.toLocaleDateString('en-US', { month: 'short' });
 
-            start = new Date(s);
-            // Exactly 14 days: 13 days after start
-            end = new Date(start.getTime() + 13 * 86400000);
-            end.setHours(23, 59, 59, 999);
-
-            const colWidth = 76;
-            let curr = new Date(start);
-            while (curr <= end && cols.length < 14) {
-                const label = curr.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const subLabel = curr.toLocaleDateString('en-US', { weekday: 'short' });
                 cols.push({
-                    id: `day-${curr.toISOString().slice(0, 10)}`,
-                    label,
-                    subLabel,
-                    date: new Date(curr),
+                    id: `day-${current.toISOString().slice(0, 10)}`,
+                    label: `${dayNum}`,
+                    subLabel: `${dayLetter} ${monthStr}`,
+                    date: new Date(current),
                     widthPx: colWidth,
                 });
-                curr.setDate(curr.getDate() + 1);
+                current.setDate(current.getDate() + 1);
             }
         } else if (scale === 'week') {
-            // Week Scale: Weekly ticks (W39 | W40 ...), minimum 8 weeks
-            start = new Date(minDate);
-            start.setHours(0, 0, 0, 0);
-            const startDay = start.getDay();
-            const diffToMon = startDay === 0 ? -6 : 1 - startDay;
-            start.setDate(start.getDate() + diffToMon);
+            const colWidth = 90;
+            while (current <= end) {
+                const weekNum = getWeekNumber(current);
+                const monthStr = current.toLocaleDateString('en-US', { month: 'short' });
+                const dayNum = current.getDate();
 
-            end = new Date(maxDate);
-            end.setHours(23, 59, 59, 999);
-            const endDay = end.getDay();
-            const diffToSun = endDay === 0 ? 0 : 7 - endDay;
-            end.setDate(end.getDate() + diffToSun);
-
-            if ((end.getTime() - start.getTime()) / (7 * 86400000) < 8) {
-                end = new Date(start.getTime() + 9 * 7 * 86400000);
-                end.setHours(23, 59, 59, 999);
-            }
-
-            const colWidth = 96;
-            let curr = new Date(start);
-            while (curr <= end) {
-                const weekNum = getWeekNumber(curr);
-                const label = `W${weekNum}`;
-                const subLabel = curr.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 cols.push({
-                    id: `week-${curr.toISOString().slice(0, 10)}`,
-                    label,
-                    subLabel,
-                    date: new Date(curr),
+                    id: `week-${current.toISOString().slice(0, 10)}`,
+                    label: `W${weekNum}`,
+                    subLabel: `${monthStr} ${dayNum}`,
+                    date: new Date(current),
                     widthPx: colWidth,
                 });
-                curr.setDate(curr.getDate() + 7);
+                current.setDate(current.getDate() + 7);
             }
         } else {
-            // Month Scale: Exactly 12 months (full year view)
-            if (minDate.getFullYear() === maxDate.getFullYear()) {
-                start = new Date(minDate.getFullYear(), 0, 1, 0, 0, 0, 0);
-            } else {
-                start = new Date(minDate.getFullYear(), minDate.getMonth(), 1, 0, 0, 0, 0);
-            }
+            // month scale
+            const colWidth = 130;
+            while (current <= end) {
+                const monthLabel = current.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 
-            end = new Date(start.getFullYear(), start.getMonth() + 12, 0, 23, 59, 59, 999);
-
-            const colWidth = 110;
-            let curr = new Date(start);
-            while (cols.length < 12) {
-                const label = curr.toLocaleDateString('en-US', { month: 'short' });
-                const subLabel = curr.getFullYear().toString();
                 cols.push({
-                    id: `month-${curr.getFullYear()}-${curr.getMonth()}`,
-                    label,
-                    subLabel,
-                    date: new Date(curr),
+                    id: `month-${current.getFullYear()}-${current.getMonth()}`,
+                    label: monthLabel,
+                    subLabel: `${current.getFullYear()}`,
+                    date: new Date(current),
                     widthPx: colWidth,
                 });
-                curr = new Date(curr.getFullYear(), curr.getMonth() + 1, 1);
+                current.setMonth(current.getMonth() + 1);
             }
         }
 
-        const totalDuration = end.getTime() - start.getTime();
-        const totalWidth = cols.reduce((sum, c) => sum + c.widthPx, 0);
+        const totalWidth = cols.reduce((acc, col) => acc + col.widthPx, 0);
+        const totalDuration = Math.max(1, end.getTime() - start.getTime());
 
         return {
             gridStart: start,
@@ -423,151 +362,154 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
 
     if (allProjects.length === 0) {
         return (
-            <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center">
-                <Layers className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-                <h3 className="text-sm font-bold text-slate-800">No Timeline Data Scheduled</h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+            <Card className="p-12 text-center border-dashed">
+                <Layers className="w-10 h-10 text-[color:var(--muted)] mx-auto mb-3" />
+                <h3 className="text-[16px] font-bold text-[color:var(--text)]">No Timeline Data Scheduled</h3>
+                <p className="text-[14px] text-[color:var(--muted)] mt-1 max-w-sm mx-auto leading-relaxed">
                     There are no scheduled projects, committees, or activities configured yet.
                 </p>
                 {isGlobal && (
-                    <Link
-                        href="/projects"
-                        className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors"
-                    >
-                        Go to Projects
-                    </Link>
+                    <div className="mt-4">
+                        <Link href="/projects">
+                            <Button variant="secondary" size="sm">
+                                Go to Projects
+                            </Button>
+                        </Link>
+                    </div>
                 )}
-            </div>
+            </Card>
         );
     }
 
     return (
         <div className={`space-y-4 ${className}`}>
             {/* ── Controls Row (Filters, Scale Selector, & Expand/Collapse) ── */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-                {/* Left Dropdown Filters & Day/Week/Month Scale Selector */}
-                <div className="flex items-center gap-2.5 flex-wrap">
-                    {/* Project Selector (only in global or multi-project mode) */}
-                    {(isGlobal || allProjects.length > 1) && (
+            <Card className="p-3.5 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    {/* Left Dropdown Filters & Day/Week/Month Scale Selector */}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        {/* Project Selector (only in global or multi-project mode) */}
+                        {(isGlobal || allProjects.length > 1) && (
+                            <div className="relative">
+                                <select
+                                    id="gantt-project-filter"
+                                    value={selectedProjectId}
+                                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                                    className="appearance-none bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] pl-3 pr-8 py-1.5 text-[13px] font-medium hover:border-[color:var(--primary)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
+                                >
+                                    <option value="all">All Projects</option>
+                                    {allProjects.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.title || p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="w-3.5 h-3.5 text-[color:var(--muted)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            </div>
+                        )}
+
+                        {/* Status Filter */}
                         <div className="relative">
                             <select
-                                id="gantt-project-filter"
-                                value={selectedProjectId}
-                                onChange={(e) => setSelectedProjectId(e.target.value)}
-                                className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-[color:var(--color-brand-dark-green)] shadow-2xs cursor-pointer"
+                                id="gantt-status-filter"
+                                value={selectedStatus}
+                                onChange={(e) => setSelectedStatus(e.target.value)}
+                                className="appearance-none bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] pl-3 pr-8 py-1.5 text-[13px] font-medium hover:border-[color:var(--primary)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
                             >
-                                <option value="all">All Projects</option>
-                                {allProjects.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.title || p.name}
-                                    </option>
-                                ))}
+                                <option value="all">All Status</option>
+                                <option value="Completed">Completed</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Under Review">Under Review</option>
+                                <option value="Returned">Returned</option>
+                                <option value="To Do">To Do</option>
+                                <option value="Submitted">Submitted</option>
                             </select>
-                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <ChevronDown className="w-3.5 h-3.5 text-[color:var(--muted)] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                         </div>
-                    )}
 
-                    {/* Status Filter */}
-                    <div className="relative">
-                        <select
-                            id="gantt-status-filter"
-                            value={selectedStatus}
-                            onChange={(e) => setSelectedStatus(e.target.value)}
-                            className="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 focus:outline-hidden focus:ring-1 focus:ring-[color:var(--color-brand-dark-green)] shadow-2xs cursor-pointer"
-                        >
-                            <option value="all">All Status</option>
-                            <option value="Completed">Completed</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Under Review">Under Review</option>
-                            <option value="Returned">Returned</option>
-                            <option value="To Do">To Do</option>
-                            <option value="Submitted">Submitted</option>
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        {/* Scale Selector: Day | Week | Month */}
+                        <div className="inline-flex items-center rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] p-0.5">
+                            <button
+                                type="button"
+                                onClick={() => setScale('day')}
+                                className={`px-2.5 py-1 rounded-[6px] text-[12px] font-semibold transition-colors cursor-pointer ${
+                                    scale === 'day'
+                                        ? 'bg-[color:var(--primary)] text-white'
+                                        : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
+                                }`}
+                            >
+                                Day
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setScale('week')}
+                                className={`px-2.5 py-1 rounded-[6px] text-[12px] font-semibold transition-colors cursor-pointer ${
+                                    scale === 'week'
+                                        ? 'bg-[color:var(--primary)] text-white'
+                                        : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
+                                }`}
+                            >
+                                Week
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setScale('month')}
+                                className={`px-2.5 py-1 rounded-[6px] text-[12px] font-semibold transition-colors cursor-pointer ${
+                                    scale === 'month'
+                                        ? 'bg-[color:var(--primary)] text-white'
+                                        : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
+                                }`}
+                            >
+                                Month
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Scale Selector: Day | Week | Month */}
-                    <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 shadow-2xs">
-                        <button
-                            type="button"
-                            onClick={() => setScale('day')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                                scale === 'day'
-                                    ? 'bg-white text-slate-900 shadow-2xs'
-                                    : 'text-slate-500 hover:text-slate-800'
-                            }`}
+                    {/* Right Expand / Collapse Buttons */}
+                    <div className="flex items-center gap-2 self-start md:self-auto">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleExpandAll}
                         >
-                            Day
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setScale('week')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                                scale === 'week'
-                                    ? 'bg-white text-slate-900 shadow-2xs'
-                                    : 'text-slate-500 hover:text-slate-800'
-                            }`}
+                            Expand all
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleCollapseAll}
                         >
-                            Week
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setScale('month')}
-                            className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                                scale === 'month'
-                                    ? 'bg-white text-slate-900 shadow-2xs'
-                                    : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                        >
-                            Month
-                        </button>
+                            Collapse all
+                        </Button>
                     </div>
                 </div>
 
-                {/* Right Expand / Collapse Buttons */}
-                <div className="flex items-center gap-2 self-start md:self-auto">
-                    <button
-                        type="button"
-                        onClick={handleExpandAll}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
-                    >
-                        Expand All
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleCollapseAll}
-                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
-                    >
-                        Collapse All
-                    </button>
+                {/* ── Status Legend Row ── */}
+                <div className="flex items-center gap-4 flex-wrap text-[12px] text-[color:var(--muted)] pt-2 border-t border-[color:var(--border)]">
+                    {Object.entries(STATUS_THEMES).map(([statusKey, theme]) => (
+                        <div key={statusKey} className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${theme.dotColor} shrink-0`} />
+                            <span className="text-[12px] font-medium text-[color:var(--muted)]">{theme.label}</span>
+                        </div>
+                    ))}
                 </div>
-            </div>
+            </Card>
 
-            {/* ── Status Legend Row ── */}
-            <div className="flex items-center gap-4 flex-wrap text-xs text-slate-600 px-1 py-0.5">
-                {Object.entries(STATUS_THEMES).map(([statusKey, theme]) => (
-                    <div key={statusKey} className="flex items-center gap-1.5">
-                        <span className={`w-2.5 h-2.5 rounded-full ${theme.dotColor} shrink-0`} />
-                        <span className="text-[11px] font-medium text-slate-600">{theme.label}</span>
-                    </div>
-                ))}
-            </div>
-
-            {/* ── Main Gantt Chart Container (Real Gantt Focus) ── */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-                <div className="overflow-x-auto relative [scrollbar-width:thin] [scrollbar-color:theme(colors.slate.300)_transparent] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-slate-50 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 pb-0.5">
-                    <div className="flex min-w-full divide-x divide-slate-200">
+            {/* ── Main Gantt Chart Container (Flat, Theme-Harmonious Card) ── */}
+            <div className="itask-card overflow-hidden">
+                <div className="overflow-x-auto relative [scrollbar-width:thin] pb-0.5">
+                    <div className="flex min-w-full divide-x divide-[color:var(--border)]">
                         {/* ── LEFT COLUMN: Projects & Hierarchy ── */}
-                        <div className="w-[260px] sm:w-[290px] shrink-0 sticky left-0 z-30 bg-white border-r border-slate-200 flex flex-col shadow-[2px_0_4px_-1px_rgba(0,0,0,0.04)]">
+                        <div className="w-[270px] sm:w-[310px] shrink-0 sticky left-0 z-30 bg-[color:var(--card)] border-r border-[color:var(--border)] flex flex-col">
                             {/* Column Header */}
-                            <div className="h-[50px] px-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                <span>Projects</span>
+                            <div className="h-[48px] px-3.5 bg-[color:var(--soft-surface)] border-b border-[color:var(--border)] flex items-center justify-between text-[11px] font-bold text-[color:var(--muted)] uppercase tracking-wider">
+                                <span>Projects & Workflows</span>
                             </div>
 
                             {/* Left Rows */}
-                            <div className="divide-y divide-slate-100 flex-1">
+                            <div className="divide-y divide-[color:var(--border)] flex-1">
                                 {filteredProjects.length === 0 ? (
-                                    <div className="p-6 text-center text-xs text-slate-400">
+                                    <div className="p-6 text-center text-[13px] text-[color:var(--muted)]">
                                         No items match
                                     </div>
                                 ) : (
@@ -578,19 +520,19 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                         return (
                                             <React.Fragment key={`left-proj-${project.id}`}>
                                                 {/* Project Left Row */}
-                                                <div className="h-[44px] px-3 bg-[#18262c] text-white flex items-center justify-between gap-1.5">
+                                                <div className="h-[46px] px-3 bg-[color:var(--soft-surface)] text-[color:var(--text)] flex items-center justify-between gap-1.5 border-l-4 border-l-[color:var(--primary)]">
                                                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                         {hasCommittees ? (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => toggleExpand(`project-${project.id}`)}
-                                                                className="w-5 h-5 rounded hover:bg-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors shrink-0 cursor-pointer"
+                                                                className="w-5 h-5 rounded-[4px] hover:bg-[color:var(--border)] flex items-center justify-center text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors shrink-0 cursor-pointer"
                                                                 aria-label={isProjectExpanded ? 'Collapse' : 'Expand'}
                                                             >
                                                                 {isProjectExpanded ? (
-                                                                    <ChevronDown className="w-3.5 h-3.5" />
+                                                                    <ChevronDown className="w-3.5 h-3.5 stroke-[2]" />
                                                                 ) : (
-                                                                    <ChevronRight className="w-3.5 h-3.5" />
+                                                                    <ChevronRight className="w-3.5 h-3.5 stroke-[2]" />
                                                                 )}
                                                             </button>
                                                         ) : (
@@ -598,7 +540,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                         )}
                                                         <Link
                                                             href={`/projects/${project.id}`}
-                                                            className="font-bold text-xs text-white hover:text-orange-300 transition-colors truncate"
+                                                            className="font-bold text-[13px] text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate"
                                                             title={project.title || project.name}
                                                         >
                                                             {project.title || project.name}
@@ -606,10 +548,10 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                     </div>
                                                     <Link
                                                         href={`/projects/${project.id}`}
-                                                        className="p-1 text-slate-400 hover:text-orange-300 rounded shrink-0 transition-colors"
+                                                        className="p-1 text-[color:var(--muted)] hover:text-[color:var(--primary)] rounded-[4px] shrink-0 transition-colors"
                                                         title="Go to project"
                                                     >
-                                                        <ExternalLink className="w-3 h-3" />
+                                                        <ExternalLink className="w-3.5 h-3.5" />
                                                     </Link>
                                                 </div>
 
@@ -622,19 +564,19 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
 
                                                             return (
                                                                 <React.Fragment key={`left-comm-${committee.id}`}>
-                                                                    <div className="h-[48px] pl-6 pr-3 bg-white hover:bg-slate-50 flex items-center justify-between gap-1.5">
+                                                                    <div className="h-[44px] pl-6 pr-3 bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)] flex items-center justify-between gap-1.5 transition-colors">
                                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                                             {hasActivities ? (
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={() => toggleExpand(`committee-${committee.id}`)}
-                                                                                    className="w-4.5 h-4.5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors shrink-0 cursor-pointer"
+                                                                                    className="w-4.5 h-4.5 rounded-[4px] hover:bg-[color:var(--border)] flex items-center justify-center text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors shrink-0 cursor-pointer"
                                                                                     aria-label={isCommExpanded ? 'Collapse' : 'Expand'}
                                                                                 >
                                                                                     {isCommExpanded ? (
-                                                                                        <ChevronDown className="w-3.5 h-3.5" />
+                                                                                        <ChevronDown className="w-3.5 h-3.5 stroke-[2]" />
                                                                                     ) : (
-                                                                                        <ChevronRight className="w-3.5 h-3.5" />
+                                                                                        <ChevronRight className="w-3.5 h-3.5 stroke-[2]" />
                                                                                     )}
                                                                                 </button>
                                                                             ) : (
@@ -643,19 +585,19 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                             <div className="min-w-0 flex-1">
                                                                                 <Link
                                                                                     href={`/projects/${project.id}/committees/${committee.id}`}
-                                                                                    className="text-xs font-semibold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate block"
+                                                                                    className="text-[13px] font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate block"
                                                                                     title={committee.name}
                                                                                 >
                                                                                     {committee.name}
                                                                                 </Link>
-                                                                                <div className="text-[10px] text-slate-400 truncate">
+                                                                                <div className="text-[11px] text-[color:var(--muted)] truncate">
                                                                                     {committee.activities?.length || 0} {committee.activities?.length === 1 ? 'activity' : 'activities'}
                                                                                 </div>
                                                                             </div>
                                                                         </div>
                                                                         <Link
                                                                             href={`/projects/${project.id}/committees/${committee.id}`}
-                                                                            className="p-1 text-slate-400 hover:text-[color:var(--color-brand-action-orange)] rounded shrink-0 transition-colors"
+                                                                            className="p-1 text-[color:var(--muted)] hover:text-[color:var(--primary)] rounded-[4px] shrink-0 transition-colors"
                                                                             title="View committee"
                                                                         >
                                                                             <ExternalLink className="w-3 h-3" />
@@ -671,19 +613,19 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
 
                                                                                 return (
                                                                                     <React.Fragment key={`left-act-${activity.id}`}>
-                                                                                        <div className="h-[44px] pl-11 pr-3 bg-slate-50/40 hover:bg-slate-50 flex items-center justify-between gap-1.5">
+                                                                                        <div className="h-[42px] pl-11 pr-3 bg-[color:var(--card-surface)] hover:bg-[color:var(--soft-surface)] flex items-center justify-between gap-1.5 transition-colors">
                                                                                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                                                                 {hasTasks ? (
                                                                                                     <button
                                                                                                         type="button"
                                                                                                         onClick={() => toggleExpand(`activity-${activity.id}`)}
-                                                                                                        className="w-4 h-4 rounded hover:bg-slate-200/70 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors shrink-0 cursor-pointer"
+                                                                                                        className="w-4 h-4 rounded-[4px] hover:bg-[color:var(--border)] flex items-center justify-center text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors shrink-0 cursor-pointer"
                                                                                                         aria-label={isActExpanded ? 'Collapse' : 'Expand'}
                                                                                                     >
                                                                                                         {isActExpanded ? (
-                                                                                                            <ChevronDown className="w-3 h-3" />
+                                                                                                            <ChevronDown className="w-3 h-3 stroke-[2]" />
                                                                                                         ) : (
-                                                                                                            <ChevronRight className="w-3 h-3" />
+                                                                                                            <ChevronRight className="w-3 h-3 stroke-[2]" />
                                                                                                         )}
                                                                                                     </button>
                                                                                                 ) : (
@@ -692,19 +634,19 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                 <div className="min-w-0 flex-1">
                                                                                                     <Link
                                                                                                         href={`/projects/${project.id}/committees/${committee.id}/activities/${activity.id}`}
-                                                                                                        className="text-xs font-medium text-slate-700 hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate block"
+                                                                                                        className="text-[12px] font-medium text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate block"
                                                                                                         title={activity.title || activity.name}
                                                                                                     >
                                                                                                         {activity.title || activity.name}
                                                                                                     </Link>
-                                                                                                    <div className="text-[10px] text-slate-400 truncate">
+                                                                                                    <div className="text-[10px] text-[color:var(--muted)] truncate">
                                                                                                         {activity.tasks?.length || 0} {activity.tasks?.length === 1 ? 'task' : 'tasks'}
                                                                                                     </div>
                                                                                                 </div>
                                                                                             </div>
                                                                                             <Link
                                                                                                 href={`/projects/${project.id}/committees/${committee.id}/activities/${activity.id}`}
-                                                                                                className="p-1 text-slate-400 hover:text-[color:var(--color-brand-action-orange)] rounded shrink-0 transition-colors"
+                                                                                                className="p-1 text-[color:var(--muted)] hover:text-[color:var(--primary)] rounded-[4px] shrink-0 transition-colors"
                                                                                                 title="View activity"
                                                                                             >
                                                                                                 <ExternalLink className="w-3 h-3" />
@@ -718,7 +660,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                 return (
                                                                                                     <div
                                                                                                         key={`left-task-${task.id}`}
-                                                                                                        className="h-[38px] pl-16 pr-3 bg-slate-50/70 hover:bg-slate-100/70 flex items-center justify-between gap-1.5"
+                                                                                                        className="h-[38px] pl-16 pr-3 bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)] flex items-center justify-between gap-1.5 transition-colors"
                                                                                                     >
                                                                                                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                                                                                             <span
@@ -726,7 +668,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                                 title={`Status: ${task.status}`}
                                                                                                             />
                                                                                                             <span
-                                                                                                                className="text-xs text-slate-600 truncate block"
+                                                                                                                className="text-[12px] text-[color:var(--text)] truncate block"
                                                                                                                 title={task.title}
                                                                                                             >
                                                                                                                 {task.title}
@@ -734,7 +676,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                         </div>
                                                                                                         <Link
                                                                                                             href={`/projects/${project.id}/committees/${committee.id}/activities/${activity.id}`}
-                                                                                                            className="p-0.5 text-slate-400 hover:text-[color:var(--color-brand-action-orange)] rounded shrink-0"
+                                                                                                            className="p-0.5 text-[color:var(--muted)] hover:text-[color:var(--primary)] rounded-[4px] shrink-0"
                                                                                                             title="View in activity"
                                                                                                         >
                                                                                                             <ExternalLink className="w-2.5 h-2.5" />
@@ -746,7 +688,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                 );
                                                                             })
                                                                         ) : (
-                                                                            <div className="h-[38px] pl-11 pr-3 flex items-center text-[10px] text-slate-400 italic">
+                                                                            <div className="h-[38px] pl-11 pr-3 flex items-center text-[11px] text-[color:var(--muted)] italic">
                                                                                 No activities
                                                                             </div>
                                                                         )
@@ -755,7 +697,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                             );
                                                         })
                                                     ) : (
-                                                        <div className="h-[38px] pl-6 pr-3 flex items-center text-[10px] text-slate-400 italic">
+                                                        <div className="h-[38px] pl-6 pr-3 flex items-center text-[11px] text-[color:var(--muted)] italic">
                                                             No committees
                                                         </div>
                                                     )
@@ -776,18 +718,18 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                             }}
                         >
                             {/* Calendar Scale Header */}
-                            <div className="h-[50px] bg-slate-50 border-b border-slate-200 flex relative select-none">
+                            <div className="h-[48px] bg-[color:var(--soft-surface)] border-b border-[color:var(--border)] flex relative select-none">
                                 {timeColumns.map((col) => (
                                     <div
                                         key={col.id}
-                                        className="border-r border-slate-200/80 px-1 py-1.5 flex flex-col items-center justify-center shrink-0"
+                                        className="border-r border-[color:var(--border)] px-1 py-1 flex flex-col items-center justify-center shrink-0"
                                         style={{ width: `${col.widthPx}px` }}
                                     >
-                                        <span className="text-[11px] font-bold text-slate-700 truncate">
+                                        <span className="text-[11px] font-bold text-[color:var(--text)] truncate tabular-nums">
                                             {col.label}
                                         </span>
                                         {col.subLabel && (
-                                            <span className="text-[9px] font-medium text-slate-400 truncate">
+                                            <span className="text-[9px] font-medium text-[color:var(--muted)] truncate tabular-nums">
                                                 {col.subLabel}
                                             </span>
                                         )}
@@ -801,19 +743,19 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                         style={{ left: `${todayPct}%` }}
                                     >
                                         <div className="absolute top-1 -translate-x-1/2 flex flex-col items-center">
-                                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/90 px-1.5 py-0.2 rounded-full shadow-2xs">
+                                            <span className="text-[10px] font-bold text-white bg-[color:var(--primary)] border border-[color:var(--primary)] px-1.5 py-0.2 rounded-full">
                                                 Today
                                             </span>
                                         </div>
-                                        <div className="h-full border-r-2 border-indigo-400/80 border-dashed" />
+                                        <div className="h-full border-r-2 border-[color:var(--primary)] border-dashed" />
                                     </div>
                                 )}
                             </div>
 
                             {/* Timeline Rows with Background Grid Lines & Gantt Bars */}
-                            <div className="divide-y divide-slate-100 flex-1 relative">
+                            <div className="divide-y divide-[color:var(--border)] flex-1 relative">
                                 {filteredProjects.length === 0 ? (
-                                    <div className="p-6 text-center text-xs text-slate-400">
+                                    <div className="p-6 text-center text-[13px] text-[color:var(--muted)]">
                                         No timeline items
                                     </div>
                                 ) : (
@@ -825,13 +767,13 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                         return (
                                             <React.Fragment key={`right-proj-${project.id}`}>
                                                 {/* ── PROJECT BAR ROW ── */}
-                                                <div className="h-[44px] bg-[#18262c] relative flex items-center">
+                                                <div className="h-[46px] bg-[color:var(--soft-surface)] relative flex items-center">
                                                     {/* Background grid lines */}
                                                     <div className="absolute inset-0 flex pointer-events-none">
                                                         {timeColumns.map((col) => (
                                                             <div
                                                                 key={`grid-proj-${col.id}`}
-                                                                className="border-r border-slate-700/30 h-full shrink-0"
+                                                                className="border-r border-[color:var(--border)]/50 h-full shrink-0"
                                                                 style={{ width: `${col.widthPx}px` }}
                                                             />
                                                         ))}
@@ -840,7 +782,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                     {/* Today vertical line */}
                                                     {todayPct !== null && (
                                                         <div
-                                                            className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-indigo-400/50 border-dashed"
+                                                            className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-[color:var(--primary)]/60 border-dashed"
                                                             style={{ left: `${todayPct}%` }}
                                                         />
                                                     )}
@@ -848,12 +790,16 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                     {/* Project Parent Bar */}
                                                     {projectBarStyle ? (
                                                         <div
-                                                            className="absolute h-5 rounded-md bg-[#2d3f4d] border border-slate-600/70 shadow-xs flex items-center px-2 transition-all pointer-events-auto"
+                                                            className="absolute h-5.5 rounded-[6px] bg-[color:var(--primary)] text-white border border-[color:var(--primary)] flex items-center px-2 transition-all pointer-events-auto shadow-none"
                                                             style={projectBarStyle}
                                                             title={`${project.title || project.name}: ${project.start_date || ''} → ${project.end_date || ''}`}
-                                                        />
+                                                        >
+                                                            <span className="text-[11px] font-bold truncate text-white">
+                                                                {project.title || project.name}
+                                                            </span>
+                                                        </div>
                                                     ) : (
-                                                        <span className="text-[11px] text-slate-400 italic pl-3 select-none">
+                                                        <span className="text-[11px] text-[color:var(--muted)] italic pl-3 select-none">
                                                             No dates scheduled
                                                         </span>
                                                     )}
@@ -869,13 +815,13 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
 
                                                             return (
                                                                 <React.Fragment key={`right-comm-${committee.id}`}>
-                                                                    <div className="h-[48px] bg-white hover:bg-slate-50/70 relative flex items-center">
+                                                                    <div className="h-[44px] bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)] relative flex items-center transition-colors">
                                                                         {/* Background grid lines */}
                                                                         <div className="absolute inset-0 flex pointer-events-none">
                                                                             {timeColumns.map((col) => (
                                                                                 <div
                                                                                     key={`grid-comm-${col.id}`}
-                                                                                    className="border-r border-slate-100 h-full shrink-0"
+                                                                                    className="border-r border-[color:var(--border)]/40 h-full shrink-0"
                                                                                     style={{ width: `${col.widthPx}px` }}
                                                                                 />
                                                                             ))}
@@ -884,32 +830,32 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                         {/* Today line */}
                                                                         {todayPct !== null && (
                                                                             <div
-                                                                                className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-indigo-400/50 border-dashed"
+                                                                                className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-[color:var(--primary)]/50 border-dashed"
                                                                                 style={{ left: `${todayPct}%` }}
                                                                             />
                                                                         )}
 
-                                                                        {/* Committee Bar (Supporting Grouping) */}
+                                                                        {/* Committee Bar */}
                                                                         {commBarStyle ? (
                                                                             <div
                                                                                 className="absolute flex items-center pointer-events-auto"
                                                                                 style={commBarStyle}
                                                                             >
                                                                                 <div
-                                                                                    className="h-4.5 w-full bg-slate-100 rounded-full overflow-hidden flex items-center shadow-2xs"
+                                                                                    className="h-4 w-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] rounded-full overflow-hidden flex items-center"
                                                                                     title={`${committee.name}: ${committee.progress}%`}
                                                                                 >
                                                                                     <div
-                                                                                        className="h-full rounded-full bg-[#7C88F7] transition-all duration-300"
+                                                                                        className="h-full rounded-full bg-[color:var(--primary)] transition-all duration-300"
                                                                                         style={{ width: `${committee.progress}%` }}
                                                                                     />
                                                                                 </div>
-                                                                                <span className="text-xs font-semibold text-slate-700 ml-2 shrink-0 select-none">
+                                                                                <span className="text-[11px] font-semibold text-[color:var(--text)] ml-2 shrink-0 select-none tabular-nums">
                                                                                     {committee.progress}%
                                                                                 </span>
                                                                             </div>
                                                                         ) : (
-                                                                            <span className="text-[11px] text-slate-300 italic pl-3 select-none">
+                                                                            <span className="text-[11px] text-[color:var(--muted)] italic pl-3 select-none">
                                                                                 No dates scheduled
                                                                             </span>
                                                                         )}
@@ -926,13 +872,13 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
 
                                                                                 return (
                                                                                     <React.Fragment key={`right-act-${activity.id}`}>
-                                                                                        <div className="h-[44px] bg-slate-50/40 hover:bg-slate-50 relative flex items-center">
+                                                                                        <div className="h-[42px] bg-[color:var(--card-surface)] hover:bg-[color:var(--soft-surface)] relative flex items-center transition-colors">
                                                                                             {/* Grid lines */}
                                                                                             <div className="absolute inset-0 flex pointer-events-none">
                                                                                                 {timeColumns.map((col) => (
                                                                                                     <div
                                                                                                         key={`grid-act-${col.id}`}
-                                                                                                        className="border-r border-slate-100 h-full shrink-0"
+                                                                                                        className="border-r border-[color:var(--border)]/40 h-full shrink-0"
                                                                                                         style={{ width: `${col.widthPx}px` }}
                                                                                                     />
                                                                                                 ))}
@@ -941,19 +887,19 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                             {/* Today line */}
                                                                                             {todayPct !== null && (
                                                                                                 <div
-                                                                                                    className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-indigo-400/50 border-dashed"
+                                                                                                    className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-[color:var(--primary)]/50 border-dashed"
                                                                                                     style={{ left: `${todayPct}%` }}
                                                                                                 />
                                                                                             )}
 
-                                                                                            {/* Activity Bar (Main Work Period) */}
+                                                                                            {/* Activity Bar */}
                                                                                             {actBarStyle ? (
                                                                                                 <div
                                                                                                     className="absolute flex items-center pointer-events-auto"
                                                                                                     style={actBarStyle}
                                                                                                 >
                                                                                                     <div
-                                                                                                        className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex items-center shadow-2xs"
+                                                                                                        className="h-3.5 w-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] rounded-full overflow-hidden flex items-center"
                                                                                                         title={`${activity.title}: ${activity.progress}% (${activity.status})`}
                                                                                                     >
                                                                                                         <div
@@ -961,12 +907,12 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                             style={{ width: `${activity.progress}%` }}
                                                                                                         />
                                                                                                     </div>
-                                                                                                    <span className="text-[11px] font-semibold text-slate-700 ml-2 shrink-0 select-none">
+                                                                                                    <span className="text-[11px] font-semibold text-[color:var(--muted)] ml-2 shrink-0 select-none tabular-nums">
                                                                                                         {activity.progress}%
                                                                                                     </span>
                                                                                                 </div>
                                                                                             ) : (
-                                                                                                <span className="text-[10px] text-slate-300 italic pl-3 select-none">
+                                                                                                <span className="text-[10px] text-[color:var(--muted)] italic pl-3 select-none">
                                                                                                     No dates scheduled
                                                                                                 </span>
                                                                                             )}
@@ -985,14 +931,14 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                 return (
                                                                                                     <div
                                                                                                         key={`right-task-${task.id}`}
-                                                                                                        className="h-[38px] bg-slate-50/70 hover:bg-slate-100/70 relative flex items-center"
+                                                                                                        className="h-[38px] bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)] relative flex items-center transition-colors"
                                                                                                     >
                                                                                                         {/* Grid lines */}
                                                                                                         <div className="absolute inset-0 flex pointer-events-none">
                                                                                                             {timeColumns.map((col) => (
                                                                                                                 <div
                                                                                                                     key={`grid-task-${col.id}`}
-                                                                                                                    className="border-r border-slate-100/80 h-full shrink-0"
+                                                                                                                    className="border-r border-[color:var(--border)]/40 h-full shrink-0"
                                                                                                                     style={{ width: `${col.widthPx}px` }}
                                                                                                                 />
                                                                                                             ))}
@@ -1001,27 +947,27 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                         {/* Today line */}
                                                                                                         {todayPct !== null && (
                                                                                                             <div
-                                                                                                                className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-indigo-400/50 border-dashed"
+                                                                                                                className="absolute top-0 bottom-0 pointer-events-none z-10 border-r-2 border-[color:var(--primary)]/50 border-dashed"
                                                                                                                 style={{ left: `${todayPct}%` }}
                                                                                                             />
                                                                                                         )}
 
-                                                                                                        {/* Task Bar (Smaller Child Bar) */}
+                                                                                                        {/* Task Bar */}
                                                                                                         {taskBarStyle ? (
                                                                                                             <div
                                                                                                                 className="absolute flex items-center pointer-events-auto"
                                                                                                                 style={taskBarStyle}
                                                                                                             >
                                                                                                                 <div
-                                                                                                                    className={`h-2.5 w-6 rounded-full ${taskTheme.barFill} shadow-2xs`}
+                                                                                                                    className={`h-2.5 w-5 rounded-full ${taskTheme.barFill}`}
                                                                                                                     title={`${task.title}: ${task.status}`}
                                                                                                                 />
-                                                                                                                <span className="text-[10px] font-medium text-slate-500 ml-1.5 shrink-0 select-none">
+                                                                                                                <span className="text-[10px] font-medium text-[color:var(--muted)] ml-1.5 shrink-0 select-none">
                                                                                                                     {task.status}
                                                                                                                 </span>
                                                                                                             </div>
                                                                                                         ) : (
-                                                                                                            <span className="text-[10px] text-slate-300 italic pl-3 select-none">
+                                                                                                            <span className="text-[10px] text-[color:var(--muted)] italic pl-3 select-none">
                                                                                                                 No dates scheduled
                                                                                                             </span>
                                                                                                         )}
@@ -1032,7 +978,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                 );
                                                                             })
                                                                         ) : (
-                                                                            <div className="h-[38px] bg-slate-50/20 flex items-center pl-3 text-[10px] text-slate-400 italic">
+                                                                            <div className="h-[38px] flex items-center pl-3 text-[11px] text-[color:var(--muted)] italic">
                                                                                 No activities scheduled
                                                                             </div>
                                                                         )
@@ -1041,7 +987,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                             );
                                                         })
                                                     ) : (
-                                                        <div className="h-[38px] bg-white flex items-center pl-3 text-[10px] text-slate-400 italic">
+                                                        <div className="h-[38px] flex items-center pl-3 text-[11px] text-[color:var(--muted)] italic">
                                                             No committees scheduled yet in this project
                                                         </div>
                                                     )

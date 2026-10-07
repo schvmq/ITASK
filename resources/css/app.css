@@ -8,390 +8,275 @@
 @source '../**/*.tsx';
 @source '../**/*.ts';
 
-@theme {
-    --font-sans: 'Figtree', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+/* ==========================================================================
+   DESIGN TOKENS (Strictly 5 base tokens + color-mix derivations)
+   ========================================================================== */
 
-    /* Brand Core Palette */
-    --color-brand-yellow: #FFBB00;
-    --color-brand-orange: #EC7505;
-    --color-brand-cream: #F3F1E2;
-    --color-brand-charcoal: #2A2A2A;
-    --color-brand-dark-gray: #393939;
+:root,
+:root[data-theme="light"] {
+    --text: #191410;
+    --background: #fdfcfb;
+    --primary: #fa8c38;
+    --secondary: #f4c28d;
+    --accent: #fbd361;
 
-    /* Theme Token Variables */
-    --color-bg-page: var(--bg);
+    /* Primary button (vibrant light orange with high-contrast text) */
+    --primary-btn: #f97316;
+    --primary-btn-hover: #ea580c;
+    --primary-btn-active: #c2410c;
+    --primary-btn-text: #ffffff;
+
+    /* Derived surfaces & boundaries */
+    --card: color-mix(in srgb, var(--background) 96%, var(--text) 4%);
+    --card-surface: color-mix(in srgb, var(--background) 98%, var(--text) 2%);
+    --border: color-mix(in srgb, var(--text) 14%, var(--background));
+    --muted: color-mix(in srgb, var(--text) 68%, var(--background));
+    --soft-surface: color-mix(in srgb, var(--text) 5%, var(--background));
+
+    /* Semantic Status Mixes (using strictly accent, secondary, danger red) */
+    /* Success / On Track (accent) */
+    --status-success: var(--accent);
+    --status-success-bg: color-mix(in srgb, var(--accent) 22%, var(--background));
+    --status-success-border: color-mix(in srgb, var(--accent) 45%, var(--background));
+    --status-success-text: color-mix(in srgb, var(--accent) 20%, var(--text));
+
+    /* In Review / Neutral (secondary) */
+    --status-neutral: var(--secondary);
+    --status-neutral-bg: color-mix(in srgb, var(--secondary) 22%, var(--background));
+    --status-neutral-border: color-mix(in srgb, var(--secondary) 45%, var(--background));
+    --status-neutral-text: color-mix(in srgb, var(--secondary) 25%, var(--text));
+
+    /* At Risk / Overdue / Critical (danger red) */
+    --status-danger: #ef4444;
+    --status-danger-bg: color-mix(in srgb, var(--status-danger) 12%, var(--background));
+    --status-danger-border: color-mix(in srgb, var(--status-danger) 32%, var(--background));
+    --status-danger-text: color-mix(in srgb, var(--status-danger) 85%, var(--text));
+
+    /* Primary Accent / Active States (light orange) */
+    --status-primary: var(--primary);
+    --status-primary-bg: color-mix(in srgb, var(--primary) 14%, var(--background));
+    --status-primary-border: color-mix(in srgb, var(--primary) 36%, var(--background));
+    --status-primary-text: color-mix(in srgb, var(--primary) 85%, var(--text));
+
+    /* Compatibility aliases */
+    --color-bg-page: var(--background);
     --color-bg-card: var(--card);
-    --color-ink: var(--ink);
+    --color-ink: var(--text);
     --color-ink-muted: var(--muted);
     --color-border-token: var(--border);
-
-    --color-tint-yellow: var(--tint-yellow);
-    --color-tint-orange: var(--tint-orange);
-    --color-tint-neutral: var(--tint-neutral);
-    --color-tint-amber: var(--tint-amber);
-    --color-amber-text: var(--amber-text);
-    --color-link-orange: var(--link-orange);
-
-    /* Mappings for component compatibility */
-    --color-primary: #EC7505;
-    --color-primary-hover: #D96904;
-    --color-primary-active: #C25D03;
-    --color-secondary: #2A2A2A;
-
-    --color-background: var(--bg);
-    --color-foreground: var(--ink);
-    --color-card: var(--card);
-    --color-card-foreground: var(--ink);
-    --color-popover: var(--card);
-    --color-popover-foreground: var(--ink);
-    --color-muted: var(--tint-neutral);
-    --color-muted-foreground: var(--muted);
-    --color-border: var(--border);
-    --color-input: var(--border);
-    --color-ring: #EC7505;
-
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 18px;
-    --radius-2xl: 20px;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   DESIGN TOKENS (LIGHT MODE DEFAULT)
-   ───────────────────────────────────────────────────────────────────────────── */
-:root, [data-theme="light"] {
-    --bg: #F3F1E2;
-    --card: #FFFEF9;
-    --ink: #2A2A2A;
-    --muted: #5C5A50;
-    --border: #E1DDC6;
+:root[data-theme="dark"],
+html.dark {
+    --text: #fceede;
+    --background: #0d0906;
+    --primary: #fb923c;
+    --secondary: #8c571c;
+    --accent: #b59520;
 
-    --tint-yellow: #FFF1C2;
-    --tint-orange: #FDE5CC;
-    --tint-neutral: #E9E7D6;
-    --tint-amber: #FFE9A8;
-    --amber-text: #8A5A00;
-    --link-orange: #B35400;
+    /* Primary button for dark mode */
+    --primary-btn: #ea580c;
+    --primary-btn-hover: #f97316;
+    --primary-btn-active: #c2410c;
+    --primary-btn-text: #ffffff;
 
-    --shadow-card: 0 1px 2px rgba(42, 42, 42, 0.06), 0 8px 24px -12px rgba(42, 42, 42, 0.22);
-    --shadow-sm: 0 1px 2px rgba(42, 42, 42, 0.05);
+    /* Derived surfaces & boundaries */
+    --card: color-mix(in srgb, var(--background) 90%, var(--text) 10%);
+    --card-surface: color-mix(in srgb, var(--background) 94%, var(--text) 6%);
+    --border: color-mix(in srgb, var(--text) 14%, var(--background));
+    --muted: color-mix(in srgb, var(--text) 68%, var(--background));
+    --soft-surface: color-mix(in srgb, var(--text) 5%, var(--background));
 
-    /* Sidebar specifics */
-    --sidebar-grad-from: #393939;
-    --sidebar-grad-to: #2A2A2A;
-    --sidebar-text: #F3F1E2;
-    --sidebar-text-muted: #B9B6A3;
-    --sidebar-active-pill: #F3F1E2;
-    --sidebar-active-text: #2A2A2A;
-    --sidebar-active-marker: #FFBB00;
-    --sidebar-border: rgba(243, 241, 226, 0.12);
+    /* Semantic Status Mixes */
+    /* Success / On Track (accent) */
+    --status-success: var(--accent);
+    --status-success-bg: color-mix(in srgb, var(--accent) 26%, var(--background));
+    --status-success-border: color-mix(in srgb, var(--accent) 50%, var(--background));
+    --status-success-text: color-mix(in srgb, var(--accent) 45%, var(--text));
+
+    /* In Review / Neutral (secondary) */
+    --status-neutral: var(--secondary);
+    --status-neutral-bg: color-mix(in srgb, var(--secondary) 26%, var(--background));
+    --status-neutral-border: color-mix(in srgb, var(--secondary) 50%, var(--background));
+    --status-neutral-text: color-mix(in srgb, var(--secondary) 45%, var(--text));
+
+    /* At Risk / Overdue / Critical */
+    --status-danger: #f87171;
+    --status-danger-bg: color-mix(in srgb, var(--status-danger) 18%, var(--background));
+    --status-danger-border: color-mix(in srgb, var(--status-danger) 40%, var(--background));
+    --status-danger-text: color-mix(in srgb, var(--status-danger) 70%, var(--text));
+
+    /* Primary Accent */
+    --status-primary: var(--primary);
+    --status-primary-bg: color-mix(in srgb, var(--primary) 18%, var(--background));
+    --status-primary-border: color-mix(in srgb, var(--primary) 40%, var(--background));
+    --status-primary-text: color-mix(in srgb, var(--primary) 70%, var(--text));
+
+    /* Compatibility aliases */
+    --color-bg-page: var(--background);
+    --color-bg-card: var(--card);
+    --color-ink: var(--text);
+    --color-ink-muted: var(--muted);
+    --color-border-token: var(--border);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   DESIGN TOKENS (DARK MODE)
-   ───────────────────────────────────────────────────────────────────────────── */
-[data-theme="dark"], html.dark {
-    --bg: #1E1E1E;
-    --card: #2A2A2A;
-    --ink: #F3F1E2;
-    --muted: #B9B6A3;
-    --border: #3D3D3D;
+/* ==========================================================================
+   GLOBAL TYPOGRAPHY & RESETS
+   ========================================================================== */
 
-    --tint-yellow: #3A3210;
-    --tint-orange: #3D2610;
-    --tint-neutral: #393939;
-    --tint-amber: #3A3210;
-    --amber-text: #FFBB00;
-    --link-orange: #EC7505;
-
-    --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -12px rgba(0, 0, 0, 0.7);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-
-    /* Sidebar specifics */
-    --sidebar-grad-from: #262626;
-    --sidebar-grad-to: #181818;
-    --sidebar-text: #F3F1E2;
-    --sidebar-text-muted: #8E8B7A;
-    --sidebar-active-pill: #383838;
-    --sidebar-active-text: #FFFEF9;
-    --sidebar-active-marker: #FFBB00;
-    --sidebar-border: rgba(255, 255, 255, 0.08);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   ANIMATION & TIMING TOKENS (Section 5)
-   ───────────────────────────────────────────────────────────────────────────── */
-:root {
-    --dur-fast: 150ms;
-    --dur-base: 250ms;
-    --dur-slow: 400ms;
-    --ease-in: cubic-bezier(.2, .8, .2, 1);
-    --ease-out: cubic-bezier(.4, 0, 1, 1);
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   ACCESSIBILITY & BASE STYLES
-   ───────────────────────────────────────────────────────────────────────────── */
-
-/* Visible keyboard focus ring: 3px orange outline, 2px offset */
-*:focus-visible {
-    outline: 3px solid #EC7505 !important;
-    outline-offset: 2px !important;
-}
-
-/* Theme switch: 200ms color transition on background, text, borders only */
-body, header, aside, main {
-    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+* {
+    border-color: var(--border);
 }
 
 body {
-    font-family: var(--font-sans);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 15px;
     line-height: 1.5;
-    background-color: var(--bg);
-    color: var(--ink);
-    min-height: 100vh;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    color: var(--text);
+    background-color: var(--background);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-/* Typography Scale Specifications */
-.page-title {
-    font-size: 32px;
-    line-height: 1.15;
-    letter-spacing: -0.025em;
-    font-weight: 800;
-    color: var(--ink);
+/* Tabular numerals for numbers, dates, stats, and tables */
+.tabular-nums,
+table,
+.stats-number,
+time {
+    font-variant-numeric: tabular-nums;
 }
 
-.section-title {
+/* Typography Scale */
+h1, .page-title {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+h2, .section-title {
     font-size: 18px;
-    line-height: 1.3;
-    font-weight: 700;
-    letter-spacing: -0.015em;
-    color: var(--ink);
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
 }
 
-.body-text {
-    font-size: 15px;
-    line-height: 1.5;
-    color: var(--ink);
+h3, .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text);
 }
 
-.muted-text {
+p, span, div {
+    /* Sentence case guidance maintained */
+}
+
+/* ==========================================================================
+   FLAT CARDS (No gradients, glows, or decorative shadows; 1px border, 12px radius)
+   ========================================================================== */
+
+.itask-card {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+/* Attention Card: The only card with a primary left edge */
+.itask-card-attention {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+/* ==========================================================================
+   KEYBOARD FOCUS RING (3px primary, 2px offset on all interactive elements)
+   ========================================================================== */
+
+:focus-visible {
+    outline: 3px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* ==========================================================================
+   BUTTONS & CONTROLS
+   ========================================================================== */
+
+.btn-primary {
+    background-color: var(--primary-btn);
+    color: #ffffff;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-weight: 600;
     font-size: 14px;
-    color: var(--muted);
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+    box-shadow: none;
 }
 
-/* Primary orange button rule: charcoal text (#2A2A2A) */
-.btn-primary-orange {
-    background-color: #EC7505;
-    color: #2A2A2A;
-    font-weight: 700;
-}
-.btn-primary-orange:hover {
-    background-color: #D96904;
-}
-.btn-primary-orange:active {
-    background-color: #C25D03;
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--primary-btn-hover);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   SMOOTH 60FPS ANIMATIONS
-   ───────────────────────────────────────────────────────────────────────────── */
-
-/* 1. Page load stagger items (fade and slide up 8px) */
-@keyframes fadeInUp8 {
-    from {
-        opacity: 0;
-        transform: translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.btn-primary:active:not(:disabled) {
+    background-color: var(--primary-btn-active);
+    transform: scale(0.99);
 }
 
-.animate-stagger-item {
-    animation: fadeInUp8 var(--dur-base) var(--ease-in) backwards;
-}
-.stagger-1 { animation-delay: 40ms; }
-.stagger-2 { animation-delay: 80ms; }
-.stagger-3 { animation-delay: 120ms; }
-.stagger-4 { animation-delay: 160ms; }
-.stagger-5 { animation-delay: 200ms; }
-.stagger-6 { animation-delay: 240ms; }
-.stagger-7 { animation-delay: 280ms; }
-.stagger-8 { animation-delay: 320ms; }
-
-/* 3. Badge Pop (scale 0.8 -> 1) */
-@keyframes badgePop {
-    0% { transform: scale(0.8); }
-    100% { transform: scale(1); }
-}
-.animate-badge-pop {
-    animation: badgePop var(--dur-fast) var(--ease-in);
+.btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
-/* 4. Card Lift on Hover (touch-safe) */
-@media (hover: hover) and (pointer: fine) {
-    .card-hover {
-        transition: transform var(--dur-fast) var(--ease-in), box-shadow var(--dur-fast) var(--ease-in);
-    }
-    .card-hover:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px -4px rgba(42, 42, 42, 0.15);
-    }
+.btn-secondary {
+    background-color: var(--soft-surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
 }
 
-/* 5. Button Press Feedback (scale .97) */
-.btn-press {
-    transition: transform var(--dur-fast) var(--ease-in);
-}
-.btn-press:active {
-    transform: scale(0.97);
+.btn-secondary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--text) 9%, var(--background));
 }
 
-/* 7. Modal & Popover scale/fade + backdrop */
-@keyframes modalScaleIn {
-    from {
-        opacity: 0;
-        transform: scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-.animate-modal-in {
-    animation: modalScaleIn var(--dur-fast) var(--ease-in) forwards;
+.btn-secondary:active:not(:disabled) {
+    transform: scale(0.99);
 }
 
-@keyframes backdropFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-.animate-backdrop-in {
-    animation: backdropFadeIn var(--dur-fast) var(--ease-in) forwards;
-}
+/* ==========================================================================
+   SUBTLE MOTION & REDUCED MOTION SUPPORT
+   ========================================================================== */
 
-/* 8. Toast Slide In & Undo Shrinking Progress Line */
-@keyframes toastSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(16px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-.animate-toast-in {
-    animation: toastSlideIn var(--dur-base) var(--ease-in) forwards;
-}
-
-@keyframes progressShrink {
-    from { width: 100%; }
-    to { width: 0%; }
-}
-.animate-progress-shrink {
-    animation: progressShrink 5s linear forwards;
-}
-
-/* 9. Message Slide In & Typing Dots Bounce */
-@keyframes messageSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-.animate-message-in {
-    animation: messageSlideIn var(--dur-fast) var(--ease-in) forwards;
-}
-
-@keyframes typingDotBounce {
-    0%, 60%, 100% {
-        transform: translateY(0);
-    }
-    30% {
-        transform: translateY(-4px);
-    }
-}
-.typing-dot-1 {
-    animation: typingDotBounce 1.2s infinite ease-in-out;
-    animation-delay: 0ms;
-}
-.typing-dot-2 {
-    animation: typingDotBounce 1.2s infinite ease-in-out;
-    animation-delay: 150ms;
-}
-.typing-dot-3 {
-    animation: typingDotBounce 1.2s infinite ease-in-out;
-    animation-delay: 300ms;
-}
-
-/* 10. Task Card Highlight Fade (1.5s yellow tint fade) */
-@keyframes taskHighlightFade {
-    0% {
-        background-color: var(--tint-yellow);
-    }
-    100% {
-        background-color: var(--card);
-    }
-}
-.animate-task-highlight {
-    animation: taskHighlightFade 1.5s var(--ease-in) forwards;
-}
-
-/* 11. Skeleton Shimmer */
-@keyframes shimmerAnim {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
-    }
-}
-.skeleton-shimmer {
-    background: linear-gradient(
-        90deg,
-        var(--tint-neutral) 25%,
-        var(--card) 50%,
-        var(--tint-neutral) 75%
-    );
-    background-size: 200% 100%;
-    animation: shimmerAnim 1.6s infinite ease-in-out;
-}
-
-/* 13. Empty State Gentle Float Once */
-@keyframes floatOnce {
-    0% {
-        opacity: 0;
-        transform: translateY(6px);
-    }
-    50% {
-        opacity: 1;
-        transform: translateY(-4px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-.animate-float-once {
-    animation: floatOnce 600ms var(--ease-in) forwards;
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
-   ACCESSIBILITY: PREFERS-REDUCED-MOTION
-   ───────────────────────────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
@@ -401,12 +286,54 @@ body {
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
     }
-    .skeleton-shimmer {
-        animation: none !important;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.18s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
     }
-    .typing-dot-1,
-    .typing-dot-2,
-    .typing-dot-3 {
-        animation: none !important;
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+    0% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.85;
+    }
+    100% {
+        opacity: 0.5;
+    }
+}
+
+.skeleton-shimmer {
+    background-color: var(--soft-surface);
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 6px;
+}
+
+/* Clean scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
 }

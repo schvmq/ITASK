@@ -378,48 +378,18 @@ export function CreateTaskModal({
                         />
                     </div>
 
-                    {/* 3. Project Selection (Read-only in group chats, selectable in direct chats) */}
+                    {/* 3. Project Selection (Always prefilled and read-only in project chats) */}
                     <div className="space-y-1">
-                        <label htmlFor="task-project-select" className="font-bold text-[var(--ink)]">
-                            Project <span className="text-[#EC7505]">*</span>
+                        <label className="font-bold text-[var(--ink)]">
+                            Project
                         </label>
-                        {conversationProjectId ? (
-                            <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--tint-neutral)]/50 border border-[var(--border)] text-[var(--ink)] font-semibold">
-                                <FolderOpen className="w-4 h-4 text-[#EC7505]" />
-                                <span className="truncate">
-                                    {conversationProjectTitle || 'Current Project Channel'}
-                                </span>
-                                <span className="ml-auto text-[10px] text-[var(--muted)]">Locked to channel</span>
-                            </div>
-                        ) : (
-                            <select
-                                ref={projectSelectRef}
-                                id="task-project-select"
-                                value={selectedProjectId ?? ''}
-                                onChange={(e) => {
-                                    setSelectedProjectId(Number(e.target.value) || null);
-                                    handleFieldChange();
-                                    if (errors.project) setErrors((prev) => ({ ...prev, project: undefined }));
-                                }}
-                                className={`w-full px-3 py-2 rounded-xl border bg-[var(--card)] text-[var(--ink)] outline-none ${
-                                    errors.project
-                                        ? 'border-red-500'
-                                        : 'border-[var(--border)] focus:border-[#EC7505]'
-                                }`}
-                            >
-                                <option value="">Select project...</option>
-                                {userProjects.map((proj) => (
-                                    <option key={proj.id} value={proj.id}>
-                                        {proj.title}
-                                    </option>
-                                ))}
-                            </select>
-                        )}
-                        {errors.project && (
-                            <p className="text-[11px] font-bold text-red-600 dark:text-red-400">
-                                {errors.project}
-                            </p>
-                        )}
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--tint-neutral)]/50 border border-[var(--border)] text-[var(--ink)] font-semibold">
+                            <FolderOpen className="w-4 h-4 text-[#EC7505]" />
+                            <span className="truncate">
+                                {conversationProjectTitle || 'Current Project'}
+                            </span>
+                            <span className="ml-auto text-[10px] text-[var(--muted)] font-medium">Locked to project</span>
+                        </div>
                     </div>
 
                     {/* 4. Assign To (Searchable multi-select + "Assign to me") */}
@@ -477,7 +447,7 @@ export function CreateTaskModal({
                                             }`}
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <Avatar size="xs">
+                                                <Avatar size="sm">
                                                     <AvatarFallback className="text-[9px] font-bold bg-[#FFBB00] text-[#2A2A2A]">
                                                         {getInitials(member.name)}
                                                     </AvatarFallback>

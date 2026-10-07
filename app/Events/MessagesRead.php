@@ -13,7 +13,7 @@ class MessagesRead implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
-        public int $conversationId,
+        public int $chatId,
         public int $userId,
         public ?int $lastReadMessageId,
         public string $readAt,
@@ -23,7 +23,7 @@ class MessagesRead implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('chat.' . $this->conversationId),
+            new PrivateChannel('chat.' . $this->chatId),
         ];
     }
 
@@ -35,7 +35,8 @@ class MessagesRead implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'conversation_id' => $this->conversationId,
+            'chat_id' => $this->chatId,
+            'conversation_id' => $this->chatId,
             'user_id' => $this->userId,
             'user_name' => $this->userName,
             'last_read_message_id' => $this->lastReadMessageId,

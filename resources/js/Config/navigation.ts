@@ -78,9 +78,9 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
     },
     {
         name: 'Messages',
-        href: '/chat',
+        href: '/messages',
         icon: MessageSquare,
-        description: 'Direct messaging and project collaboration chat',
+        description: 'Project collaboration and group chat',
     },
 ];
 

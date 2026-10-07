@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
+use App\Events\MessageSent;
+use App\Models\Chat;
+use App\Models\Message;
 use App\Models\Project;
 use App\Models\ProjectApprovalDocument;
 use App\Models\ProjectRoleAssignment;
@@ -69,8 +72,23 @@ class ProjectController extends Controller
                 ];
             });
 
+        $availableUsers = $userId ? User::query()
+            ->where('id', '!=', $userId)
+            ->whereNotNull('email_verified_at')
+            ->select(['id', 'name', 'email'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+            ])
+            ->values()
+            ->all() : [];
+
         return Inertia::render('Projects/Index', [
             'projects' => $projects,
+            'availableUsers' => $availableUsers,
         ]);
     }
 
@@ -99,6 +117,52 @@ class ProjectController extends Controller
                     'role' => ProjectRoleAssignment::ROLE_PROJECT_LEADER,
                     'committee_id' => null,
                 ]);
+
+                // Create exactly one group chat in the same database transaction
+                $chat = Chat::create([
+                    'project_id' => $project->id,
+                ]);
+
+                // Post initial system message
+                $chat->messages()->create([
+                    'sender_id' => null,
+                    'type' => Message::TYPE_SYSTEM,
+                    'body' => 'Project chat created. Everyone in this project can message here.',
+                ]);
+
+                // Assign initial project members if provided
+                $memberIds = $request->validated('member_ids') ?? [];
+                $memberRoles = $request->validated('member_roles') ?? [];
+
+                $uniqueMemberIds = array_values(array_unique(array_filter(
+                    $memberIds,
+                    fn ($id) => (int) $id !== (int) $request->user()->id
+                )));
+
+                if (! empty($uniqueMemberIds)) {
+                    $selectedUsers = User::whereIn('id', $uniqueMemberIds)->get(['id', 'name', 'email']);
+
+                    foreach ($selectedUsers as $memberUser) {
+                        $role = $memberRoles[$memberUser->id] ?? ProjectRoleAssignment::ROLE_PROJECT_MEMBER;
+                        if (! in_array($role, [ProjectRoleAssignment::ROLE_PROJECT_MEMBER, ProjectRoleAssignment::ROLE_PROJECT_STAFF])) {
+                            $role = ProjectRoleAssignment::ROLE_PROJECT_MEMBER;
+                        }
+
+                        ProjectRoleAssignment::create([
+                            'project_id' => $project->id,
+                            'user_id' => $memberUser->id,
+                            'role' => $role,
+                            'committee_id' => null,
+                        ]);
+
+                        // Post join system message to chat
+                        $chat->messages()->create([
+                            'sender_id' => null,
+                            'type' => Message::TYPE_SYSTEM,
+                            'body' => "{$memberUser->name} joined the project",
+                        ]);
+                    }
+                }
 
                 // Store approval document on the PRIVATE 'local' disk under project_approvals/{project_id}
                 $directory = "project_approvals/{$project->id}";
@@ -202,7 +266,7 @@ class ProjectController extends Controller
                 'name' => $projectModel->leaderAssignment->user->name,
                 'email' => $projectModel->leaderAssignment->user->email,
             ] : null,
-            'committees' => $projectModel->committees->map(function ($committee) {
+            'committees' => $projectModel->committees->sortBy('id')->values()->map(function ($committee) {
                 $canView = Auth::check() ? Auth::user()->can('view', $committee) : false;
 
                 return [
@@ -341,6 +405,8 @@ class ProjectController extends Controller
     {
         Gate::authorize('update', $project);
 
+        $oldTitle = $project->title;
+
         $project->update($request->safe()->only([
             'title',
             'description',
@@ -348,6 +414,19 @@ class ProjectController extends Controller
             'end_date',
             'status',
         ]));
+
+        if ($oldTitle !== $project->title && $project->chat) {
+            $msg = $project->chat->messages()->create([
+                'sender_id' => null,
+                'type' => Message::TYPE_SYSTEM,
+                'body' => "Project renamed to \"{$project->title}\".",
+            ]);
+            try {
+                broadcast(new MessageSent($msg))->toOthers();
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         return redirect()->route('projects.show', $project)->with('status', 'Project updated successfully.');
     }
@@ -363,7 +442,135 @@ class ProjectController extends Controller
             'status' => Project::STATUS_ARCHIVED,
         ]);
 
+        if ($project->chat) {
+            $project->chat->update(['archived_at' => now()]);
+            $msg = $project->chat->messages()->create([
+                'sender_id' => null,
+                'type' => Message::TYPE_SYSTEM,
+                'body' => 'This project is archived. Messages are read-only.',
+            ]);
+            try {
+                broadcast(new MessageSent($msg))->toOthers();
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         return redirect()->route('projects.show', $project)->with('status', 'Project archived successfully.');
+    }
+
+    /**
+     * Unarchive the specified project.
+     */
+    public function unarchive(Project $project): RedirectResponse
+    {
+        Gate::authorize('archive', $project);
+
+        $project->update([
+            'status' => Project::STATUS_ACTIVE,
+        ]);
+
+        if ($project->chat) {
+            $project->chat->update(['archived_at' => null]);
+            $msg = $project->chat->messages()->create([
+                'sender_id' => null,
+                'type' => Message::TYPE_SYSTEM,
+                'body' => 'Project restored from archive.',
+            ]);
+            try {
+                broadcast(new MessageSent($msg))->toOthers();
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
+        return redirect()->route('projects.show', $project)->with('status', 'Project unarchived successfully.');
+    }
+
+    /**
+     * Soft delete project with 30-day retention period.
+     * Owner only. Requires typing project name to confirm.
+     */
+    public function destroy(Request $request, Project $project): RedirectResponse
+    {
+        $user = $request->user();
+
+        if ((int) $project->created_by !== (int) $user->id) {
+            abort(403, 'Only the project owner can delete this project.');
+        }
+
+        $request->validate([
+            'confirmation_name' => ['required', 'string'],
+        ]);
+
+        if (trim($request->input('confirmation_name')) !== trim($project->title)) {
+            return back()->withErrors(['confirmation_name' => 'Please type the exact project title to confirm deletion.']);
+        }
+
+        DB::transaction(function () use ($project, $user) {
+            if ($project->chat) {
+                $project->chat->delete();
+            }
+
+            $project->delete();
+        });
+
+        return redirect()->route('projects.index')->with(
+            'status',
+            "Project \"{$project->title}\" deleted. It will be retained for 30 days and can be restored during that time."
+        );
+    }
+
+    /**
+     * Restore a soft-deleted project within retention period.
+     */
+    public function restore(Request $request, int $projectId): RedirectResponse
+    {
+        $user = $request->user();
+
+        $project = Project::withTrashed()->find($projectId);
+
+        if (! $project) {
+            return back()->withErrors(['error' => 'This project was permanently deleted.']);
+        }
+
+        if (! $project->trashed()) {
+            return redirect()->route('projects.show', $project);
+        }
+
+        if ((int) $project->created_by !== (int) $user->id) {
+            abort(403, 'Only the project owner can restore this project.');
+        }
+
+        // Handle possible name collision on restore
+        $collision = Project::where('created_by', $user->id)
+            ->where('title', $project->title)
+            ->exists();
+
+        if ($collision) {
+            $project->title = $project->title . ' (restored)';
+        }
+
+        DB::transaction(function () use ($project) {
+            $project->restore();
+
+            $chat = Chat::withTrashed()->where('project_id', $project->id)->first();
+            if ($chat) {
+                $chat->restore();
+                $msg = $chat->messages()->create([
+                    'sender_id' => null,
+                    'type' => Message::TYPE_SYSTEM,
+                    'body' => 'Project restored',
+                ]);
+                try {
+                    broadcast(new MessageSent($msg))->toOthers();
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
+        });
+
+        return redirect()->route('projects.show', $project)->with('status', 'Project restored successfully.');
     }
 
     /**

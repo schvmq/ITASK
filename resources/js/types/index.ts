@@ -28,7 +28,7 @@ export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'gh
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export type AlertVariant = 'info' | 'success' | 'warning' | 'danger';
-export type BadgeVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral';
+export type BadgeVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'neutral' | 'accent' | 'soft';
 
 export interface NotificationData {
     notification_type: string;

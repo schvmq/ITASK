@@ -16,7 +16,7 @@ class Activity extends Model
     public const STATUS_IN_PROGRESS = 'In Progress';
     public const STATUS_UNDER_REVIEW = 'Under Review';
     public const STATUS_RETURNED = 'Returned';
-    /** @deprecated Use STATUS_RETURNED */
+    /** Alias kept for backward compatibility. Use STATUS_RETURNED for all new code. */
     public const STATUS_RETURNED_FOR_REVISION = self::STATUS_RETURNED;
     public const STATUS_COMPLETED = 'Completed';
 

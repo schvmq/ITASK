@@ -1,33 +1,35 @@
-import React, { useState, useMemo, useRef } from 'react';
-import { Head, router, useForm } from '@inertiajs/react';
-import { AppLayout } from '@/Layouts/AppLayout';
-import { type ProjectRole } from '@/Config/navigation';
-import { Modal } from '@/Components/Modal';
-import { FormField } from '@/Components/FormField';
-import { Label } from '@/Components/Label';
-import { InputError } from '@/Components/InputError';
-import { Button } from '@/Components/ui/button';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { AppLayout, openCreateProjectModal } from '@/Layouts/AppLayout';
+import { Button } from '@/Components/Button';
+import { Badge } from '@/Components/Badge';
+import { Card } from '@/Components/Card';
+import { Tabs } from '@/Components/Tabs';
+import { Pagination } from '@/Components/Pagination';
+import { EmptyState } from '@/Components/EmptyState';
+import { ProjectRoleBadge } from '@/Components/ProjectRoleBadge';
+import { JoinProjectModal } from '@/Components/JoinProjectModal';
 import {
     FolderOpen,
     Plus,
     Search,
-    RotateCcw,
-    ArrowUpRight,
-    Info,
     X,
-    FileText,
+    Clock,
     LayoutGrid,
     List,
     Archive,
+    RotateCw,
+    Users,
+    CheckCircle2,
+    Calendar,
 } from 'lucide-react';
 
-// ─── Project Item Data Model ────────────────────────────────────────────────
 export interface ProjectItem {
     id: string;
     title: string;
     description: string;
     status: string;
-    role: ProjectRole;
+    role: string;
     progress: number;
     deadline: string;
     startDate?: string | null;
@@ -36,487 +38,90 @@ export interface ProjectItem {
     activitiesCount?: number;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-function getSimplifiedRole(role: string): string {
-    if (!role) return 'Member';
-    const lower = role.toLowerCase();
-    if (lower.includes('leader')) return 'Leader';
-    if (lower.includes('staff')) return 'Staff';
-    if (lower.includes('member')) return 'Member';
-    return role;
-}
-
-function formatDeadline(deadline: string | null | undefined): string {
-    if (!deadline || deadline === 'No deadline') return 'No deadline';
-    try {
-        const date = new Date(deadline);
-        if (isNaN(date.getTime())) return deadline;
-        const month = date.toLocaleDateString('en-US', { month: 'short' });
-        const day = date.getDate();
-        const year = date.getFullYear();
-        return `Ends ${month} ${day}, ${year}`;
-    } catch {
-        return `Ends ${deadline}`;
-    }
-}
-
-// ─── Project Card Component ──────────────────────────────────────────────────
-// Matches the card layout from Image 1 using ITASK Global CSS design tokens:
-// - Title and status badge (• Active)
-// - Short description of the project
-// - Progress bar with percentage
-// - 3-box statistics (Role, Committees, Activities)
-// - Ends date & Archive action
-interface ProjectCardProps {
-    project: ProjectItem;
-    onSelect: (project: ProjectItem) => void;
-    onArchive?: (project: ProjectItem) => void;
-}
-
-function ProjectCard({ project, onSelect, onArchive }: ProjectCardProps) {
-    const simplifiedRole = getSimplifiedRole(project.role);
-    const formattedDeadline = formatDeadline(project.deadline);
-    const activitiesCount = project.activitiesCount ?? project.tasksCount ?? 0;
-    const isCompleted = project.status === 'Completed' || project.progress === 100;
-
-    const statusLabel =
-        project.status === 'Archived'
-            ? 'Archived'
-            : project.status === 'Planning'
-            ? 'Draft'
-            : 'Active';
-
-    const statusColorClass =
-        project.status === 'Archived'
-            ? 'text-[color:var(--color-text-muted)]'
-            : project.status === 'Planning'
-            ? 'text-[color:var(--color-brand-action-orange)]'
-            : 'text-emerald-700';
-
-    const dotColorClass =
-        project.status === 'Archived'
-            ? 'bg-slate-400'
-            : project.status === 'Planning'
-            ? 'bg-[color:var(--color-brand-action-orange)]'
-            : 'bg-emerald-500';
-
-    return (
-        <div
-            onClick={() => onSelect(project)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onSelect(project);
-                }
-            }}
-            className="group relative bg-white rounded-2xl border border-[color:var(--color-border-light)] p-5 sm:p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:shadow-md hover:border-[color:var(--color-brand-action-orange)]/60 transition-all duration-200 cursor-pointer flex flex-col justify-between"
-        >
-            <div>
-                {/* Header: Title and Status badge */}
-                <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-base font-bold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug line-clamp-1">
-                        {project.title}
-                    </h3>
-                    <div
-                        className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold ${statusColorClass} pt-0.5`}
-                    >
-                        <span className={`w-2 h-2 rounded-full ${dotColorClass}`} />
-                        <span>{statusLabel}</span>
-                    </div>
-                </div>
-
-                {/* Short Description */}
-                <p className="text-xs text-[color:var(--color-text-muted)] leading-relaxed mt-2 line-clamp-2 min-h-[2.5rem]">
-                    {project.description ? project.description : 'No description provided.'}
-                </p>
-
-                {/* Progress Bar */}
-                <div className="mt-5">
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                        <span className="text-[11px] font-medium text-[color:var(--color-text-muted)]">Progress</span>
-                        <span className="text-xs font-bold text-[color:var(--color-text-main)]">
-                            {project.progress}%
-                        </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                                width: `${project.progress}%`,
-                                backgroundColor: isCompleted
-                                    ? '#10b981'
-                                    : 'var(--color-brand-action-orange)',
-                            }}
-                        />
-                    </div>
-                </div>
-
-                {/* 3 Stats Boxes */}
-                <div className="grid grid-cols-3 gap-2 mt-5">
-                    <div className="bg-[color:var(--color-surface-subtle)] rounded-xl py-2.5 px-2 text-center border border-[color:var(--color-border-light)]">
-                        <div className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] leading-tight">
-                            {simplifiedRole}
-                        </div>
-                        <div className="text-[11px] text-[color:var(--color-text-muted)] font-medium mt-0.5">
-                            Role
-                        </div>
-                    </div>
-                    <div className="bg-[color:var(--color-surface-subtle)] rounded-xl py-2.5 px-2 text-center border border-[color:var(--color-border-light)]">
-                        <div className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] leading-tight">
-                            {project.committeesCount ?? 0}
-                        </div>
-                        <div className="text-[11px] text-[color:var(--color-text-muted)] font-medium mt-0.5">
-                            Committees
-                        </div>
-                    </div>
-                    <div className="bg-[color:var(--color-surface-subtle)] rounded-xl py-2.5 px-2 text-center border border-[color:var(--color-border-light)]">
-                        <div className="text-xs sm:text-sm font-bold text-[color:var(--color-text-main)] leading-tight">
-                            {activitiesCount}
-                        </div>
-                        <div className="text-[11px] text-[color:var(--color-text-muted)] font-medium mt-0.5">
-                            Activities
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Card Footer: Ends Date & Archive */}
-            <div className="mt-5 pt-3 border-t border-[color:var(--color-border-subtle)] flex items-center justify-between text-xs">
-                <span className="text-[color:var(--color-text-muted)] font-normal">{formattedDeadline}</span>
-                {project.status !== 'Archived' && onArchive && (
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onArchive(project);
-                        }}
-                        className="text-[color:var(--color-brand-action-orange)] hover:text-[color:var(--color-primary-hover)] transition-colors cursor-pointer text-xs font-semibold"
-                    >
-                        Archive
-                    </button>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// ─── Project List Component ──────────────────────────────────────────────────
-interface ProjectListProps {
-    projects: ProjectItem[];
-    onSelect: (project: ProjectItem) => void;
-    onArchive?: (project: ProjectItem) => void;
-}
-
-function ProjectList({ projects, onSelect, onArchive }: ProjectListProps) {
-    return (
-        <div className="w-full bg-white rounded-xl border border-[color:var(--color-border-light)] shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[720px]">
-                    <thead>
-                        <tr className="border-b border-[color:var(--color-border-light)] bg-[color:var(--color-surface-subtle)] text-[11px] font-bold text-[color:var(--color-text-muted)] uppercase tracking-wider">
-                            <th className="px-5 py-3.5">Project</th>
-                            <th className="px-4 py-3.5">Role</th>
-                            <th className="px-4 py-3.5">Progress</th>
-                            <th className="px-4 py-3.5 text-center">Committees</th>
-                            <th className="px-4 py-3.5 text-center">Activities</th>
-                            <th className="px-4 py-3.5">Deadline</th>
-                            <th className="px-5 py-3.5 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs">
-                        {projects.map((project) => {
-                            const simplifiedRole = getSimplifiedRole(project.role);
-                            const formattedDeadline = formatDeadline(project.deadline);
-                            const activitiesCount = project.activitiesCount ?? project.tasksCount ?? 0;
-                            const isCompleted = project.status === 'Completed' || project.progress === 100;
-                            return (
-                                <tr
-                                    key={project.id}
-                                    onClick={() => onSelect(project)}
-                                    role="button"
-                                    tabIndex={0}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
-                                            e.preventDefault();
-                                            onSelect(project);
-                                        }
-                                    }}
-                                    className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
-                                >
-                                    {/* Project Name & Short Description */}
-                                    <td className="px-5 py-4 max-w-xs">
-                                        <div className="font-bold text-[color:var(--color-text-main)] group-hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-tight">
-                                            {project.title}
-                                        </div>
-                                        <div className="text-[11px] text-[color:var(--color-text-muted)] truncate mt-0.5">
-                                            {project.description || 'No description provided.'}
-                                        </div>
-                                    </td>
-
-                                    {/* Role */}
-                                    <td className="px-4 py-4 whitespace-nowrap">
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[color:var(--color-surface-muted)] text-[color:var(--color-text-main)]">
-                                            {simplifiedRole}
-                                        </span>
-                                    </td>
-
-                                    {/* Progress */}
-                                    <td className="px-4 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-20 sm:w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full transition-all duration-300"
-                                                    style={{
-                                                        width: `${project.progress}%`,
-                                                        backgroundColor: isCompleted
-                                                            ? '#10b981'
-                                                            : 'var(--color-brand-action-orange)',
-                                                    }}
-                                                />
-                                            </div>
-                                            <span className="text-[11px] font-medium text-[color:var(--color-text-main)] w-8">
-                                                {project.progress}%
-                                            </span>
-                                        </div>
-                                    </td>
-
-                                    {/* Committees */}
-                                    <td className="px-4 py-4 whitespace-nowrap text-center font-semibold text-[color:var(--color-text-main)]">
-                                        {project.committeesCount ?? 0}
-                                    </td>
-
-                                    {/* Activities */}
-                                    <td className="px-4 py-4 whitespace-nowrap text-center font-semibold text-[color:var(--color-text-main)]">
-                                        {activitiesCount}
-                                    </td>
-
-                                    {/* Deadline */}
-                                    <td className="px-4 py-4 whitespace-nowrap text-[color:var(--color-text-muted)] text-[11px]">
-                                        {formattedDeadline}
-                                    </td>
-
-                                    {/* Action */}
-                                    <td className="px-5 py-4 whitespace-nowrap text-right">
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold text-[color:var(--color-brand-action-orange)] group-hover:bg-orange-50 transition-colors">
-                                            <span>Open</span>
-                                            <ArrowUpRight className="w-3.5 h-3.5" />
-                                        </span>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
-
-// ─── Empty State Component ───────────────────────────────────────────────────
-interface ProjectsEmptyStateProps {
-    activeTab: 'active' | 'drafts' | 'archived';
-    isFiltered: boolean;
-    searchTerm: string;
-    onResetFilters?: () => void;
-    onCreateClick?: () => void;
-}
-
-function ProjectsEmptyState({
-    activeTab,
-    isFiltered,
-    searchTerm,
-    onResetFilters,
-    onCreateClick,
-}: ProjectsEmptyStateProps) {
-    if (isFiltered) {
-        return (
-            <div className="flex flex-col items-center justify-center py-14 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-dark)] bg-white shadow-2xs">
-                <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
-                    <Search className="w-5 h-5" />
-                </div>
-                <h4 className="text-base font-semibold text-[color:var(--color-text-main)]">
-                    No matching projects found
-                </h4>
-                <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 mb-4 leading-relaxed">
-                    No projects match the search query{' '}
-                    <span className="font-semibold text-[color:var(--color-text-main)]">"{searchTerm}"</span>.
-                </p>
-                {onResetFilters && (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={onResetFilters}
-                        className="text-[color:var(--color-brand-action-orange)] border-[color:var(--color-brand-action-orange)]/40 hover:bg-[color:var(--color-brand-active-warm-orange)]"
-                    >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Clear Search</span>
-                    </Button>
-                )}
-            </div>
-        );
-    }
-
-    if (activeTab === 'archived') {
-        return (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-white shadow-2xs">
-                <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
-                    <Archive className="w-6 h-6" />
-                </div>
-                <h4 className="text-base font-bold text-[color:var(--color-text-main)]">No archived projects</h4>
-                <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 leading-relaxed">
-                    Completed and archived projects will appear here for historical records.
-                </p>
-            </div>
-        );
-    }
-
-    if (activeTab === 'drafts') {
-        return (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-white shadow-2xs">
-                <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
-                    <FileText className="w-6 h-6" />
-                </div>
-                <h4 className="text-base font-bold text-[color:var(--color-text-main)]">No draft projects</h4>
-                <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 leading-relaxed">
-                    Projects in the planning or draft stage will appear here before activation.
-                </p>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-white shadow-2xs">
-            <div className="w-12 h-12 rounded-xl bg-[color:var(--color-surface-subtle)] border border-[color:var(--color-border-light)] flex items-center justify-center text-[color:var(--color-text-subtle)] mb-3 shadow-2xs">
-                <FolderOpen className="w-6 h-6" />
-            </div>
-            <h4 className="text-base font-bold text-[color:var(--color-text-main)]">No active projects</h4>
-            <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-1 mb-5 leading-relaxed">
-                You do not have any active projects yet. Start a new project to get underway.
-            </p>
-            {onCreateClick && (
-                <Button
-                    type="button"
-                    onClick={onCreateClick}
-                    className="bg-[color:var(--color-brand-action-orange)] hover:bg-[color:var(--color-primary-hover)] text-white shadow-xs font-semibold gap-1.5"
-                >
-                    <Plus className="w-4 h-4" />
-                    <span>+ Create Project</span>
-                </Button>
-            )}
-        </div>
-    );
+export interface AvailableUser {
+    id: number;
+    name: string;
+    email: string;
 }
 
 interface ProjectsIndexProps {
     projects: ProjectItem[];
+    availableUsers?: AvailableUser[];
 }
 
-// ─── Main Projects Page Component ─────────────────────────────────────────────
-export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
-    // Top-level tabs matching Image 1: Active | Drafts | Archived
-    const [activeTab, setActiveTab] = useState<'active' | 'drafts' | 'archived'>('active');
+export default function ProjectsIndex({ projects = [], availableUsers = [] }: ProjectsIndexProps) {
+    const [isJoinCodeOpen, setIsJoinCodeOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
-    // View mode state (Card vs List)
-    const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+    // ── URL Synchronization for Filters & Pagination ──
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const initialStatus = searchParams.get('status') || 'ALL';
+    const initialRole = searchParams.get('role') || 'ALL';
+    const initialSearch = searchParams.get('q') || '';
+    const initialPage = parseInt(searchParams.get('page') || '1', 10);
+    const initialSize = parseInt(searchParams.get('size') || '10', 10);
 
-    // Search query state
-    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
+    const [roleFilter, setRoleFilter] = useState<string>(initialRole);
+    const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
+    const [currentPage, setCurrentPage] = useState<number>(Number.isInteger(initialPage) && initialPage > 0 ? initialPage : 1);
+    const [pageSize, setPageSize] = useState<number>([5, 10, 25].includes(initialSize) ? initialSize : 10);
 
-    // Modal / Notice feedback state
-    const [activeNotice, setActiveNotice] = useState<{
-        title: string;
-        message: string;
-    } | null>(null);
+    const updateUrlParams = useCallback((newStatus: string, newRole: string, newQuery: string, newPage: number, newSize: number) => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (newStatus !== 'ALL') url.searchParams.set('status', newStatus); else url.searchParams.delete('status');
+        if (newRole !== 'ALL') url.searchParams.set('role', newRole); else url.searchParams.delete('role');
+        if (newQuery) url.searchParams.set('q', newQuery); else url.searchParams.delete('q');
+        url.searchParams.set('page', String(newPage));
+        url.searchParams.set('size', String(newSize));
+        window.history.replaceState({}, '', url.toString());
+    }, []);
 
-    // Modal state for project creation
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Inertia form handling for project creation
-    const { data, setData, post, processing, errors, reset, clearErrors } = useForm<{
-        title: string;
-        description: string;
-        start_date: string;
-        end_date: string;
-        approval_document: File | null;
-    }>({
-        title: '',
-        description: '',
-        start_date: '',
-        end_date: '',
-        approval_document: null,
-    });
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0] ?? null;
-        setData('approval_document', file);
+    const handleStatusFilterChange = (status: string) => {
+        setStatusFilter(status);
+        setCurrentPage(1);
+        updateUrlParams(status, roleFilter, searchTerm, 1, pageSize);
     };
 
-    const handleRemoveFile = () => {
-        if (processing) return;
-        setData('approval_document', null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+    const handleRoleFilterChange = (role: string) => {
+        setRoleFilter(role);
+        setCurrentPage(1);
+        updateUrlParams(statusFilter, role, searchTerm, 1, pageSize);
     };
 
-    const handleOpenCreateModal = () => {
-        clearErrors();
-        setIsCreateModalOpen(true);
+    const handleSearchChange = (query: string) => {
+        setSearchTerm(query);
+        setCurrentPage(1);
+        updateUrlParams(statusFilter, roleFilter, query, 1, pageSize);
     };
 
-    const handleCloseCreateModal = () => {
-        if (processing) return;
-        setIsCreateModalOpen(false);
-        reset();
-        clearErrors();
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        updateUrlParams(statusFilter, roleFilter, searchTerm, page, pageSize);
     };
 
-    const handleCreateProjectSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (processing) return;
-        post('/projects', {
-            forceFormData: true,
-            onSuccess: () => {
-                handleCloseCreateModal();
-            },
-        });
+    const handlePageSizeChange = (size: number) => {
+        setPageSize(size);
+        setCurrentPage(1);
+        updateUrlParams(statusFilter, roleFilter, searchTerm, 1, size);
     };
 
-    const handleProjectCardSelect = (project: ProjectItem) => {
-        router.visit(`/projects/${project.id}`);
-    };
-
-    const handleArchiveProject = (project: ProjectItem) => {
-        if (confirm(`Are you sure you want to archive "${project.title}"?`)) {
-            router.post(
-                `/projects/${project.id}/archive`,
-                {},
-                {
-                    preserveScroll: true,
-                }
-            );
-        }
-    };
-
-    // Client-side filtering of projects
+    // Filter projects based on search query, status, and role
     const filteredProjects = useMemo(() => {
         return projects.filter((project) => {
-            const isArchived = project.status === 'Archived' || project.status === 'Completed';
-            const isDraft = project.status === 'Planning' || project.status === 'Draft';
-            const isActive = !isArchived && !isDraft;
+            if (statusFilter !== 'ALL') {
+                if (statusFilter === 'Active' && project.status === 'Archived') return false;
+                if (statusFilter !== 'Active' && project.status !== statusFilter) return false;
+            }
 
-            if (activeTab === 'active' && !isActive) return false;
-            if (activeTab === 'drafts' && !isDraft) return false;
-            if (activeTab === 'archived' && !isArchived) return false;
+            if (roleFilter !== 'ALL') {
+                const lowerRole = (project.role || '').toLowerCase();
+                if (roleFilter === 'Leader' && !lowerRole.includes('leader')) return false;
+                if (roleFilter === 'Staff' && !lowerRole.includes('staff')) return false;
+                if (roleFilter === 'Member' && !lowerRole.includes('member')) return false;
+            }
 
-            // Search Term
             if (searchTerm.trim() !== '') {
                 const query = searchTerm.toLowerCase();
                 const matchesTitle = project.title.toLowerCase().includes(query);
@@ -526,318 +131,398 @@ export default function ProjectsIndex({ projects }: ProjectsIndexProps) {
 
             return true;
         });
-    }, [projects, activeTab, searchTerm]);
+    }, [projects, statusFilter, roleFilter, searchTerm]);
 
-    const isFiltered = searchTerm.trim() !== '';
+    // Client pagination (noted as client pagination because backend index returns unpaginated collection)
+    const totalItems = filteredProjects.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safePage = Math.min(currentPage, totalPages);
 
-    const handleResetFilters = () => {
-        setSearchTerm('');
+    const paginatedProjects = useMemo(() => {
+        const start = (safePage - 1) * pageSize;
+        return filteredProjects.slice(start, start + pageSize);
+    }, [filteredProjects, safePage, pageSize]);
+
+    // Archive / Unarchive Handlers
+    const handleArchiveToggle = (project: ProjectItem) => {
+        if (project.status === 'Archived') {
+            router.post(`/projects/${project.id}/unarchive`, {}, { preserveScroll: true });
+        } else {
+            router.post(`/projects/${project.id}/archive`, {}, { preserveScroll: true });
+        }
     };
 
     return (
-        <AppLayout
-            title="My Projects"
-            subtitle={`${projects.length} total ${projects.length === 1 ? 'project' : 'projects'}`}
-            hidePageHeadingBanner={true}
-        >
-            <Head title="My Projects — ITASK" />
+        <AppLayout hidePageHeadingBanner={true}>
+            <Head title="Projects" />
 
-            <div className="space-y-6 max-w-7xl mx-auto pb-10">
-
-                {/* ── Notice Banner Modal / Alert ── */}
-                {activeNotice && (
-                    <div className="p-4 rounded-xl border border-orange-200 bg-[color:var(--color-brand-active-warm-orange)] flex items-start justify-between gap-3 text-xs animate-in fade-in duration-200">
-                        <div className="flex items-start gap-2.5">
-                            <Info className="w-4 h-4 text-[color:var(--color-brand-action-orange)] shrink-0 mt-0.5" />
-                            <div>
-                                <p className="font-bold text-[color:var(--color-brand-dark-green)]">
-                                    {activeNotice.title}
-                                </p>
-                                <p className="text-[color:var(--color-text-muted)] mt-0.5 leading-relaxed">
-                                    {activeNotice.message}
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setActiveNotice(null)}
-                            className="text-[color:var(--color-text-subtle)] hover:text-[color:var(--color-text-main)] p-1 rounded-md hover:bg-white/60 transition-colors cursor-pointer shrink-0"
-                            aria-label="Close notification"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
-
-                {/* ── Page Header: My Projects + Create Project button ── */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
+            <div className="space-y-6">
+                {/* ══ 1. Page Header ══ */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[color:var(--border)]">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-[color:var(--color-text-main)] leading-tight">
-                            My Projects
+                        <h1 className="text-[26px] font-bold text-[color:var(--text)] tracking-tight">
+                            Projects
                         </h1>
-                        <p className="text-xs text-[color:var(--color-text-muted)] mt-1 font-normal">
-                            {projects.length} total {projects.length === 1 ? 'project' : 'projects'}
+                        <p className="text-[15px] text-[color:var(--muted)] mt-1">
+                            Team workspaces, committees, and collective deliverables.
                         </p>
                     </div>
 
-                    <Button
-                        type="button"
-                        onClick={handleOpenCreateModal}
-                        className="bg-[color:var(--color-brand-action-orange)] hover:bg-[color:var(--color-primary-hover)] text-white shadow-xs font-semibold gap-1.5 cursor-pointer"
-                        title="Create a new project"
-                    >
-                        <Plus className="w-4 h-4 shrink-0" strokeWidth={2.4} />
-                        <span>+ Create Project</span>
-                    </Button>
-                </div>
-
-                {/* ── Filter Tabs: Active, Drafts, Archived ── */}
-                <div className="flex items-center gap-8 border-b border-[color:var(--color-border-light)]">
-                    {(['active', 'drafts', 'archived'] as const).map((tab) => {
-                        const isActive = activeTab === tab;
-                        const labels: Record<string, string> = {
-                            active: 'Active',
-                            drafts: 'Drafts',
-                            archived: 'Archived',
-                        };
-                        return (
-                            <button
-                                key={tab}
-                                type="button"
-                                onClick={() => setActiveTab(tab)}
-                                className={`pb-3 text-xs sm:text-sm font-semibold transition-all relative cursor-pointer ${
-                                    isActive
-                                        ? 'text-[color:var(--color-brand-dark-green)] font-bold'
-                                        : 'text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)]'
-                                }`}
-                            >
-                                <span>{labels[tab]}</span>
-                                {isActive && (
-                                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--color-brand-action-orange)] rounded-full" />
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* ── Separated Search Bar and View Switcher Row ── */}
-                <div className="flex items-center justify-between gap-4">
-                    {/* Standalone Search Projects input */}
-                    <div className="relative w-full max-w-xs sm:max-w-sm">
-                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--color-text-subtle)] pointer-events-none" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search projects..."
-                            className="w-full pl-8.5 pr-8 py-2 text-xs bg-white rounded-lg border border-[color:var(--color-border-light)] placeholder:text-[color:var(--color-text-subtle)] focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] focus:ring-2 focus:ring-[color:var(--color-brand-action-orange)]/20 shadow-2xs transition-all text-[color:var(--color-text-main)]"
-                        />
-                        {searchTerm && (
-                            <button
-                                type="button"
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--color-text-subtle)] hover:text-[color:var(--color-text-main)] cursor-pointer p-0.5"
-                                aria-label="Clear search"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* View Switcher: Grid vs List */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                            type="button"
-                            onClick={() => setViewMode('card')}
-                            className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                                viewMode === 'card'
-                                    ? 'bg-[color:var(--color-brand-dark-green)] text-white shadow-2xs'
-                                    : 'text-[color:var(--color-text-subtle)] hover:text-[color:var(--color-text-main)] hover:bg-[color:var(--color-surface-muted)]'
-                            }`}
-                            title="Grid view"
-                            aria-label="Switch to Card view"
+                    <div className="flex items-center gap-2.5 shrink-0">
+                        <Button
+                            variant="secondary"
+                            size="md"
+                            onClick={() => setIsJoinCodeOpen(true)}
                         >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                                viewMode === 'list'
-                                    ? 'bg-[color:var(--color-brand-dark-green)] text-white shadow-2xs'
-                                    : 'text-[color:var(--color-text-subtle)] hover:text-[color:var(--color-text-main)] hover:bg-[color:var(--color-surface-muted)]'
-                            }`}
-                            title="List view"
-                            aria-label="Switch to List view"
+                            <span>Join with code</span>
+                        </Button>
+                        <Button
+                            variant="primary"
+                            size="md"
+                            onClick={() => openCreateProjectModal()}
                         >
-                            <List className="w-4 h-4" />
-                        </button>
+                            <Plus className="w-4 h-4 mr-1.5" strokeWidth={2} />
+                            <span>Create project</span>
+                        </Button>
                     </div>
                 </div>
 
-                {/* ── Content Area: Dynamic based on filters ── */}
-                {filteredProjects.length === 0 ? (
-                    <ProjectsEmptyState
-                        activeTab={activeTab}
-                        isFiltered={isFiltered}
-                        searchTerm={searchTerm}
-                        onResetFilters={handleResetFilters}
-                        onCreateClick={handleOpenCreateModal}
-                    />
-                ) : (
-                    <div>
-                        {/* Projects Display: Card Grid vs List View */}
-                        {viewMode === 'card' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {filteredProjects.map((project) => (
-                                    <ProjectCard
-                                        key={project.id}
-                                        project={project}
-                                        onSelect={handleProjectCardSelect}
-                                        onArchive={handleArchiveProject}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <ProjectList
-                                projects={filteredProjects}
-                                onSelect={handleProjectCardSelect}
-                                onArchive={handleArchiveProject}
+                {/* ══ 2. Filters & View Switcher ══ */}
+                <Card className="p-4 space-y-3">
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                        {/* Search Input */}
+                        <div className="relative flex-1">
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] pointer-events-none" />
+                            <input
+                                type="text"
+                                placeholder="Search projects by title or description..."
+                                value={searchTerm}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] placeholder:text-[color:var(--muted)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors"
                             />
-                        )}
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSearchChange('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer"
+                                    aria-label="Clear search"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Status Filter */}
+                        <div className="shrink-0 w-full md:w-44">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => handleStatusFilterChange(e.target.value)}
+                                className="w-full py-2 px-3 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
+                                aria-label="Filter by project status"
+                            >
+                                <option value="ALL">All statuses</option>
+                                <option value="Active">Active only</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Archived">Archived</option>
+                            </select>
+                        </div>
+
+                        {/* Role Filter */}
+                        <div className="shrink-0 w-full md:w-44">
+                            <select
+                                value={roleFilter}
+                                onChange={(e) => handleRoleFilterChange(e.target.value)}
+                                className="w-full py-2 px-3 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
+                                aria-label="Filter by my role"
+                            >
+                                <option value="ALL">All my roles</option>
+                                <option value="Leader">Leader</option>
+                                <option value="Staff">Staff</option>
+                                <option value="Member">Member</option>
+                            </select>
+                        </div>
+
+                        {/* View Mode Toggle */}
+                        <div className="flex items-center gap-1 border border-[color:var(--border)] rounded-[8px] p-1 bg-[color:var(--soft-surface)] shrink-0 self-end md:self-auto">
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('table')}
+                                className={`p-1.5 rounded-[6px] transition-colors cursor-pointer ${
+                                    viewMode === 'table'
+                                        ? 'bg-[color:var(--card)] text-[color:var(--text)] shadow-xs'
+                                        : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
+                                }`}
+                                aria-label="Table view"
+                            >
+                                <List className="w-4 h-4 stroke-[2]" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setViewMode('grid')}
+                                className={`p-1.5 rounded-[6px] transition-colors cursor-pointer ${
+                                    viewMode === 'grid'
+                                        ? 'bg-[color:var(--card)] text-[color:var(--text)] shadow-xs'
+                                        : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
+                                }`}
+                                aria-label="Grid view"
+                            >
+                                <LayoutGrid className="w-4 h-4 stroke-[2]" />
+                            </button>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* ══ 3. Project Content (Table or Grid) ══ */}
+                {totalItems === 0 ? (
+                    <EmptyState
+                        title="No projects found"
+                        description={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'No projects match your active search and filter criteria.' : 'You have not joined or created any projects yet.'}
+                        actionLabel={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'Reset filters' : 'Create a project'}
+                        onAction={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? () => {
+                            setStatusFilter('ALL');
+                            setRoleFilter('ALL');
+                            setSearchTerm('');
+                            updateUrlParams('ALL', 'ALL', '', 1, pageSize);
+                        } : openCreateProjectModal}
+                    />
+                ) : viewMode === 'table' ? (
+                    /* Table View */
+                    <Card className="p-5 space-y-4">
+                        <div className="overflow-x-auto -mx-5 px-5">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-[color:var(--border)] text-[12px] font-semibold text-[color:var(--muted)] uppercase tracking-wider">
+                                        <th className="py-2.5 pr-4">Project</th>
+                                        <th className="py-2.5 px-3">Status</th>
+                                        <th className="py-2.5 px-3">Progress</th>
+                                        <th className="py-2.5 px-3">Committees</th>
+                                        <th className="py-2.5 px-3">Tasks</th>
+                                        <th className="py-2.5 px-3">Deadline</th>
+                                        <th className="py-2.5 pl-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[color:var(--border)] text-[14px]">
+                                    {paginatedProjects.map((project) => {
+                                        const isArchived = project.status === 'Archived';
+                                        const isLeader = (project.role || '').toLowerCase().includes('leader');
+
+                                        return (
+                                            <tr
+                                                key={project.id}
+                                                className={`hover:bg-[color:var(--soft-surface)] transition-colors group ${
+                                                    isArchived ? 'opacity-60' : ''
+                                                }`}
+                                            >
+                                                {/* Project */}
+                                                <td className="py-3.5 pr-4 min-w-[220px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <Link
+                                                            href={`/projects/${project.id}`}
+                                                            className="font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate"
+                                                        >
+                                                            {project.title}
+                                                        </Link>
+                                                        <ProjectRoleBadge role={project.role} />
+                                                    </div>
+                                                    {project.description && (
+                                                        <p className="text-[12px] text-[color:var(--muted)] truncate max-w-sm mt-0.5">
+                                                            {project.description}
+                                                        </p>
+                                                    )}
+                                                </td>
+
+                                                {/* Status */}
+                                                <td className="py-3.5 px-3 whitespace-nowrap">
+                                                    <Badge variant={isArchived ? 'soft' : project.progress >= 60 || project.status === 'Completed' ? 'accent' : 'secondary'}>
+                                                        {project.status}
+                                                    </Badge>
+                                                </td>
+
+                                                {/* Progress */}
+                                                <td className="py-3.5 px-3 min-w-[140px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 h-2 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-[color:var(--primary)] rounded-full transition-all duration-300"
+                                                                style={{ width: `${project.progress}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-[12px] font-medium text-[color:var(--text)] tabular-nums w-8 text-right">
+                                                            {project.progress}%
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Committees */}
+                                                <td className="py-3.5 px-3 whitespace-nowrap text-[13px] text-[color:var(--muted)] tabular-nums">
+                                                    {project.committeesCount}
+                                                </td>
+
+                                                {/* Tasks */}
+                                                <td className="py-3.5 px-3 whitespace-nowrap text-[13px] text-[color:var(--muted)] tabular-nums">
+                                                    {project.tasksCount}
+                                                </td>
+
+                                                {/* Deadline */}
+                                                <td className="py-3.5 px-3 whitespace-nowrap text-[13px] text-[color:var(--muted)] tabular-nums">
+                                                    {project.deadline}
+                                                </td>
+
+                                                {/* Actions */}
+                                                <td className="py-3.5 pl-3 whitespace-nowrap text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <Link href={`/projects/${project.id}`}>
+                                                            <Button variant="outline" size="sm">
+                                                                Open
+                                                            </Button>
+                                                        </Link>
+
+                                                        {isLeader && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleArchiveToggle(project)}
+                                                                title={isArchived ? 'Restore project' : 'Archive project'}
+                                                                className="p-1.5 rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                                                aria-label={isArchived ? `Restore ${project.title}` : `Archive ${project.title}`}
+                                                            >
+                                                                {isArchived ? (
+                                                                    <RotateCw className="w-4 h-4 stroke-[2]" />
+                                                                ) : (
+                                                                    <Archive className="w-4 h-4 stroke-[2]" />
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination */}
+                        <div className="pt-2 border-t border-[color:var(--border)]">
+                            <Pagination
+                                currentPage={safePage}
+                                totalPages={totalPages}
+                                totalItems={totalItems}
+                                pageSize={pageSize}
+                                onPageChange={handlePageChange}
+                                onPageSizeChange={handlePageSizeChange}
+                                pageSizeOptions={[5, 10, 25]}
+                            />
+                        </div>
+                    </Card>
+                ) : (
+                    /* Grid View */
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            {paginatedProjects.map((project) => {
+                                const isArchived = project.status === 'Archived';
+                                const isLeader = (project.role || '').toLowerCase().includes('leader');
+
+                                return (
+                                    <Card
+                                        key={project.id}
+                                        className={`p-5 flex flex-col justify-between space-y-4 hover:border-[color:var(--primary)] transition-colors ${
+                                            isArchived ? 'opacity-60' : ''
+                                        }`}
+                                    >
+                                        <div className="space-y-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <Link
+                                                        href={`/projects/${project.id}`}
+                                                        className="font-bold text-[16px] text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate block"
+                                                    >
+                                                        {project.title}
+                                                    </Link>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <ProjectRoleBadge role={project.role} />
+                                                        <Badge variant={isArchived ? 'soft' : project.progress >= 60 || project.status === 'Completed' ? 'accent' : 'secondary'}>
+                                                            {project.status}
+                                                        </Badge>
+                                                    </div>
+                                                </div>
+
+                                                {isLeader && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleArchiveToggle(project)}
+                                                        title={isArchived ? 'Restore' : 'Archive'}
+                                                        className="p-1 rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors cursor-pointer"
+                                                        aria-label={isArchived ? `Restore ${project.title}` : `Archive ${project.title}`}
+                                                    >
+                                                        {isArchived ? <RotateCw className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {project.description && (
+                                                <p className="text-[13px] text-[color:var(--muted)] line-clamp-2">
+                                                    {project.description}
+                                                </p>
+                                            )}
+
+                                            {/* Progress */}
+                                            <div className="space-y-1.5 pt-1">
+                                                <div className="flex items-center justify-between text-[12px]">
+                                                    <span className="text-[color:var(--muted)]">Progress</span>
+                                                    <span className="font-bold text-[color:var(--text)] tabular-nums">
+                                                        {project.progress}%
+                                                    </span>
+                                                </div>
+                                                <div className="w-full h-2 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-[color:var(--primary)] rounded-full transition-all duration-300"
+                                                        style={{ width: `${project.progress}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Stats list */}
+                                            <div className="flex items-center justify-between text-[12px] text-[color:var(--muted)] pt-2 border-t border-[color:var(--border)]">
+                                                <span>{project.committeesCount} committees</span>
+                                                <span>{project.tasksCount} tasks</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between pt-3 border-t border-[color:var(--border)]">
+                                            <span className="text-[12px] text-[color:var(--muted)] tabular-nums">
+                                                {project.deadline}
+                                            </span>
+                                            <Link href={`/projects/${project.id}`}>
+                                                <Button variant="outline" size="sm">
+                                                    Open
+                                                </Button>
+                                            </Link>
+                                        </div>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+
+                        {/* Pagination */}
+                        <Card className="p-4">
+                            <Pagination
+                                currentPage={safePage}
+                                totalPages={totalPages}
+                                totalItems={totalItems}
+                                pageSize={pageSize}
+                                onPageChange={handlePageChange}
+                                onPageSizeChange={handlePageSizeChange}
+                                pageSizeOptions={[5, 10, 25]}
+                            />
+                        </Card>
                     </div>
                 )}
-
-                {/* ── Create Project Modal ── */}
-                <Modal
-                    isOpen={isCreateModalOpen}
-                    onClose={() => !processing && handleCloseCreateModal()}
-                    title="Create New Project"
-                    description="Initiate a new CCIS project workspace. As the creator, you will automatically be assigned as Project Leader."
-                    maxWidth="md"
-                >
-                    <form onSubmit={handleCreateProjectSubmit} className="space-y-4 pt-1">
-                        <FormField
-                            label="Project Title"
-                            id="create-project-title"
-                            name="title"
-                            value={data.title}
-                            onChange={(e) => setData('title', e.target.value)}
-                            error={errors.title}
-                            required
-                            placeholder="e.g., CCIS General Assembly 2026"
-                            autoFocus
-                        />
-
-                        <div className="space-y-1">
-                            <Label htmlFor="create-project-description">Description</Label>
-                            <textarea
-                                id="create-project-description"
-                                name="description"
-                                rows={3}
-                                value={data.description}
-                                onChange={(e) => setData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-[color:var(--color-border-dark)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--color-brand-action-orange)]/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-[color:var(--color-text-subtle)]"
-                                placeholder="Brief project charter, scope, or background..."
-                            />
-                            <InputError message={errors.description} />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <FormField
-                                label="Start Date"
-                                id="create-project-start-date"
-                                type="date"
-                                value={data.start_date}
-                                onChange={(e) => setData('start_date', e.target.value)}
-                                error={errors.start_date}
-                            />
-
-                            <FormField
-                                label="End Date"
-                                id="create-project-end-date"
-                                type="date"
-                                value={data.end_date}
-                                onChange={(e) => setData('end_date', e.target.value)}
-                                error={errors.end_date}
-                                helperText="Target conclusion date"
-                            />
-                        </div>
-
-                        {/* Approval / Supporting Document Upload */}
-                        <div className="space-y-1.5">
-                            <Label htmlFor="create-project-document" required>
-                                Approval / Supporting Document
-                            </Label>
-                            <div className="p-3 border border-dashed border-[color:var(--color-border-dark)] rounded-lg bg-[color:var(--color-surface-subtle)] hover:bg-[color:var(--color-surface-muted)] transition-colors">
-                                {data.approval_document ? (
-                                    <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-md border border-[color:var(--color-border-light)]">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <FileText className="w-4 h-4 text-[color:var(--color-brand-action-orange)] shrink-0" />
-                                            <span className="text-xs font-medium text-[color:var(--color-text-main)] truncate">
-                                                {data.approval_document.name}
-                                            </span>
-                                            <span className="text-[10px] text-[color:var(--color-text-subtle)] shrink-0">
-                                                ({(data.approval_document.size / 1024).toFixed(0)} KB)
-                                            </span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveFile}
-                                            className="text-xs text-rose-600 hover:text-rose-700 font-semibold shrink-0 cursor-pointer p-1"
-                                            title="Remove selected file"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-2 text-center">
-                                        <input
-                                            ref={fileInputRef}
-                                            id="create-project-document"
-                                            name="approval_document"
-                                            type="file"
-                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                            onChange={handleFileChange}
-                                            className="hidden"
-                                        />
-                                        <label
-                                            htmlFor="create-project-document"
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-[color:var(--color-brand-action-orange)] bg-[color:var(--color-brand-active-warm-orange)] border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
-                                        >
-                                            <Plus className="w-3.5 h-3.5" />
-                                            <span>Attach Official Document</span>
-                                        </label>
-                                        <p className="text-[11px] text-[color:var(--color-text-muted)] mt-1.5">
-                                            Approved memo, activity design, or letter (PDF, Word, Image · max 10MB)
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                            <InputError message={errors.approval_document} />
-                        </div>
-
-                        <div className="pt-3 border-t border-[color:var(--color-border-light)] flex items-center justify-end gap-2.5">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleCloseCreateModal}
-                                disabled={processing}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={processing}
-                                className="bg-[color:var(--color-brand-action-orange)] hover:bg-[color:var(--color-primary-hover)] text-white shadow-xs font-semibold"
-                            >
-                                Create Project
-                            </Button>
-                        </div>
-                    </form>
-                </Modal>
-
             </div>
+
+            <JoinProjectModal
+                isOpen={isJoinCodeOpen}
+                onClose={() => setIsJoinCodeOpen(false)}
+            />
         </AppLayout>
     );
 }

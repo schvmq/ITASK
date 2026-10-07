@@ -1,6 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { Head, Link, usePage, router } from '@inertiajs/react';
-import { AppLayout } from '@/Layouts/AppLayout';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { AppLayout, openCreateProjectModal } from '@/Layouts/AppLayout';
 import {
     PageProps,
     DashboardProject,
@@ -15,25 +15,28 @@ import {
     AlertCircle,
     Clock,
     ClipboardCheck,
-    ChevronRight,
     AlertTriangle,
-    Bell,
     FolderOpen,
     Plus,
-    CalendarDays,
     Calendar,
+    ArrowRight,
     Sparkles,
-    Check,
-    ExternalLink,
-    HelpCircle,
-    ArrowUpRight,
+    FileText,
+    Users,
+    Activity,
+    BookOpen,
+    CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/Components/Button';
 import { Badge } from '@/Components/Badge';
+import { Card } from '@/Components/Card';
+import { Checkbox } from '@/Components/Checkbox';
+import { Tabs } from '@/Components/Tabs';
+import { Pagination } from '@/Components/Pagination';
+import { EmptyState } from '@/Components/EmptyState';
 import { ProjectRoleBadge } from '@/Components/ProjectRoleBadge';
-import { CreateProjectModal } from '@/Components/CreateProjectModal';
 import { JoinProjectModal } from '@/Components/JoinProjectModal';
-import { NumberCounter } from '@/Components/NumberCounter';
+import { Avatar, AvatarFallback } from '@/Components/ui/avatar';
 
 interface DashboardPageProps {
     primaryRole?: string;
@@ -46,6 +49,15 @@ interface DashboardPageProps {
     unreadNotificationsCount?: number;
 }
 
+function getInitials(name: string): string {
+    return name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0].toUpperCase())
+        .join('');
+}
+
 export default function Welcome({
     primaryRole = 'Project Member',
     stats,
@@ -56,178 +68,311 @@ export default function Welcome({
     unreadNotificationsCount = 0,
 }: DashboardPageProps) {
     const { auth } = usePage<PageProps>().props;
-    const user = auth?.user;
-    const firstName = user?.name?.split(' ')[0] ?? 'there';
-
-    // Modals
-    const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
     const [isJoinCodeOpen, setIsJoinCodeOpen] = useState(false);
 
-    // Dynamic greeting based on time of day
-    const greeting = useMemo(() => {
-        const hour = new Date().getHours();
-        if (hour < 12) return 'Good morning';
-        if (hour < 17) return 'Good afternoon';
-        return 'Good evening';
+    // Track locally completed or submitting task IDs for smooth optimistic feedback
+    const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(new Set());
+
+    // ── URL Synchronization for Projects Table (tab, page, size) ──
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const initialTab = searchParams.get('tab') || 'all';
+    const initialPage = parseInt(searchParams.get('page') || '1', 10);
+    const initialSize = parseInt(searchParams.get('size') || '5', 10);
+
+    const [activeTab, setActiveTab] = useState<string>(['all', 'on-track', 'at-risk'].includes(initialTab) ? initialTab : 'all');
+    const [currentPage, setCurrentPage] = useState<number>(Number.isInteger(initialPage) && initialPage > 0 ? initialPage : 1);
+    const [pageSize, setPageSize] = useState<number>([5, 10, 25].includes(initialSize) ? initialSize : 5);
+
+    // Sync URL query params with state
+    const updateUrlParams = useCallback((newTab: string, newPage: number, newSize: number) => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', newTab);
+        url.searchParams.set('page', String(newPage));
+        url.searchParams.set('size', String(newSize));
+        window.history.replaceState({}, '', url.toString());
     }, []);
 
-    // Format today's date & day string
-    const todayInfo = useMemo(() => {
-        const today = new Date();
-        const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
-        const monthDay = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        return {
-            dateStr: `${dayName}, ${monthDay}`,
-            dayIndex: today.getDay(), // 0 = Sun, 6 = Sat
-            todayDate: today,
-        };
-    }, []);
+    const handleTabChange = (newTab: string) => {
+        setActiveTab(newTab);
+        setCurrentPage(1); // Reset to page 1 when filter/tab changes
+        updateUrlParams(newTab, 1, pageSize);
+    };
 
-    // Count tasks due today or overdue for greeting context line
-    const dueTodayCount = useMemo(() => {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        return assignedTasks.filter(
-            (t) => t.status !== 'Completed' && t.due_date === todayStr
-        ).length;
+    const handlePageChange = (newPage: number) => {
+        setCurrentPage(newPage);
+        updateUrlParams(activeTab, newPage, pageSize);
+    };
+
+    const handlePageSizeChange = (newSize: number) => {
+        setPageSize(newSize);
+        setCurrentPage(1);
+        updateUrlParams(activeTab, 1, newSize);
+    };
+
+    // ── Today & Overdue Calculations for Summary ──
+    const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+    const overdueTasks = useMemo(() => {
+        return assignedTasks.filter((t) => t.is_overdue && t.status !== 'Completed');
     }, [assignedTasks]);
 
-    const contextMessage = useMemo(() => {
-        if (dueTodayCount > 0) {
-            return `You have ${dueTodayCount} deliverable${dueTodayCount === 1 ? '' : 's'} due today.`;
-        }
-        const overdue = assignedTasks.filter((t) => t.is_overdue && t.status !== 'Completed').length;
-        if (overdue > 0) {
-            return `You have ${overdue} item${overdue === 1 ? '' : 's'} requiring revision or overdue.`;
-        }
-        return 'You have nothing due today. A good time to plan ahead.';
-    }, [dueTodayCount, assignedTasks]);
+    const dueTodayTasks = useMemo(() => {
+        return assignedTasks.filter(
+            (t) => !t.is_overdue && t.status !== 'Completed' && t.due_date === todayStr
+        );
+    }, [assignedTasks, todayStr]);
 
-    const isLeader = primaryRole === 'Project Leader';
-    const isStaff = primaryRole === 'Project Staff';
-    const isMember = primaryRole === 'Project Member';
+    const focusCount = overdueTasks.length + dueTodayTasks.length;
+    const overdueCount = overdueTasks.length;
 
-    // ── Build actionable "Needs Your Attention" items ──
+    // Summary line formatted per Section 4 requirement
+    const summaryText = useMemo(() => {
+        if (focusCount === 0 && overdueCount === 0) {
+            return 'All deliverables are up to date. You have no urgent items today.';
+        }
+        const taskWord = focusCount === 1 ? 'task' : 'tasks';
+        const overduePhrase = overdueCount === 1 ? '1 is overdue' : `${overdueCount} are overdue`;
+        return `You have ${focusCount} ${taskWord} to focus on today, and ${overduePhrase}.`;
+    }, [focusCount, overdueCount]);
+
+    // ── Attention Items (Strict Ordering: Overdue first, Due today, High priority/approaching/returned) ──
     const attentionItems = useMemo(() => {
         const items: Array<{
             id: string;
-            type: 'pending_review' | 'returned_task' | 'overdue_task' | 'approaching_task';
+            taskId?: string;
+            type: 'overdue' | 'today' | 'returned' | 'review' | 'approaching';
             title: string;
             projectTitle: string;
             committeeName?: string;
             activityTitle?: string;
             actionUrl: string;
-            actionLabel: string;
-            urgency: 'critical' | 'urgent' | 'warning';
+            badgeVariant: 'danger' | 'warning' | 'primary' | 'secondary' | 'accent';
             badgeLabel: string;
-            actionReason: string;
-            dateFormatted?: string;
+            dueDateFormatted?: string;
+            requiresReview?: boolean;
+            isCompletedLocal?: boolean;
+            rawTask?: DashboardTask;
         }> = [];
 
-        // 1. Returned tasks (highest priority: member needs to revise and resubmit)
+        // 1. Overdue tasks first
+        overdueTasks.forEach((task) => {
+            items.push({
+                id: `task-${task.id}`,
+                taskId: task.id,
+                type: 'overdue',
+                title: task.title,
+                projectTitle: task.project.title,
+                committeeName: task.committee.name,
+                activityTitle: task.activity.title,
+                actionUrl: task.action_url,
+                badgeVariant: 'danger',
+                badgeLabel: 'Overdue',
+                dueDateFormatted: task.due_date_formatted,
+                requiresReview: task.requires_review,
+                rawTask: task,
+            });
+        });
+
+        // 2. Due today
+        dueTodayTasks.forEach((task) => {
+            items.push({
+                id: `task-${task.id}`,
+                taskId: task.id,
+                type: 'today',
+                title: task.title,
+                projectTitle: task.project.title,
+                committeeName: task.committee.name,
+                activityTitle: task.activity.title,
+                actionUrl: task.action_url,
+                badgeVariant: 'warning',
+                badgeLabel: 'Due today',
+                dueDateFormatted: task.due_date_formatted,
+                requiresReview: task.requires_review,
+                rawTask: task,
+            });
+        });
+
+        // 3. Returned tasks (requires revision)
         assignedTasks
-            .filter((task) => task.status === 'Returned')
+            .filter((t) => t.status === 'Returned' && !items.some((i) => i.taskId === t.id))
             .forEach((task) => {
                 items.push({
-                    id: `returned-${task.id}`,
-                    type: 'returned_task',
+                    id: `task-${task.id}`,
+                    taskId: task.id,
+                    type: 'returned',
                     title: task.title,
                     projectTitle: task.project.title,
                     committeeName: task.committee.name,
                     activityTitle: task.activity.title,
                     actionUrl: task.action_url,
-                    actionLabel: 'Revise task',
-                    urgency: 'critical',
+                    badgeVariant: 'danger',
                     badgeLabel: 'Revision required',
-                    actionReason: 'Returned by reviewer with feedback notes. Update deliverables and resubmit.',
-                    dateFormatted: task.due_date_formatted,
+                    dueDateFormatted: task.due_date_formatted,
+                    requiresReview: task.requires_review,
+                    rawTask: task,
                 });
             });
 
-        // 2. Pending reviews (for Staff and Leader)
-        if (isStaff || isLeader) {
-            pendingReviews.forEach((review) => {
-                items.push({
-                    id: `review-${review.type}-${review.id}`,
-                    type: 'pending_review',
-                    title: review.title,
-                    projectTitle: review.project.title,
-                    committeeName: review.committee.name,
-                    activityTitle: review.activity.title,
-                    actionUrl: review.action_url,
-                    actionLabel: review.type === 'task' ? 'Review task' : 'Review activity',
-                    urgency: 'urgent',
-                    badgeLabel: 'Review needed',
-                    actionReason: `Submitted by ${review.submitted_by} · Awaiting your approval`,
-                    dateFormatted: review.updated_at,
-                });
+        // 4. Pending reviews (for staff or leader)
+        pendingReviews.forEach((review) => {
+            items.push({
+                id: `review-${review.type}-${review.id}`,
+                type: 'review',
+                title: review.title,
+                projectTitle: review.project.title,
+                committeeName: review.committee.name,
+                activityTitle: review.activity.title,
+                actionUrl: review.action_url,
+                badgeVariant: 'secondary',
+                badgeLabel: 'In review',
+                dueDateFormatted: review.updated_at,
             });
-        }
+        });
 
-        // 3. Overdue assigned tasks
+        // 5. Approaching tasks (within 2 days, not already added)
         assignedTasks
             .filter(
-                (task) =>
-                    task.is_overdue &&
-                    task.status !== 'Completed' &&
-                    task.status !== 'Returned'
+                (t) =>
+                    t.is_approaching &&
+                    t.status !== 'Completed' &&
+                    t.status !== 'Returned' &&
+                    !items.some((i) => i.taskId === t.id)
             )
             .forEach((task) => {
                 items.push({
-                    id: `overdue-${task.id}`,
-                    type: 'overdue_task',
+                    id: `task-${task.id}`,
+                    taskId: task.id,
+                    type: 'approaching',
                     title: task.title,
                     projectTitle: task.project.title,
                     committeeName: task.committee.name,
                     activityTitle: task.activity.title,
                     actionUrl: task.action_url,
-                    actionLabel: 'Open task',
-                    urgency: 'critical',
-                    badgeLabel: 'Overdue',
-                    actionReason: `Past deadline (${task.due_date_formatted}). Complete and submit deliverables.`,
-                    dateFormatted: task.due_date_formatted,
-                });
-            });
-
-        // 4. Tasks approaching due date (within 2 days)
-        assignedTasks
-            .filter(
-                (task) =>
-                    task.is_approaching &&
-                    task.status !== 'Completed' &&
-                    task.status !== 'Returned' &&
-                    !task.is_overdue
-            )
-            .forEach((task) => {
-                items.push({
-                    id: `approaching-${task.id}`,
-                    type: 'approaching_task',
-                    title: task.title,
-                    projectTitle: task.project.title,
-                    committeeName: task.committee.name,
-                    activityTitle: task.activity.title,
-                    actionUrl: task.action_url,
-                    actionLabel: 'Open task',
-                    urgency: 'warning',
+                    badgeVariant: 'secondary',
                     badgeLabel: 'Due soon',
-                    actionReason: `Due ${task.due_date_formatted}. Work on task deliverables.`,
-                    dateFormatted: task.due_date_formatted,
+                    dueDateFormatted: task.due_date_formatted,
+                    requiresReview: task.requires_review,
+                    rawTask: task,
                 });
             });
 
         return items;
-    }, [assignedTasks, pendingReviews, isStaff, isLeader]);
+    }, [overdueTasks, dueTodayTasks, assignedTasks, pendingReviews]);
 
-    const displayedAttentionItems = attentionItems.slice(0, 5);
+    // Local optimistic state for checked/unchecked tasks
+    const [locallyCompletedTaskIds, setLocallyCompletedTaskIds] = useState<Set<string>>(new Set());
+    const [locallyUncompletedTaskIds, setLocallyUncompletedTaskIds] = useState<Set<string>>(new Set());
 
-    // Active ongoing projects (max 4)
-    const activeProjects = useMemo(() => {
-        return projects.filter((p) => p.status !== 'Archived').slice(0, 4);
-    }, [projects]);
+    const isTaskCompleted = useCallback((taskId: string, initialStatus: string) => {
+        const idStr = String(taskId);
+        if (locallyCompletedTaskIds.has(idStr)) return true;
+        if (locallyUncompletedTaskIds.has(idStr)) return false;
+        return initialStatus === 'Completed';
+    }, [locallyCompletedTaskIds, locallyUncompletedTaskIds]);
 
-    // Stat numbers (calculated from real data)
-    const activeProjectsCount = stats?.activeProjectsCount ?? projects.filter((p) => p.status !== 'Archived').length;
-    
-    // Due this week count: tasks with due dates in the next 7 days
+    // Universal task completion toggle that updates the Progress Bar immediately
+    const handleToggleAssignedTask = useCallback((task: DashboardTask) => {
+        const taskIdStr = String(task.id);
+        const isDone = isTaskCompleted(taskIdStr, task.status);
+
+        // Optimistic toggle
+        if (isDone) {
+            setLocallyCompletedTaskIds((prev) => {
+                const next = new Set(prev);
+                next.delete(taskIdStr);
+                return next;
+            });
+            setLocallyUncompletedTaskIds((prev) => new Set(prev).add(taskIdStr));
+        } else {
+            setLocallyUncompletedTaskIds((prev) => {
+                const next = new Set(prev);
+                next.delete(taskIdStr);
+                return next;
+            });
+            setLocallyCompletedTaskIds((prev) => new Set(prev).add(taskIdStr));
+        }
+
+        const newCompleting = new Set(completingTaskIds);
+        newCompleting.add(`task-${taskIdStr}`);
+        setCompletingTaskIds(newCompleting);
+
+        if (!isDone && task.requires_review) {
+            router.post(
+                `/projects/${task.project.id}/committees/${task.committee.id}/activities/${task.activity.id}/tasks/${task.id}/submit`,
+                {},
+                {
+                    preserveScroll: true,
+                    onFinish: () => {
+                        setCompletingTaskIds((prev) => {
+                            const updated = new Set(prev);
+                            updated.delete(`task-${taskIdStr}`);
+                            return updated;
+                        });
+                    },
+                }
+            );
+        } else {
+            const nextStatus = isDone ? 'In Progress' : 'Completed';
+            router.patch(
+                `/projects/${task.project.id}/committees/${task.committee.id}/activities/${task.activity.id}/tasks/${task.id}`,
+                { status: nextStatus },
+                {
+                    preserveScroll: true,
+                    onFinish: () => {
+                        setCompletingTaskIds((prev) => {
+                            const updated = new Set(prev);
+                            updated.delete(`task-${taskIdStr}`);
+                            return updated;
+                        });
+                    },
+                }
+            );
+        }
+    }, [isTaskCompleted, completingTaskIds]);
+
+    // Handle Inline Task Completion from Attention Items
+    const handleToggleTaskCompletion = (item: (typeof attentionItems)[0]) => {
+        if (!item.rawTask) {
+            router.visit(item.actionUrl);
+            return;
+        }
+        handleToggleAssignedTask(item.rawTask);
+    };
+
+    // ── Reactive Progress Bar Computation (updates immediately when any task is checked) ──
+    const computedCompletedTasks = useMemo(() => {
+        return assignedTasks.filter((t) => isTaskCompleted(String(t.id), t.status));
+    }, [assignedTasks, isTaskCompleted]);
+
+    const completedTasksCount = computedCompletedTasks.length;
+    const totalTasksCount = assignedTasks.length;
+    const percentDone = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 100;
+
+    // ── Tasks Ordered by Strict Hierarchy of Importance ──
+    // Tier 1: Overdue -> Tier 2: Revision Required -> Tier 3: Due Today -> Tier 4: In Review -> Tier 5: Due Soon -> Tier 6: Other Active -> Tier 7: Completed
+    const hierarchyOrderedTasks = useMemo(() => {
+        return [...assignedTasks].sort((a, b) => {
+            const aDone = isTaskCompleted(String(a.id), a.status);
+            const bDone = isTaskCompleted(String(b.id), b.status);
+            if (aDone !== bDone) return aDone ? 1 : -1;
+
+            const getHierarchyRank = (t: DashboardTask) => {
+                if (t.is_overdue) return 1;
+                if (t.status === 'Returned') return 2;
+                if (t.due_date === todayStr) return 3;
+                if (t.status === 'Under Review') return 4;
+                if (t.is_approaching) return 5;
+                if (t.status === 'In Progress') return 6;
+                return 7;
+            };
+
+            const rankDiff = getHierarchyRank(a) - getHierarchyRank(b);
+            if (rankDiff !== 0) return rankDiff;
+            return (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99');
+        });
+    }, [assignedTasks, isTaskCompleted, todayStr]);
+
     const dueThisWeekCount = useMemo(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -235,853 +380,767 @@ export default function Welcome({
         nextWeek.setDate(today.getDate() + 7);
 
         return assignedTasks.filter((t) => {
-            if (t.status === 'Completed' || !t.due_date) return false;
+            if (isTaskCompleted(String(t.id), t.status) || !t.due_date) return false;
             const due = new Date(t.due_date);
             return due >= today && due <= nextWeek;
         }).length;
-    }, [assignedTasks]);
+    }, [assignedTasks, isTaskCompleted]);
 
-    const needsRevisionCount = stats?.returnedTasksCount ?? assignedTasks.filter((t) => t.status === 'Returned').length;
-    const completedTasksCount = stats?.completedTasksCount ?? assignedTasks.filter((t) => t.status === 'Completed').length;
+    // ── Filtered & Paginated Projects ──
+    const filteredProjects = useMemo(() => {
+        if (activeTab === 'on-track') {
+            return projects.filter((p) => (p.progressPercentage ?? 0) >= 60 || p.status === 'Completed');
+        }
+        if (activeTab === 'at-risk') {
+            return projects.filter((p) => (p.progressPercentage ?? 0) < 60 && p.status !== 'Completed');
+        }
+        return projects;
+    }, [projects, activeTab]);
 
-    // ── 7-Day Week Strip Data (Requirement 15: Sat to Fri, with today highlighted) ──
-    const weekStrip = useMemo(() => {
-        const days = [];
+    const totalProjects = filteredProjects.length;
+    const totalPages = Math.max(1, Math.ceil(totalProjects / pageSize));
+
+    // Handle shrinking last page after deletions/filter changes
+    const safePage = Math.min(currentPage, totalPages);
+    const paginatedProjects = useMemo(() => {
+        const startIndex = (safePage - 1) * pageSize;
+        return filteredProjects.slice(startIndex, startIndex + pageSize);
+    }, [filteredProjects, safePage, pageSize]);
+
+    // Tab items with counts
+    const tabItems = useMemo(() => {
+        const onTrackCount = projects.filter((p) => (p.progressPercentage ?? 0) >= 60 || p.status === 'Completed').length;
+        const atRiskCount = projects.filter((p) => (p.progressPercentage ?? 0) < 60 && p.status !== 'Completed').length;
+        return [
+            { id: 'all', label: 'All', count: projects.length },
+            { id: 'on-track', label: 'On track', count: onTrackCount },
+            { id: 'at-risk', label: 'At risk', count: atRiskCount },
+        ];
+    }, [projects]);
+
+    // ── First Login Onboarding State (Section 5 requirement) ──
+    const isFirstLogin = projects.length === 0;
+
+    // Template presets for first login pre-fill
+    const handleTemplateClick = (title: string, description: string) => {
+        openCreateProjectModal({
+            title,
+            description,
+        });
+    };
+
+    // ── Next 7 Days Deadlines (Item 5: small and muted) ──
+    const next7DaysDeadlines = useMemo(() => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
 
-        // Find Saturday of the current week (or rolling 7 days starting from Saturday)
-        const currentDayIndex = today.getDay(); // 0 is Sun, 6 is Sat
-        const diffToSaturday = currentDayIndex === 6 ? 0 : -(currentDayIndex + 1);
-        const saturday = new Date(today);
-        saturday.setDate(today.getDate() + diffToSaturday);
-
-        for (let i = 0; i < 7; i++) {
-            const date = new Date(saturday);
-            date.setDate(saturday.getDate() + i);
-            const dateStr = date.toISOString().slice(0, 10);
-
-            const isToday =
-                date.getDate() === today.getDate() &&
-                date.getMonth() === today.getMonth() &&
-                date.getFullYear() === today.getFullYear();
-
-            // Check if any assigned tasks are due on this date
-            const hasDeadlines = assignedTasks.some(
-                (t) => t.status !== 'Completed' && t.due_date === dateStr
-            );
-
-            days.push({
-                dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
-                dayNumber: date.getDate(),
-                dateStr,
-                isToday,
-                hasDeadlines,
-            });
-        }
-        return days;
-    }, [assignedTasks]);
-
-    // Upcoming deadlines list (compact chronological list of incomplete tasks with due dates)
-    const upcomingDeadlines = useMemo(() => {
         return assignedTasks
-            .filter((task) => task.status !== 'Completed' && task.due_date)
-            .sort((a, b) => {
-                const dateA = a.due_date || '9999-99-99';
-                const dateB = b.due_date || '9999-99-99';
-                return dateA.localeCompare(dateB);
+            .filter((t) => {
+                if (t.status === 'Completed' || !t.due_date) return false;
+                const d = new Date(t.due_date);
+                return d >= today && d <= nextWeek;
             })
-            .slice(0, 4);
+            .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
+            .slice(0, 5);
     }, [assignedTasks]);
 
-    // Recent notifications preview (max 4)
-    const displayedNotifications = useMemo(() => {
-        return recentNotifications.slice(0, 4);
+    // ── Recent Activity (Item 5: small and muted) ──
+    const recentActivityItems = useMemo(() => {
+        return recentNotifications.slice(0, 5);
     }, [recentNotifications]);
 
-    // ── "Get started in 3 steps" checklist state (Requirement 14) ──
-    const step1Done = true; // Account created (user is logged in)
-    const step2Done = projects.length > 0; // Create or join a project
-    const step3Done = assignedTasks.length > 0; // Add your first task with a deadline
-
-    const completedStepsCount = (step1Done ? 1 : 0) + (step2Done ? 1 : 0) + (step3Done ? 1 : 0);
-    const isAllOnboardingComplete = completedStepsCount === 3;
+    const firstName = auth?.user?.name ? auth.user.name.split(' ')[0] : 'there';
 
     return (
         <AppLayout hidePageHeadingBanner={true}>
-            <Head title="Dashboard" />
+            <Head title={`Hello, ${firstName} — ITASK`} />
 
             <div className="space-y-6">
-                {/* ── 1. Greeting & Page Header ── */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* ══ 1. Page Title, Summary, and Primary Create Button ══ */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[color:var(--border)]">
                     <div>
-                        <h1 className="page-title text-[28px] sm:text-[32px] font-extrabold tracking-tight text-[var(--ink)]">
-                            {greeting}, {firstName} 👋
+                        <h1 className="text-[26px] font-bold text-[color:var(--text)] tracking-tight">
+                            Hello, {firstName}
                         </h1>
-                        <p className="text-sm font-medium text-[var(--muted)] mt-1">
-                            {todayInfo.dateStr} · {contextMessage}
+                        <p className="text-[15px] text-[color:var(--muted)] mt-1">
+                            {summaryText}
                         </p>
                     </div>
 
-                    {/* Header action buttons */}
                     <div className="flex items-center gap-2.5 shrink-0">
-                        <Link href="/calendar">
-                            <Button variant="secondary" size="md">
-                                <CalendarDays className="w-4 h-4 text-[var(--ink)]" />
-                                <span>View calendar</span>
-                            </Button>
-                        </Link>
+                        <Button
+                            variant="secondary"
+                            size="md"
+                            onClick={() => setIsJoinCodeOpen(true)}
+                        >
+                            <span>Join project</span>
+                        </Button>
                         <Button
                             variant="primary"
                             size="md"
-                            onClick={() => setIsCreateProjectOpen(true)}
+                            onClick={() => openCreateProjectModal()}
+                            leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
                         >
-                            <Plus className="w-4 h-4 text-[#2A2A2A]" strokeWidth={2.5} />
-                            <span>Create project</span>
+                            <span>Create</span>
                         </Button>
                     </div>
                 </div>
 
-                {/* ── 2. Four Stat Cards in a Row ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    {/* Stat 1: Active Projects */}
-                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-[var(--shadow-card)] flex items-center justify-between card-hover animate-stagger-item stagger-1">
-                        <div>
-                            <p className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">
-                                Active projects
-                            </p>
-                            <p className="text-3xl font-extrabold text-[var(--ink)] mt-1.5 tracking-tight">
-                                <NumberCounter value={activeProjectsCount} />
-                            </p>
-                            <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                                Current assignments
-                            </p>
-                        </div>
-                        <div className="w-12 h-12 rounded-xl bg-[var(--tint-yellow)] flex items-center justify-center text-[#8A5A00] dark:text-[#FFBB00] shrink-0 shadow-xs">
-                            <FolderOpen className="w-6 h-6" />
-                        </div>
-                    </div>
-
-                    {/* Stat 2: Due This Week */}
-                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-[var(--shadow-card)] flex items-center justify-between card-hover animate-stagger-item stagger-2">
-                        <div>
-                            <p className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">
-                                Due this week
-                            </p>
-                            <p className="text-3xl font-extrabold text-[var(--ink)] mt-1.5 tracking-tight">
-                                <NumberCounter value={dueThisWeekCount} />
-                            </p>
-                            <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                                Approaching deadlines
-                            </p>
-                        </div>
-                        <div className="w-12 h-12 rounded-xl bg-[var(--tint-orange)] flex items-center justify-center text-[#EC7505] shrink-0 shadow-xs">
-                            <Clock className="w-6 h-6" />
-                        </div>
-                    </div>
-
-                    {/* Stat 3: Needs Revision */}
-                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-[var(--shadow-card)] flex items-center justify-between card-hover animate-stagger-item stagger-3">
-                        <div>
-                            <p className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">
-                                Needs revision
-                            </p>
-                            <p className="text-3xl font-extrabold text-[var(--ink)] mt-1.5 tracking-tight">
-                                <NumberCounter value={needsRevisionCount} />
-                            </p>
-                            <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                                Feedback to address
-                            </p>
-                        </div>
-                        <div className="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0 shadow-xs">
-                            <AlertCircle className="w-6 h-6" />
-                        </div>
-                    </div>
-
-                    {/* Stat 4: Completed */}
-                    <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-5 shadow-[var(--shadow-card)] flex items-center justify-between card-hover animate-stagger-item stagger-4">
-                        <div>
-                            <p className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">
-                                Completed
-                            </p>
-                            <p className="text-3xl font-extrabold text-[var(--ink)] mt-1.5 tracking-tight">
-                                <NumberCounter value={completedTasksCount} />
-                            </p>
-                            <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                                Deliverables finished
-                            </p>
-                        </div>
-                        <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 shadow-xs">
-                            <CheckCircle2 className="w-6 h-6" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* ── 3. Onboarding Checklist: "Get started in 3 steps" (Requirement 14) ── */}
-                {!isAllOnboardingComplete && (
-                    <section
-                        aria-labelledby="get-started-heading"
-                        className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-[var(--shadow-card)] space-y-4"
-                    >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border)]">
+                {/* ══ FIRST LOGIN ONBOARDING (Section 5: shown when no projects yet) ══ */}
+                {isFirstLogin && (
+                    <Card className="p-6 border-[color:var(--primary)] bg-[color:var(--card)] space-y-5">
+                        <div className="flex items-start justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <h2
-                                        id="get-started-heading"
-                                        className="section-title text-base sm:text-lg font-bold text-[var(--ink)]"
-                                    >
-                                        Get started in 3 steps
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[color:var(--primary)]" />
+                                    <h2 className="text-[18px] font-bold text-[color:var(--text)]">
+                                        Welcome to ITASK! Get started in 3 steps
                                     </h2>
-                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--tint-orange)] text-[#2A2A2A]">
-                                        {completedStepsCount} of 3 done
-                                    </span>
                                 </div>
-                                <p className="text-xs text-[var(--muted)] mt-0.5">
-                                    Complete these steps to set up your ITASK project management hub
+                                <p className="text-[14px] text-[color:var(--muted)] mt-1">
+                                    Set up your project workspace, collaborate with teammates, and track assignments.
                                 </p>
                             </div>
-                            {/* Progress bar indicator */}
-                            <div className="w-32 h-2 bg-[var(--tint-neutral)] rounded-full overflow-hidden self-start sm:self-center">
-                                <div
-                                    className="h-full bg-[#EC7505] rounded-full transition-all duration-300"
-                                    style={{ width: `${(completedStepsCount / 3) * 100}%` }}
-                                />
-                            </div>
+                            <Badge variant="accent">
+                                Step 1 of 3 complete
+                            </Badge>
                         </div>
 
-                        <div className="divide-y divide-[var(--border)]">
-                            {/* Step 1: Create your account */}
-                            <div className="py-3 flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-6 h-6 rounded-full bg-[#FFBB00] flex items-center justify-center text-[#2A2A2A] shrink-0">
-                                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs sm:text-sm font-bold text-[var(--ink)] line-through opacity-70">
-                                            Create your account
-                                        </p>
-                                        <p className="text-[11px] text-[var(--muted)]">
-                                            Account created and institutional profile ready.
-                                        </p>
-                                    </div>
+                        {/* 3-Step Checklist */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="p-3.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] flex items-start gap-3">
+                                <div className="w-5 h-5 rounded-full bg-[color:var(--status-success-bg)] text-[color:var(--status-success-text)] flex items-center justify-center shrink-0 mt-0.5">
+                                    <CheckCircle2 className="w-4 h-4 stroke-[2]" />
                                 </div>
-                                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
-                                    Done
-                                </span>
-                            </div>
-
-                            {/* Step 2: Create or join a project */}
-                            <div className="py-3 flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    {step2Done ? (
-                                        <div className="w-6 h-6 rounded-full bg-[#FFBB00] flex items-center justify-center text-[#2A2A2A] shrink-0">
-                                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                        </div>
-                                    ) : (
-                                        <div className="w-6 h-6 rounded-full border-2 border-[var(--border)] shrink-0" />
-                                    )}
-                                    <div>
-                                        <p className={`text-xs sm:text-sm font-bold text-[var(--ink)] ${step2Done ? 'line-through opacity-70' : ''}`}>
-                                            Create or join a project
-                                        </p>
-                                        <p className="text-[11px] text-[var(--muted)]">
-                                            Projects hold your tasks, deadlines and teammates in one place.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div>
-                                    {step2Done ? (
-                                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
-                                            Done
-                                        </span>
-                                    ) : (
-                                        <Button
-                                            variant="primary"
-                                            size="sm"
-                                            onClick={() => setIsCreateProjectOpen(true)}
-                                        >
-                                            Create project
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Step 3: Add your first task with a deadline */}
-                            <div className="py-3 flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    {step3Done ? (
-                                        <div className="w-6 h-6 rounded-full bg-[#FFBB00] flex items-center justify-center text-[#2A2A2A] shrink-0">
-                                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                        </div>
-                                    ) : (
-                                        <div className="w-6 h-6 rounded-full border-2 border-[var(--border)] shrink-0" />
-                                    )}
-                                    <div>
-                                        <p className={`text-xs sm:text-sm font-bold text-[var(--ink)] ${step3Done ? 'line-through opacity-70' : ''}`}>
-                                            Add your first task with a deadline
-                                        </p>
-                                        <p className="text-[11px] text-[var(--muted)]">
-                                            Assign deliverables and due dates to track progress effortlessly.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div>
-                                    {step3Done ? (
-                                        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">
-                                            Done
-                                        </span>
-                                    ) : (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                if (projects.length > 0) {
-                                                    router.visit(`/projects/${projects[0].id}`);
-                                                } else {
-                                                    setIsCreateProjectOpen(true);
-                                                }
-                                            }}
-                                        >
-                                            Add task
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-                )}
-
-                {/* ── 4. Main Two-Column Layout (Main 2/3, Right 1/3, collapses < 1100px) ── */}
-                <div className="grid grid-cols-1 min-[1100px]:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)] gap-5">
-                    {/* ══ Left Column (2/3) ═════════════════════════════════════ */}
-                    <div className="space-y-5">
-                        {/* Section A: Needs Your Attention */}
-                        <section
-                            aria-labelledby="attention-heading"
-                            className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-6 shadow-[var(--shadow-card)]"
-                        >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-[var(--border)]">
-                                <div>
-                                    <div className="flex items-center gap-2.5">
-                                        <h2
-                                            id="attention-heading"
-                                            className="section-title text-base sm:text-lg font-bold text-[var(--ink)]"
-                                        >
-                                            Needs your attention
-                                        </h2>
-                                        {attentionItems.length > 0 && (
-                                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[var(--tint-orange)] text-[#2A2A2A]">
-                                                {attentionItems.length} {attentionItems.length === 1 ? 'item' : 'items'}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs text-[var(--muted)] mt-0.5">
-                                        {isMember && 'Tasks requiring revision, approaching deadlines, or submissions.'}
-                                        {isStaff && 'Committee review queue, revision requests, and urgent deliverables.'}
-                                        {isLeader && 'Project review queue, deliverables, and items requiring your decision.'}
+                                <div className="min-w-0">
+                                    <p className="text-[14px] font-semibold text-[color:var(--text)]">
+                                        1. Account created
+                                    </p>
+                                    <p className="text-[12px] text-[color:var(--muted)] mt-0.5">
+                                        Your institutional account is verified.
                                     </p>
                                 </div>
-
-                                {attentionItems.length > 0 && (
-                                    <Link
-                                        href="/my-tasks"
-                                        className="text-xs font-bold text-[var(--link-orange)] hover:underline inline-flex items-center gap-1 self-start sm:self-center"
-                                    >
-                                        <span>View all in My Tasks</span>
-                                    </Link>
-                                )}
                             </div>
 
-                            {/* Attention Items: List or Rewarding Empty State (Requirement 12) */}
+                            <div className="p-3.5 rounded-[8px] bg-[color:var(--card)] border border-[color:var(--primary)] flex items-start gap-3">
+                                <div className="w-5 h-5 rounded-full border-2 border-[color:var(--primary)] flex items-center justify-center shrink-0 mt-0.5">
+                                    <span className="w-2 h-2 rounded-full bg-[color:var(--primary)]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[14px] font-semibold text-[color:var(--text)]">
+                                        2. Create or join a project
+                                    </p>
+                                    <p className="text-[12px] text-[color:var(--muted)] mt-0.5">
+                                        Start a new team or enter an invite code.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="p-3.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] opacity-60 flex items-start gap-3">
+                                <div className="w-5 h-5 rounded-full border border-[color:var(--border)] shrink-0 mt-0.5" />
+                                <div className="min-w-0">
+                                    <p className="text-[14px] font-semibold text-[color:var(--text)]">
+                                        3. Add your first task
+                                    </p>
+                                    <p className="text-[12px] text-[color:var(--muted)] mt-0.5">
+                                        Assign deliverables with deadlines.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Two Clear Actions */}
+                        <div className="flex flex-wrap items-center gap-3 pt-2">
+                            <Button
+                                variant="primary"
+                                size="md"
+                                onClick={() => openCreateProjectModal()}
+                                leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
+                            >
+                                <span>Create a project</span>
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="md"
+                                onClick={() => setIsJoinCodeOpen(true)}
+                            >
+                                <span>Join with a code</span>
+                            </Button>
+                        </div>
+
+                        {/* Template Buttons (pre-fill create modal) */}
+                        <div className="pt-2 border-t border-[color:var(--border)]">
+                            <p className="text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)] mb-2.5">
+                                Or start from a template
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => handleTemplateClick(
+                                        'Senior Design Thesis & Capstone',
+                                        'Undergraduate engineering capstone project documentation, requirements, and sprint deliverables.'
+                                    )}
+                                    className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <BookOpen className="w-4 h-4 text-[color:var(--primary)] mb-1" />
+                                    Thesis or capstone
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleTemplateClick(
+                                        'Systems Analysis & Design Group Project',
+                                        'Collaborative coursework deliverables, system architecture models, and milestone reporting.'
+                                    )}
+                                    className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <Users className="w-4 h-4 text-[color:var(--primary)] mb-1" />
+                                    Group class project
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleTemplateClick(
+                                        'Annual IT Department Hackathon & Symposium',
+                                        'Logistics coordination, sponsorship drives, participant registration, and venue planning.'
+                                    )}
+                                    className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <CalendarDays className="w-4 h-4 text-[color:var(--primary)] mb-1" />
+                                    Event planning
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleTemplateClick(
+                                        'Independent Research & Study Tracker',
+                                        'Individual academic research tracking, literature reviews, and personal milestones.'
+                                    )}
+                                    className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <FileText className="w-4 h-4 text-[color:var(--primary)] mb-1" />
+                                    Personal to-dos
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* ══ 2. "Needs Your Attention" Card & 3. Compact "This Week" Card ══ */}
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-5">
+                    {/* Item 2: Needs Your Attention (The only card with a primary left edge) */}
+                    <Card
+                        isAttention={true}
+                        className="p-5 flex flex-col justify-between"
+                    >
+                        <div>
+                            <div className="flex items-center justify-between gap-3 pb-3.5 mb-3 border-b border-[color:var(--border)]">
+                                <div className="flex items-center gap-2.5">
+                                    <h2 className="text-[16px] font-bold text-[color:var(--text)]">
+                                        Needs your attention
+                                    </h2>
+                                    {attentionItems.length > 0 && (
+                                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[color:var(--status-danger-bg)] text-[color:var(--status-danger-text)] border border-[color:var(--status-danger-border)] tabular-nums">
+                                            {attentionItems.length}
+                                        </span>
+                                    )}
+                                </div>
+                                <Link
+                                    href="/my-tasks"
+                                    className="text-[13px] font-medium text-[color:var(--primary)] hover:underline"
+                                >
+                                    View all tasks
+                                </Link>
+                            </div>
+
                             {attentionItems.length === 0 ? (
-                                <div className="p-6 rounded-2xl bg-[var(--tint-yellow)] border border-[#FFE9A8] dark:border-[#524410] space-y-3">
-                                    <div className="flex items-start gap-3.5">
-                                        {/* Amber check icon in brand yellow */}
-                                        <div className="w-10 h-10 rounded-xl bg-[#FFBB00] flex items-center justify-center text-[#2A2A2A] shrink-0 shadow-xs">
-                                            <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="text-sm font-bold text-[var(--ink)]">
-                                                You're all caught up
-                                            </h3>
-                                            <p className="text-xs text-[var(--muted)] mt-0.5">
-                                                Nothing needs your attention right now. All submissions, reviews, and tasks are on schedule.
-                                            </p>
-                                        </div>
+                                <div className="py-8 text-center space-y-2">
+                                    <div className="w-10 h-10 rounded-full bg-[color:var(--status-success-bg)] text-[color:var(--status-success-text)] flex items-center justify-center mx-auto">
+                                        <CheckCircle2 className="w-5 h-5 stroke-[2]" />
                                     </div>
-
-                                    {/* Rewarding Progress Bar */}
-                                    <div className="space-y-1.5 pt-1">
-                                        <div className="flex items-center justify-between text-[11px] font-bold text-[var(--ink)]">
-                                            <span>Task review & status</span>
-                                            <span className="text-[#8A5A00] dark:text-[#FFBB00]">100% caught up</span>
-                                        </div>
-                                        <div className="w-full h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
-                                            <div className="h-full bg-gradient-to-r from-[#FFBB00] to-[#EC7505] rounded-full w-full" />
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-2 flex items-center justify-between">
-                                        <Link
-                                            href="/my-tasks"
-                                            className="text-xs font-bold text-[var(--link-orange)] hover:underline"
-                                        >
-                                            View all tasks in My Tasks
-                                        </Link>
-                                        <Link
-                                            href="/calendar"
-                                            className="text-xs font-bold text-[var(--link-orange)] hover:underline"
-                                        >
-                                            Open calendar
-                                        </Link>
-                                    </div>
+                                    <p className="text-[14px] font-semibold text-[color:var(--text)]">
+                                        You are all caught up
+                                    </p>
+                                    <p className="text-[13px] text-[color:var(--muted)] max-w-sm mx-auto">
+                                        No overdue tasks, returned items, or pending reviews require your immediate action.
+                                    </p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-[var(--border)]">
-                                    {displayedAttentionItems.map((item) => {
-                                        const isCritical = item.urgency === 'critical';
-                                        const isUrgent = item.urgency === 'urgent';
-
+                                <div className="divide-y divide-[color:var(--border)]">
+                                    {attentionItems.slice(0, 5).map((item) => {
+                                        const isDone = item.rawTask ? isTaskCompleted(String(item.rawTask.id), item.rawTask.status) : false;
+                                        const isCompleting = completingTaskIds.has(item.id);
                                         return (
                                             <div
                                                 key={item.id}
-                                                className="py-3.5 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group hover:bg-[var(--tint-neutral)]/40 px-3 -mx-3 rounded-xl transition-colors"
+                                                className={`py-3 first:pt-0 last:pb-0 flex items-start gap-3 transition-opacity ${
+                                                    isCompleting ? 'opacity-40 pointer-events-none' : ''
+                                                }`}
                                             >
-                                                <div className="flex items-start gap-3 min-w-0 flex-1">
-                                                    <div
-                                                        className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border ${
-                                                            isCritical
-                                                                ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
-                                                                : isUrgent
-                                                                ? 'bg-[var(--tint-yellow)] border-[#FFE9A8] dark:border-[#524410] text-[#8A5A00] dark:text-[#FFBB00]'
-                                                                : 'bg-[var(--tint-orange)] border-[#FDE5CC] dark:border-[#573516] text-[#EC7505]'
-                                                        }`}
-                                                    >
-                                                        {item.type === 'pending_review' ? (
-                                                            <ClipboardCheck className="w-4.5 h-4.5" />
-                                                        ) : item.type === 'returned_task' ? (
-                                                            <AlertCircle className="w-4.5 h-4.5" />
-                                                        ) : item.type === 'overdue_task' ? (
-                                                            <Clock className="w-4.5 h-4.5" />
-                                                        ) : (
-                                                            <AlertTriangle className="w-4.5 h-4.5" />
+                                                <div className="pt-0.5 shrink-0">
+                                                    <Checkbox
+                                                        checked={isDone || isCompleting}
+                                                        onChange={() => handleToggleTaskCompletion(item)}
+                                                        aria-label={`Mark ${item.title} as ${isDone ? 'incomplete' : 'completed'}`}
+                                                    />
+                                                </div>
+
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <Link
+                                                            href={item.actionUrl}
+                                                            className={`text-[14px] font-semibold transition-colors truncate hover:text-[color:var(--primary)] ${
+                                                                isDone
+                                                                    ? 'line-through text-[color:var(--muted)]'
+                                                                    : 'text-[color:var(--text)]'
+                                                            }`}
+                                                        >
+                                                            {item.title}
+                                                        </Link>
+                                                        <Badge variant={isDone ? 'accent' : item.badgeVariant}>
+                                                            {isDone ? 'Completed' : item.badgeLabel}
+                                                        </Badge>
+                                                    </div>
+                                                    <p className="text-[12px] text-[color:var(--muted)] mt-0.5 truncate">
+                                                        <span className="font-medium text-[color:var(--text)]">
+                                                            {item.projectTitle}
+                                                        </span>
+                                                        {item.committeeName && ` · ${item.committeeName}`}
+                                                        {item.activityTitle && ` · ${item.activityTitle}`}
+                                                        {item.dueDateFormatted && (
+                                                            <span className="tabular-nums ml-1">
+                                                                · Due {item.dueDateFormatted}
+                                                            </span>
                                                         )}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        {attentionItems.length > 5 && (
+                            <div className="pt-3 border-t border-[color:var(--border)] text-[12px] text-[color:var(--muted)] flex items-center justify-between">
+                                <span className="tabular-nums">Showing 5 of {attentionItems.length} urgent items</span>
+                                <Link
+                                    href="/my-tasks"
+                                    className="font-medium text-[color:var(--primary)] hover:underline"
+                                >
+                                    Open My Tasks
+                                </Link>
+                            </div>
+                        )}
+                    </Card>
+
+                    {/* Item 3: Progress Bar & Interactive Checklist Card */}
+                    <Card className="p-5 flex flex-col justify-between space-y-4">
+                        <div className="space-y-4">
+                            {/* Card Header & Percentage */}
+                            <div className="flex items-center justify-between gap-2 pb-3 border-b border-[color:var(--border)]">
+                                <div>
+                                    <h2 className="text-[16px] font-bold text-[color:var(--text)]">
+                                        Weekly Deliverables
+                                    </h2>
+                                    <p className="text-[12px] text-[color:var(--muted)] mt-0.5">
+                                        Check off tasks to advance your progress
+                                    </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <span className="text-[16px] font-bold text-[color:var(--text)] tabular-nums block">
+                                        {percentDone}% done
+                                    </span>
+                                    <span className="text-[11px] font-medium text-[color:var(--muted)] tabular-nums">
+                                        {completedTasksCount} of {totalTasksCount} completed
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* ── Progress Bar ── */}
+                            <div className="space-y-1.5">
+                                <div className="w-full h-3 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden shadow-2xs">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-[color:var(--primary)] to-emerald-500 rounded-full transition-all duration-500 ease-out"
+                                        style={{ width: `${percentDone}%` }}
+                                        role="progressbar"
+                                        aria-valuenow={percentDone}
+                                        aria-valuemin={0}
+                                        aria-valuemax={100}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Dense Metric Pills by Hierarchy of Importance */}
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="p-2 rounded-[6px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                                    <span className="text-[11px] text-[color:var(--muted)] block">Overdue</span>
+                                    <span className="text-[13px] font-bold text-[color:var(--status-danger-text)] tabular-nums">
+                                        {overdueCount}
+                                    </span>
+                                </div>
+
+                                <div className="p-2 rounded-[6px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                                    <span className="text-[11px] text-[color:var(--muted)] block">This week</span>
+                                    <span className="text-[13px] font-bold text-[color:var(--text)] tabular-nums">
+                                        {dueThisWeekCount}
+                                    </span>
+                                </div>
+
+                                <div className="p-2 rounded-[6px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                                    <span className="text-[11px] text-[color:var(--muted)] block">Completed</span>
+                                    <span className="text-[13px] font-bold text-[color:var(--status-success-text)] tabular-nums">
+                                        {completedTasksCount}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* ── Progress Bar Checklist (Ordered by Hierarchy of Importance) ── */}
+                            <div className="pt-2 border-t border-[color:var(--border)] space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <ClipboardCheck className="w-3.5 h-3.5 text-[color:var(--primary)]" />
+                                        <h3 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--text)]">
+                                            Task Checklist
+                                        </h3>
+                                    </div>
+                                    <span className="text-[11px] font-medium text-[color:var(--muted)]">
+                                        Hierarchy of Importance
+                                    </span>
+                                </div>
+
+                                {hierarchyOrderedTasks.length === 0 ? (
+                                    <div className="py-4 text-center text-[12px] text-[color:var(--muted)]">
+                                        No assigned tasks in your checklist yet.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1 divide-y divide-[color:var(--border)]">
+                                        {hierarchyOrderedTasks.slice(0, 6).map((task) => {
+                                            const isDone = isTaskCompleted(String(task.id), task.status);
+                                            const isBusy = completingTaskIds.has(`task-${task.id}`);
+
+                                            // Hierarchy badge determination
+                                            let importanceBadgeVariant: 'danger' | 'warning' | 'primary' | 'secondary' | 'accent' | 'soft' = 'soft';
+                                            let importanceLabel = task.status;
+                                            if (isDone) {
+                                                importanceBadgeVariant = 'accent';
+                                                importanceLabel = 'Completed';
+                                            } else if (task.is_overdue) {
+                                                importanceBadgeVariant = 'danger';
+                                                importanceLabel = 'Tier 1: Overdue';
+                                            } else if (task.status === 'Returned') {
+                                                importanceBadgeVariant = 'danger';
+                                                importanceLabel = 'Tier 2: Revision';
+                                            } else if (task.due_date === todayStr) {
+                                                importanceBadgeVariant = 'warning';
+                                                importanceLabel = 'Tier 3: Due today';
+                                            } else if (task.status === 'Under Review') {
+                                                importanceBadgeVariant = 'secondary';
+                                                importanceLabel = 'Tier 4: In review';
+                                            } else if (task.is_approaching) {
+                                                importanceBadgeVariant = 'primary';
+                                                importanceLabel = 'Tier 5: Due soon';
+                                            } else {
+                                                importanceBadgeVariant = 'soft';
+                                                importanceLabel = 'Tier 6: Active';
+                                            }
+
+                                            return (
+                                                <div
+                                                    key={task.id}
+                                                    className={`pt-2 pb-1.5 flex items-start gap-2.5 transition-opacity ${
+                                                        isBusy ? 'opacity-50 pointer-events-none' : ''
+                                                    }`}
+                                                >
+                                                    <div className="pt-0.5 shrink-0">
+                                                        <Checkbox
+                                                            checked={isDone}
+                                                            onChange={() => handleToggleAssignedTask(task)}
+                                                            aria-label={`Toggle checklist task ${task.title}`}
+                                                        />
                                                     </div>
 
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                            <Badge
-                                                                variant={
-                                                                    isCritical
-                                                                        ? 'danger'
-                                                                        : isUrgent
-                                                                        ? 'warning'
-                                                                        : 'primary'
-                                                                }
+                                                        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                                                            <Link
+                                                                href={task.action_url}
+                                                                className={`text-[13px] font-semibold transition-colors truncate hover:text-[color:var(--primary)] ${
+                                                                    isDone
+                                                                        ? 'line-through text-[color:var(--muted)]'
+                                                                        : 'text-[color:var(--text)]'
+                                                                }`}
                                                             >
-                                                                {item.badgeLabel}
+                                                                {task.title}
+                                                            </Link>
+                                                            <Badge variant={importanceBadgeVariant} className="text-[10px] px-1.5 py-0.2 shrink-0">
+                                                                {importanceLabel}
                                                             </Badge>
-                                                            <h3 className="text-sm font-bold text-[var(--ink)] group-hover:text-[#EC7505] transition-colors truncate">
-                                                                {item.title}
-                                                            </h3>
                                                         </div>
 
-                                                        <p className="text-[11px] text-[var(--muted)] mt-1 truncate">
-                                                            <span className="font-semibold text-[var(--ink)]">
-                                                                {item.projectTitle}
-                                                            </span>
-                                                            {item.committeeName && ` · ${item.committeeName}`}
-                                                            {item.activityTitle && ` · ${item.activityTitle}`}
-                                                        </p>
-
-                                                        <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                                                            {item.actionReason}
+                                                        <p className="text-[11px] text-[color:var(--muted)] mt-0.5 truncate">
+                                                            <span>{task.project.title}</span>
+                                                            {task.committee && ` · ${task.committee.name}`}
+                                                            {task.due_date_formatted && (
+                                                                <span className="tabular-nums ml-1">
+                                                                    · Due {task.due_date_formatted}
+                                                                </span>
+                                                            )}
                                                         </p>
                                                     </div>
                                                 </div>
-
-                                                <div className="flex items-center gap-2 sm:self-center shrink-0 pl-12 sm:pl-0">
-                                                    <Link href={item.actionUrl}>
-                                                        <Button
-                                                            variant={isCritical ? 'primary' : 'outline'}
-                                                            size="sm"
-                                                        >
-                                                            <span>{item.actionLabel}</span>
-                                                        </Button>
-                                                    </Link>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {attentionItems.length > 5 && (
-                                <div className="mt-4 pt-3 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--muted)]">
-                                    <span>Showing 5 of {attentionItems.length} actionable items</span>
-                                    <Link
-                                        href="/my-tasks"
-                                        className="font-bold text-[var(--link-orange)] hover:underline"
-                                    >
-                                        View all in My Tasks
-                                    </Link>
-                                </div>
-                            )}
-                        </section>
-
-                        {/* Section B: Your Projects (Requirement 13) */}
-                        <section
-                            aria-labelledby="projects-heading"
-                            className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-6 shadow-[var(--shadow-card)]"
-                        >
-                            <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border)]">
-                                <div>
-                                    <h2
-                                        id="projects-heading"
-                                        className="section-title text-base sm:text-lg font-bold text-[var(--ink)]"
-                                    >
-                                        Your projects
-                                    </h2>
-                                    <p className="text-xs text-[var(--muted)] mt-0.5">
-                                        Summary of your ongoing group projects and committee assignments
-                                    </p>
-                                </div>
-                                <Link
-                                    href="/projects"
-                                    className="text-xs font-bold text-[var(--link-orange)] hover:underline"
-                                >
-                                    View all projects
-                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
+                        </div>
 
-                            {activeProjects.length === 0 ? (
-                                /* Dashed-Border Panel Empty State (Requirement 13) */
-                                <div className="border-2 border-dashed border-[var(--border)] rounded-2xl p-8 text-center space-y-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-[var(--tint-yellow)] flex items-center justify-center text-[#8A5A00] dark:text-[#FFBB00] mx-auto">
-                                        <FolderOpen className="w-6 h-6" />
-                                    </div>
-                                    <div className="max-w-md mx-auto">
-                                        <h3 className="text-lg font-bold text-[var(--ink)]">
-                                            Start your first project
-                                        </h3>
-                                        <p className="text-xs text-[var(--muted)] mt-1.5 leading-relaxed">
-                                            Projects hold your tasks, deadlines and teammates in one place.
-                                        </p>
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                                        <Button
-                                            variant="primary"
-                                            size="md"
-                                            onClick={() => setIsCreateProjectOpen(true)}
-                                        >
-                                            <Plus className="w-4 h-4 text-[#2A2A2A]" strokeWidth={2.5} />
-                                            <span>Create project</span>
-                                        </Button>
-                                        <Button
-                                            variant="secondary"
-                                            size="md"
-                                            onClick={() => setIsJoinCodeOpen(true)}
-                                        >
-                                            <span>Join with a code</span>
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {activeProjects.map((proj) => (
-                                        <div
-                                            key={proj.id}
-                                            className="p-4 rounded-xl border border-[var(--border)] hover:border-[#EC7505] transition-colors group bg-[var(--card)] shadow-xs"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <Link
-                                                            href={`/projects/${proj.id}`}
-                                                            className="text-sm font-bold text-[var(--ink)] group-hover:text-[#EC7505] transition-colors truncate"
-                                                        >
-                                                            {proj.title}
-                                                        </Link>
-                                                        <ProjectRoleBadge role={proj.role} />
-                                                    </div>
-                                                    {proj.end_date && (
-                                                        <p className="text-xs text-[var(--muted)] mt-1 flex items-center gap-1.5">
-                                                            <Clock className="w-3.5 h-3.5 text-[var(--muted)]" />
-                                                            <span>Deadline: {proj.end_date}</span>
-                                                        </p>
-                                                    )}
-                                                </div>
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between text-[12px]">
+                            <Link
+                                href="/my-tasks"
+                                className="font-medium text-[color:var(--primary)] hover:underline"
+                            >
+                                View full checklist ({assignedTasks.length})
+                            </Link>
+                            <Link
+                                href="/calendar"
+                                className="font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] inline-flex items-center gap-1"
+                            >
+                                <span>Calendar</span>
+                                <ArrowRight className="w-3.5 h-3.5" />
+                            </Link>
+                        </div>
+                    </Card>
+                </div>
 
-                                                <Link
-                                                    href={`/projects/${proj.id}`}
-                                                    className="text-xs font-bold text-[var(--link-orange)] hover:underline inline-flex items-center gap-0.5 shrink-0"
-                                                >
-                                                    <span>Open project</span>
-                                                </Link>
-                                            </div>
+                {/* ══ 4. Projects Table with Tabs & Real Pagination ══ */}
+                <Card className="p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[color:var(--border)]">
+                        <div>
+                            <h2 className="text-[16px] font-bold text-[color:var(--text)]">
+                                Projects
+                            </h2>
+                            <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
+                                Collaborative workspaces and committee progress
+                            </p>
+                        </div>
 
-                                            {/* Progress Bar & Percentage */}
-                                            <div className="mt-3">
-                                                <div className="flex items-center justify-between text-xs mb-1">
-                                                    <span className="text-[var(--muted)]">Overall progress</span>
-                                                    <span className="font-bold text-[var(--ink)]">
-                                                        {proj.progressPercentage}%
-                                                    </span>
-                                                </div>
-                                                <div className="w-full h-2 bg-[var(--tint-neutral)] rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full rounded-full transition-all duration-300"
-                                                        style={{
-                                                            width: `${proj.progressPercentage}%`,
-                                                            backgroundColor: '#EC7505',
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </section>
+                        {/* Tabs: All, On track, At risk */}
+                        <Tabs
+                            tabs={tabItems}
+                            activeTab={activeTab}
+                            onChange={handleTabChange}
+                        />
                     </div>
 
-                    {/* ══ Right Column (1/3) ════════════════════════════════════ */}
-                    <div className="space-y-5">
-                        {/* Section C: Upcoming Deadlines with 7-Day Strip (Requirement 15) */}
-                        <section
-                            aria-labelledby="deadlines-heading"
-                            className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-6 shadow-[var(--shadow-card)] space-y-4"
-                        >
-                            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
-                                <div>
-                                    <h2
-                                        id="deadlines-heading"
-                                        className="section-title text-base font-bold text-[var(--ink)]"
-                                    >
-                                        Upcoming deadlines
-                                    </h2>
-                                    <p className="text-xs text-[var(--muted)] mt-0.5">
-                                        7-day week deliverable schedule
-                                    </p>
-                                </div>
-                                <Link
-                                    href="/calendar"
-                                    className="text-xs font-bold text-[var(--link-orange)] hover:underline"
-                                >
-                                    Calendar
-                                </Link>
-                            </div>
+                    {/* Table View */}
+                    {paginatedProjects.length === 0 ? (
+                        <EmptyState
+                            title="No projects match this filter"
+                            description={activeTab === 'all' ? "You haven't joined or created any projects yet." : `There are no projects currently marked as ${activeTab === 'on-track' ? 'on track' : 'at risk'}.`}
+                            actionLabel={activeTab === 'all' ? "Create a project" : "View all projects"}
+                            onAction={activeTab === 'all' ? openCreateProjectModal : () => handleTabChange('all')}
+                        />
+                    ) : (
+                        <div className="overflow-x-auto -mx-5 px-5">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-[color:var(--border)] text-[12px] font-semibold text-[color:var(--muted)] uppercase tracking-wider">
+                                        <th className="py-2.5 pr-4">Project</th>
+                                        <th className="py-2.5 px-3">Status</th>
+                                        <th className="py-2.5 px-3">Progress</th>
+                                        <th className="py-2.5 px-3">Due date</th>
+                                        <th className="py-2.5 pl-3 text-right">Team</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[color:var(--border)] text-[14px]">
+                                    {paginatedProjects.map((project) => {
+                                        const progress = project.progressPercentage ?? 0;
+                                        const isOnTrack = progress >= 60 || project.status === 'Completed';
 
-                            {/* 7-Day Week Strip (Sat to Fri) with Today Highlighted in Yellow */}
-                            <div className="grid grid-cols-7 gap-1 p-2 rounded-xl bg-[var(--tint-neutral)]/50 border border-[var(--border)] text-center">
-                                {weekStrip.map((day) => (
+                                        return (
+                                            <tr
+                                                key={project.id}
+                                                className="hover:bg-[color:var(--soft-surface)] transition-colors group"
+                                            >
+                                                {/* Project */}
+                                                <td className="py-3.5 pr-4 min-w-[200px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <Link
+                                                            href={`/projects/${project.id}`}
+                                                            className="font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate"
+                                                        >
+                                                            {project.title}
+                                                        </Link>
+                                                        <ProjectRoleBadge role={project.role} />
+                                                    </div>
+                                                    {project.description && (
+                                                        <p className="text-[12px] text-[color:var(--muted)] truncate max-w-sm mt-0.5">
+                                                            {project.description}
+                                                        </p>
+                                                    )}
+                                                </td>
+
+                                                {/* Status */}
+                                                <td className="py-3.5 px-3 whitespace-nowrap">
+                                                    <Badge variant={isOnTrack ? 'accent' : 'danger'}>
+                                                        {isOnTrack ? 'On track' : 'At risk'}
+                                                    </Badge>
+                                                </td>
+
+                                                {/* Progress */}
+                                                <td className="py-3.5 px-3 min-w-[140px]">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="flex-1 h-2 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-[color:var(--primary)] rounded-full transition-all duration-300"
+                                                                style={{ width: `${progress}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-[12px] font-medium text-[color:var(--text)] tabular-nums w-8 text-right">
+                                                            {progress}%
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Due Date */}
+                                                <td className="py-3.5 px-3 whitespace-nowrap text-[13px] text-[color:var(--muted)] tabular-nums">
+                                                    {project.end_date || '—'}
+                                                </td>
+
+                                                {/* Team Avatars */}
+                                                <td className="py-3.5 pl-3 whitespace-nowrap text-right">
+                                                    <div className="flex items-center justify-end -space-x-1.5">
+                                                        <Avatar className="w-6 h-6 border-2 border-[color:var(--card)]">
+                                                            <AvatarFallback className="text-[10px]">
+                                                                {getInitials(project.role || 'M')}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <span className="w-6 h-6 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-[10px] font-semibold text-[color:var(--muted)] flex items-center justify-center tabular-nums">
+                                                            +{project.tasksCount || 1}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Real Pagination: page numbers, prev/next, rows per page, URL sync */}
+                    {totalProjects > 0 && (
+                        <div className="pt-2 border-t border-[color:var(--border)]">
+                            <Pagination
+                                currentPage={safePage}
+                                totalPages={totalPages}
+                                totalItems={totalProjects}
+                                pageSize={pageSize}
+                                onPageChange={handlePageChange}
+                                onPageSizeChange={handlePageSizeChange}
+                                pageSizeOptions={[5, 10, 25]}
+                            />
+                        </div>
+                    )}
+                </Card>
+
+                {/* ══ 5. Small and Muted: Next 7 Days Deadlines and Recent Activity ══ */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
+                    {/* Next 7 Days Deadlines */}
+                    <div className="p-4 rounded-[12px] border border-[color:var(--border)] bg-[color:var(--card)] space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-[color:var(--border)]">
+                            <h3 className="text-[14px] font-semibold text-[color:var(--muted)] flex items-center gap-2">
+                                <Calendar className="w-4 h-4 stroke-[2]" />
+                                Next 7 days deadlines
+                            </h3>
+                            <Link
+                                href="/calendar"
+                                className="text-[12px] font-medium text-[color:var(--primary)] hover:underline"
+                            >
+                                Calendar
+                            </Link>
+                        </div>
+
+                        {next7DaysDeadlines.length === 0 ? (
+                            <p className="text-[13px] text-[color:var(--muted)] py-3">
+                                No deadlines scheduled in the next 7 days.
+                            </p>
+                        ) : (
+                            <div className="divide-y divide-[color:var(--border)]">
+                                {next7DaysDeadlines.map((task) => (
                                     <div
-                                        key={day.dateStr}
-                                        className={`flex flex-col items-center py-2 px-1 rounded-lg transition-all ${
-                                            day.isToday
-                                                ? 'bg-[#FFBB00] text-[#2A2A2A] font-extrabold shadow-sm ring-1 ring-[#FFBB00]'
-                                                : 'text-[var(--ink)] font-medium hover:bg-[var(--card)]'
-                                        }`}
+                                        key={task.id}
+                                        className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-[13px]"
                                     >
-                                        <span className="text-[10px] uppercase tracking-wider block">
-                                            {day.dayName}
-                                        </span>
-                                        <span className="text-xs font-bold block mt-0.5">
-                                            {day.dayNumber}
-                                        </span>
-                                        {/* Orange dot for deadline */}
-                                        <div className="h-1.5 mt-1 flex items-center justify-center">
-                                            {day.hasDeadlines && (
-                                                <span
-                                                    className={`w-1.5 h-1.5 rounded-full ${
-                                                        day.isToday ? 'bg-[#2A2A2A]' : 'bg-[#EC7505]'
-                                                    }`}
-                                                    title="Deliverable deadline scheduled"
-                                                />
-                                            )}
+                                        <div className="min-w-0 flex-1">
+                                            <Link
+                                                href={task.action_url}
+                                                className="font-medium text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate block"
+                                            >
+                                                {task.title}
+                                            </Link>
+                                            <span className="text-[11px] text-[color:var(--muted)] truncate block">
+                                                {task.project.title}
+                                            </span>
                                         </div>
+                                        <span className="text-[12px] text-[color:var(--muted)] tabular-nums shrink-0">
+                                            {task.due_date_formatted}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
+                        )}
+                    </div>
 
-                            {/* Deadlines List or Clean Empty State */}
-                            {upcomingDeadlines.length === 0 ? (
-                                <div className="py-6 px-3 text-center space-y-2">
-                                    <Calendar className="w-7 h-7 mx-auto text-[var(--muted)]/50" />
-                                    <p className="text-xs font-bold text-[var(--ink)]">
-                                        Your week is clear.
-                                    </p>
-                                    <p className="text-[11px] text-[var(--muted)]">
-                                        Add a deadline and it appears here.
-                                    </p>
-                                    <div className="pt-2">
-                                        <Link
-                                            href="/calendar"
-                                            className="text-xs font-bold text-[var(--link-orange)] hover:underline"
-                                        >
-                                            Open calendar view
-                                        </Link>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-[var(--border)]">
-                                    {upcomingDeadlines.map((task) => {
-                                        const isOverdue = task.is_overdue;
-                                        const isApproaching = task.is_approaching;
-
-                                        return (
-                                            <div
-                                                key={task.id}
-                                                className="py-3 first:pt-0 last:pb-0 flex items-start justify-between gap-3 group"
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span
-                                                            className={`w-2 h-2 rounded-full shrink-0 ${
-                                                                isOverdue
-                                                                    ? 'bg-rose-500'
-                                                                    : isApproaching
-                                                                    ? 'bg-[#EC7505]'
-                                                                    : 'bg-[#FFBB00]'
-                                                            }`}
-                                                        />
-                                                        <Link
-                                                            href={task.action_url}
-                                                            className="text-xs font-bold text-[var(--ink)] group-hover:text-[#EC7505] transition-colors truncate"
-                                                        >
-                                                            {task.title}
-                                                        </Link>
-                                                    </div>
-                                                    <p className="text-[11px] text-[var(--muted)] truncate pl-4 mt-0.5">
-                                                        {task.project.title}
-                                                    </p>
-                                                </div>
-
-                                                <div className="text-right shrink-0">
-                                                    <span
-                                                        className={`text-xs block font-bold ${
-                                                            isOverdue
-                                                                ? 'text-rose-600 dark:text-rose-400'
-                                                                : isApproaching
-                                                                ? 'text-[#EC7505]'
-                                                                : 'text-[var(--ink)]'
-                                                        }`}
-                                                    >
-                                                        {task.due_date_formatted}
-                                                    </span>
-                                                    <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--muted)]">
-                                                        {isOverdue ? 'Overdue' : isApproaching ? 'Due soon' : 'Upcoming'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </section>
-
-                        {/* Section D: Notifications (Requirement 16) */}
-                        <section
-                            aria-labelledby="notifications-heading"
-                            className="bg-[var(--card)] rounded-2xl border border-[var(--border)] p-6 shadow-[var(--shadow-card)] space-y-4"
-                        >
-                            <div className="flex items-center justify-between pb-3 border-b border-[var(--border)]">
-                                <div className="flex items-center gap-2">
-                                    <h2
-                                        id="notifications-heading"
-                                        className="section-title text-base font-bold text-[var(--ink)]"
-                                    >
-                                        Notifications
-                                    </h2>
-                                    {unreadNotificationsCount > 0 && (
-                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EC7505] text-[#2A2A2A]">
-                                            {unreadNotificationsCount} new
-                                        </span>
-                                    )}
-                                </div>
-                                <Link
-                                    href="/notifications"
-                                    className="text-xs font-bold text-[var(--link-orange)] hover:underline"
-                                >
-                                    View all
-                                </Link>
-                            </div>
-
-                            {/* Notifications List or Friendlier Empty Copy (Requirement 16) */}
-                            {displayedNotifications.length === 0 ? (
-                                <div className="py-6 px-3 text-center space-y-2">
-                                    <Bell className="w-7 h-7 mx-auto text-[var(--muted)]/50" />
-                                    <p className="text-xs font-bold text-[var(--ink)]">
-                                        You're up to date
-                                    </p>
-                                    <p className="text-xs text-[var(--muted)] leading-relaxed">
-                                        Task updates and feedback will show here.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-[var(--border)]">
-                                    {displayedNotifications.map((notif) => {
-                                        const isUnread = !notif.read_at;
-                                        return (
-                                            <div
-                                                key={notif.id}
-                                                className={`py-3 first:pt-0 last:pb-0 ${
-                                                    isUnread ? 'font-bold' : ''
-                                                }`}
-                                            >
-                                                <div className="flex items-start justify-between gap-1">
-                                                    <span className="text-xs truncate text-[var(--ink)] font-bold">
-                                                        {notif.data.title || 'Notification'}
-                                                    </span>
-                                                    <span className="text-[10px] text-[var(--muted)] shrink-0 ml-2">
-                                                        {notif.created_at_human || 'Recent'}
-                                                    </span>
-                                                </div>
-                                                <p className="text-[11px] text-[var(--muted)] line-clamp-2 mt-0.5 leading-snug">
-                                                    {notif.data.message}
-                                                </p>
-                                                {notif.data.action_url && (
-                                                    <Link
-                                                        href={notif.data.action_url}
-                                                        className="inline-flex items-center gap-1 text-[11px] text-[var(--link-orange)] font-bold mt-1 hover:underline"
-                                                    >
-                                                        <span>View details</span>
-                                                    </Link>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </section>
-
-                        {/* Section E: Shortcut Tip Card (Requirement 17) */}
-                        <div
-                            className="bg-[var(--tint-neutral)]/60 border border-[var(--border)] rounded-2xl p-4.5 flex items-start gap-3 text-xs"
-                            role="note"
-                        >
-                            <div className="w-8 h-8 rounded-xl bg-[var(--tint-yellow)] flex items-center justify-center text-[#8A5A00] dark:text-[#FFBB00] shrink-0 mt-0.5">
-                                <Sparkles className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-bold text-[var(--ink)] leading-snug">
-                                    Tip: press Ctrl K
-                                </p>
-                                <p className="text-[11px] text-[var(--muted)] mt-0.5 leading-relaxed">
-                                    Jump to any task or project without leaving your keyboard.
-                                </p>
-                            </div>
+                    {/* Recent Activity */}
+                    <div className="p-4 rounded-[12px] border border-[color:var(--border)] bg-[color:var(--card)] space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-[color:var(--border)]">
+                            <h3 className="text-[14px] font-semibold text-[color:var(--muted)] flex items-center gap-2">
+                                <Activity className="w-4 h-4 stroke-[2]" />
+                                Recent activity
+                            </h3>
+                            <Link
+                                href="/notifications"
+                                className="text-[12px] font-medium text-[color:var(--primary)] hover:underline"
+                            >
+                                All activity
+                            </Link>
                         </div>
+
+                        {recentActivityItems.length === 0 ? (
+                            <p className="text-[13px] text-[color:var(--muted)] py-3">
+                                No recent activity logged.
+                            </p>
+                        ) : (
+                            <div className="divide-y divide-[color:var(--border)]">
+                                {recentActivityItems.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3 text-[13px]"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-medium text-[color:var(--text)] truncate">
+                                                {item.data?.title || (item as any).title || 'Notification'}
+                                            </p>
+                                            <p className="text-[11px] text-[color:var(--muted)] truncate">
+                                                {item.data?.message || (item as any).message || ''}
+                                            </p>
+                                        </div>
+                                        <span className="text-[11px] text-[color:var(--muted)] tabular-nums shrink-0">
+                                            {item.created_at}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Modals */}
-            <CreateProjectModal
-                isOpen={isCreateProjectOpen}
-                onClose={() => setIsCreateProjectOpen(false)}
-            />
-
+            {/* Modal for joining project by invite code */}
             <JoinProjectModal
                 isOpen={isJoinCodeOpen}
                 onClose={() => setIsJoinCodeOpen(false)}

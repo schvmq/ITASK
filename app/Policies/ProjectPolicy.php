@@ -10,10 +10,15 @@ class ProjectPolicy
 {
     /**
      * Determine whether the user can view the project.
-     * Allowed for: Project Leader, Project Staff, Project Member assigned to the project.
+     * Allowed for: Project Creator, Project Leader, Project Staff, Project Member assigned to the project.
      */
     public function view(User $user, Project $project): bool
     {
+        // Creator always has access
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
         return $project->roleAssignments()
             ->where('user_id', $user->id)
             ->exists();

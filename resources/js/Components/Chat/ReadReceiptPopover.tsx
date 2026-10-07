@@ -12,14 +12,14 @@ interface MemberReadStatus {
 
 interface ReadReceiptPopoverProps {
     messageId: number;
-    isDirect: boolean;
+    isDirect?: boolean;
     participants: MemberReadStatus[];
     currentUserId: number;
 }
 
 export function ReadReceiptPopover({
     messageId,
-    isDirect,
+    isDirect = false,
     participants,
     currentUserId,
 }: ReadReceiptPopoverProps) {
@@ -49,7 +49,6 @@ export function ReadReceiptPopover({
     const totalOthers = otherMembers.length;
     const readCount = readMembers.length;
     const isFullyRead = totalOthers > 0 && readCount === totalOthers;
-    const isAnyRead = readCount > 0;
 
     // Close popover when clicking outside
     useEffect(() => {
@@ -70,8 +69,8 @@ export function ReadReceiptPopover({
         };
     }, [isOpen]);
 
-    // ── Direct Chat Receipt ──
-    if (isDirect) {
+    // ── 2-Member Chat Receipt (or isDirect): Show "Read on {date, time}" directly ──
+    if (totalOthers === 1 || isDirect) {
         if (readMembers.length > 0) {
             const readAt = readMembers[0].readAt;
             const formatted = formatReadReceiptTime(readAt);
@@ -87,7 +86,6 @@ export function ReadReceiptPopover({
             );
         }
 
-        // Before it is read: show "Delivered"
         return (
             <div className="flex items-center gap-1 text-[11px] text-[var(--muted)] font-medium select-none">
                 <Check className="w-3.5 h-3.5 text-[var(--muted)]" strokeWidth={2} />
@@ -96,7 +94,17 @@ export function ReadReceiptPopover({
         );
     }
 
-    // ── Group Chat Receipt ──
+    // ── Multi-Member Chat Receipt: Show "Delivered" until read by at least 1 person ──
+    if (readCount === 0) {
+        return (
+            <div className="flex items-center gap-1 text-[11px] text-[var(--muted)] font-medium select-none">
+                <Check className="w-3.5 h-3.5 text-[var(--muted)]" strokeWidth={2} />
+                <span>Delivered</span>
+            </div>
+        );
+    }
+
+    // ── Read by X of Y Popover ──
     return (
         <div className="relative inline-block" ref={popoverRef}>
             <button

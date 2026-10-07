@@ -13,14 +13,14 @@ class MessageDeleted implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
-        public int $conversationId,
+        public int $chatId,
         public int $messageId
     ) {}
 
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('chat.' . $this->conversationId),
+            new PrivateChannel('chat.' . $this->chatId),
         ];
     }
 
@@ -32,7 +32,8 @@ class MessageDeleted implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'conversation_id' => $this->conversationId,
+            'chat_id' => $this->chatId,
+            'conversation_id' => $this->chatId,
             'message_id' => $this->messageId,
             'is_deleted' => true,
         ];

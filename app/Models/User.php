@@ -79,11 +79,31 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(ProjectApprovalDocument::class, 'uploaded_by');
     }
 
-    public function conversations(): BelongsToMany
+    public function chats()
     {
-        return $this->belongsToMany(Conversation::class, 'conversation_participants')
-            ->withPivot(['last_read_at', 'last_read_message_id'])
-            ->withTimestamps();
+        return Chat::query()
+            ->whereHas('project', function ($q) {
+                $q->whereNull('deleted_at')
+                    ->where(function ($pq) {
+                        $pq->where('created_by', $this->id)
+                            ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $this->id));
+                    });
+            });
+    }
+
+    public function chatReadStates(): HasMany
+    {
+        return $this->hasMany(ChatReadState::class);
+    }
+
+    public function chatUserPreferences(): HasMany
+    {
+        return $this->hasMany(ChatUserPreference::class);
+    }
+
+    public function conversations()
+    {
+        return $this->chats();
     }
 
     public function sentMessages(): HasMany

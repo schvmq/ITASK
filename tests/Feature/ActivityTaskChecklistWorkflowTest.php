@@ -184,7 +184,7 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
             ->where('activity.tasks.0.id', (string) $task->id)
             ->where('activity.tasks.0.title', 'Build Database Migrations')
             ->where('activity.tasks.0.status', Task::STATUS_IN_PROGRESS)
-            ->where('activity.tasks.0.can.manageChecklist', false)
+            ->where('activity.tasks.0.can.manageChecklist', true)
             ->where('activity.tasks.0.can.update', true)
             ->has('activity.tasks.0.checklist_items', 2)
             ->where('activity.tasks.0.checklist_items.0.id', (string) $item1->id)

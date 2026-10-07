@@ -21,7 +21,11 @@ class ActivityPolicy
         $project = $activity->project;
         $committee = $activity->committee;
 
-        // 1. Project Leader has project-level oversight
+        // 1. Project Creator or Leader has project-level oversight
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
@@ -47,7 +51,11 @@ class ActivityPolicy
     {
         $project = $committee->project;
 
-        // Project Leader can create activities in any committee within their project
+        // Project Leader or Creator can create activities in any committee within their project
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
@@ -74,6 +82,10 @@ class ActivityPolicy
     {
         $project = $activity->committee->project;
 
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
@@ -98,6 +110,10 @@ class ActivityPolicy
     public function delete(User $user, Activity $activity): bool
     {
         $project = $activity->committee->project;
+
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
 
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
@@ -160,6 +176,10 @@ class ActivityPolicy
         $project = $activity->project ?? $activity->committee?->project;
 
         if ($project) {
+            if ((int) $project->created_by === (int) $user->id) {
+                return true;
+            }
+
             $isLeader = $project->roleAssignments()
                 ->where('user_id', $user->id)
                 ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)

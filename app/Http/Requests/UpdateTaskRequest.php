@@ -50,17 +50,20 @@ class UpdateTaskRequest extends FormRequest
             return false;
         }
 
-        $isLeader = $task->activity->committee->project->roleAssignments()
-            ->where('user_id', $user->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-            ->exists();
+        $project = $task->activity->committee->project;
+        $isLeader = (int) $project->created_by === (int) $user->id
+            || $project->roleAssignments()
+                ->where('user_id', $user->id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                ->exists();
 
         $isStaff = $task->activity->committee->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
 
-        $isAssignee = $task->assigned_to && (int) $task->assigned_to === (int) $user->id;
+        $isAssignee = ($task->assigned_to && (int) $task->assigned_to === (int) $user->id)
+            || ($task->relationLoaded('assignees') ? $task->assignees->contains('id', $user->id) : $task->assignees()->where('users.id', $user->id)->exists());
 
         // 1. Task Status Modification: ONLY the assigned personnel can change execution status!
         if ($this->has('status')) {
@@ -95,21 +98,26 @@ class UpdateTaskRequest extends FormRequest
 
         $isLeader = false;
         if ($task && $user) {
-            $isLeader = $task->activity->committee->project->roleAssignments()
-                ->where('user_id', $user->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-                ->exists();
+            $project = $task->activity?->committee?->project;
+            $isLeader = ($project && (int) $project->created_by === (int) $user->id)
+                || ($project && $project->roleAssignments()
+                    ->where('user_id', $user->id)
+                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                    ->exists());
         }
 
         $isStaff = false;
         if ($task && $user) {
-            $isStaff = $task->activity->committee->roleAssignments()
+            $isStaff = $task->activity?->committee?->roleAssignments()
                 ->where('user_id', $user->id)
                 ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
                 ->exists();
         }
 
-        $isAssignee = $task && $user && $task->assigned_to && (int) $task->assigned_to === (int) $user->id;
+        $isAssignee = $task && $user && (
+            ($task->assigned_to && (int) $task->assigned_to === (int) $user->id)
+            || ($task->relationLoaded('assignees') ? $task->assignees->contains('id', $user->id) : $task->assignees()->where('users.id', $user->id)->exists())
+        );
 
         $rules = [];
 

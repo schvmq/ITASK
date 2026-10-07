@@ -10,23 +10,23 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-    // Accessibility: text on orange buttons is charcoal (#2A2A2A), not white, for readable contrast
+    // Primary: main action button using accessible --primary-btn with white text (WCAG AA > 4.5:1)
     primary:
-        'bg-[#EC7505] hover:bg-[#D96904] active:bg-[#C25D03] text-[#2A2A2A] font-bold shadow-xs border border-transparent',
+        'bg-[color:var(--primary-btn)] hover:opacity-90 active:scale-[0.99] text-white font-semibold border border-transparent',
     secondary:
-        'bg-[var(--card)] hover:bg-[var(--tint-neutral)] active:opacity-90 text-[var(--ink)] shadow-xs border border-[var(--border)] font-semibold',
+        'bg-[color:var(--soft-surface)] hover:bg-[color:color-mix(in_srgb,var(--text)_9%,var(--background))] active:scale-[0.99] text-[color:var(--text)] border border-[color:var(--border)] font-medium',
     outline:
-        'bg-transparent hover:bg-[var(--tint-neutral)] text-[var(--ink)] border border-[var(--border)] shadow-xs font-semibold',
+        'bg-transparent hover:bg-[color:var(--soft-surface)] active:scale-[0.99] text-[color:var(--text)] border border-[color:var(--border)] font-medium',
     danger:
-        'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs border border-transparent font-semibold',
+        'bg-[color:var(--primary)] hover:opacity-90 active:scale-[0.99] text-white font-semibold border border-transparent',
     ghost:
-        'bg-transparent hover:bg-[var(--tint-neutral)] text-[var(--ink)] border border-transparent font-medium',
+        'bg-transparent hover:bg-[color:var(--soft-surface)] active:scale-[0.99] text-[color:var(--text)] border border-transparent font-medium',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-    sm: 'text-xs px-3 py-1.5 rounded-lg gap-1.5',
-    md: 'text-[14px] px-4 py-2 rounded-xl gap-2',
-    lg: 'text-[15px] px-5 py-2.5 rounded-xl gap-2.5',
+    sm: 'text-xs px-2.5 py-1.5 rounded-lg gap-1.5',
+    md: 'text-[14px] px-3.5 py-2 rounded-lg gap-2',
+    lg: 'text-[15px] px-4.5 py-2.5 rounded-lg gap-2.5',
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -50,7 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             <button
                 ref={ref}
                 disabled={isDisabled}
-                className={`inline-flex items-center justify-center transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+                className={`inline-flex items-center justify-center transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
                 {...props}
             >
                 {isLoading ? (
@@ -75,10 +75,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                         />
                     </svg>
                 ) : (
-                    leftIcon
+                    leftIcon && <span className="inline-flex shrink-0 items-center justify-center">{leftIcon}</span>
                 )}
-                <span>{children}</span>
-                {!isLoading && rightIcon}
+                {typeof children === 'string' ? <span>{children}</span> : children}
+                {!isLoading && rightIcon && (
+                    <span className="inline-flex shrink-0 items-center justify-center">{rightIcon}</span>
+                )}
             </button>
         );
     }

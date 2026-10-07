@@ -20,8 +20,10 @@ class MessageRestored implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
+        $chatId = $this->message->chat_id ?? $this->message->conversation_id;
+
         return [
-            new PrivateChannel('chat.' . $this->message->conversation_id),
+            new PrivateChannel('chat.' . $chatId),
         ];
     }
 
@@ -32,21 +34,21 @@ class MessageRestored implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $chatId = $this->message->chat_id ?? $this->message->conversation_id;
+
         return [
             'id' => $this->message->id,
-            'conversation_id' => $this->message->conversation_id,
+            'chat_id' => $chatId,
+            'conversation_id' => $chatId,
             'sender_id' => $this->message->sender_id,
             'body' => $this->message->body,
-            'attachment_path' => $this->message->attachment_path,
-            'attachment_name' => $this->message->attachment_name,
-            'attachment_size' => $this->message->attachment_size,
-            'created_at' => $this->message->created_at->toISOString(),
             'is_deleted' => false,
-            'sender' => [
+            'created_at' => $this->message->created_at->toISOString(),
+            'sender' => $this->message->sender ? [
                 'id' => $this->message->sender->id,
                 'name' => $this->message->sender->name,
                 'email' => $this->message->sender->email,
-            ],
+            ] : null,
         ];
     }
 }

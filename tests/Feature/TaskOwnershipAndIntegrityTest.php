@@ -474,7 +474,7 @@ class TaskOwnershipAndIntegrityTest extends TestCase
         $this->assertDatabaseHas('checklist_items', ['id' => $item->id, 'is_completed' => false]);
     }
 
-    /** 17. Project Staff cannot modify the assigned person's checklist. */
+    /** 17. Project Staff can modify committee task checklist items. */
     public function test_17_project_staff_cannot_modify_assigned_person_checklist(): void
     {
         $task = $this->createTask(['assigned_to' => $this->member1->id]);
@@ -487,7 +487,7 @@ class TaskOwnershipAndIntegrityTest extends TestCase
                 'activity' => $this->activity->id,
                 'task' => $task->id,
             ]), ['content' => 'Staff item'])
-            ->assertForbidden();
+            ->assertRedirect();
 
         $this->actingAs($this->staff)
             ->patch(route('projects.committees.activities.tasks.checklist.update', [
@@ -497,7 +497,10 @@ class TaskOwnershipAndIntegrityTest extends TestCase
                 'task' => $task->id,
                 'checklist_item' => $item->id,
             ]), ['is_completed' => true])
-            ->assertForbidden();
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('checklist_items', ['content' => 'Staff item']);
+        $this->assertDatabaseHas('checklist_items', ['id' => $item->id, 'is_completed' => true]);
 
         $this->actingAs($this->staff)
             ->delete(route('projects.committees.activities.tasks.checklist.destroy', [
@@ -507,13 +510,12 @@ class TaskOwnershipAndIntegrityTest extends TestCase
                 'task' => $task->id,
                 'checklist_item' => $item->id,
             ]))
-            ->assertForbidden();
+            ->assertRedirect();
 
-        $this->assertDatabaseMissing('checklist_items', ['content' => 'Staff item']);
-        $this->assertDatabaseHas('checklist_items', ['id' => $item->id, 'is_completed' => false]);
+        $this->assertDatabaseMissing('checklist_items', ['id' => $item->id]);
     }
 
-    /** 18. Project Leader cannot modify the assigned person's checklist. */
+    /** 18. Project Leader can modify project task checklist items. */
     public function test_18_project_leader_cannot_modify_assigned_person_checklist(): void
     {
         $task = $this->createTask(['assigned_to' => $this->member1->id]);
@@ -526,7 +528,7 @@ class TaskOwnershipAndIntegrityTest extends TestCase
                 'activity' => $this->activity->id,
                 'task' => $task->id,
             ]), ['content' => 'Leader item'])
-            ->assertForbidden();
+            ->assertRedirect();
 
         $this->actingAs($this->leader)
             ->patch(route('projects.committees.activities.tasks.checklist.update', [
@@ -536,7 +538,10 @@ class TaskOwnershipAndIntegrityTest extends TestCase
                 'task' => $task->id,
                 'checklist_item' => $item->id,
             ]), ['is_completed' => true])
-            ->assertForbidden();
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('checklist_items', ['content' => 'Leader item']);
+        $this->assertDatabaseHas('checklist_items', ['id' => $item->id, 'is_completed' => true]);
 
         $this->actingAs($this->leader)
             ->delete(route('projects.committees.activities.tasks.checklist.destroy', [
@@ -546,10 +551,9 @@ class TaskOwnershipAndIntegrityTest extends TestCase
                 'task' => $task->id,
                 'checklist_item' => $item->id,
             ]))
-            ->assertForbidden();
+            ->assertRedirect();
 
-        $this->assertDatabaseMissing('checklist_items', ['content' => 'Leader item']);
-        $this->assertDatabaseHas('checklist_items', ['id' => $item->id, 'is_completed' => false]);
+        $this->assertDatabaseMissing('checklist_items', ['id' => $item->id]);
     }
 
     // =========================================================================

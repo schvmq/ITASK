@@ -1,8 +1,10 @@
 import React from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { GanttTimeline } from '@/Components/GanttTimeline';
+import { Button } from '@/Components/Button';
 import { type ProjectTimelineData } from '@/types';
+import { Calendar, FolderOpen } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,14 +66,38 @@ export default function TimelineIndex({ projects, timelines = [] }: TimelineInde
     }, [timelines, projects]);
 
     return (
-        <AppLayout
-            title="Timeline / Gantt"
-            subtitle="Project schedule and activity progress visualization"
-        >
-            <Head title="Timeline / Gantt — ITASK" />
+        <AppLayout hidePageHeadingBanner={true}>
+            <Head title="Timeline — ITASK" />
 
-            <div className="space-y-4">
-                {/* Main Gantt Timeline Component (page title is only in the top header) */}
+            <div className="space-y-6">
+                {/* ══ 1. Page Header ══ */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[color:var(--border)]">
+                    <div>
+                        <h1 className="text-[26px] font-bold text-[color:var(--text)] tracking-tight">
+                            Timeline
+                        </h1>
+                        <p className="text-[15px] text-[color:var(--muted)] mt-1">
+                            Gantt schedule and activity progress across your CCIS projects.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 shrink-0">
+                        <Link href="/calendar">
+                            <Button variant="secondary" size="md">
+                                <Calendar className="w-4 h-4 mr-1.5" />
+                                <span>Calendar</span>
+                            </Button>
+                        </Link>
+                        <Link href="/projects">
+                            <Button variant="secondary" size="md">
+                                <FolderOpen className="w-4 h-4 mr-1.5" />
+                                <span>Projects</span>
+                            </Button>
+                        </Link>
+                    </div>
+                </div>
+
+                {/* ══ 2. Main Gantt Timeline Component ══ */}
                 <GanttTimeline timelines={effectiveTimelines} isGlobal={true} />
             </div>
         </AppLayout>

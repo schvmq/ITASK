@@ -7,9 +7,9 @@ use App\Events\MessageRestored;
 use App\Events\MessageSent;
 use App\Events\MessagesRead;
 use App\Models\Activity;
-use App\Models\Committee;
-use App\Models\Conversation;
-use App\Models\ConversationParticipant;
+use App\Models\Chat;
+use App\Models\ChatReadState;
+use App\Models\ChatUserPreference;
 use App\Models\Message;
 use App\Models\Project;
 use App\Models\ProjectRoleAssignment;
@@ -23,7 +23,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -36,325 +35,385 @@ class ChatController extends Controller
     ) {}
 
     /**
-     * Display the messaging interface.
+     * Display the Project Group Chats interface.
+     * Enforces that only active project members can view chats.
+     * No direct messages exist.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, ?int $projectId = null): Response
     {
         $user = $request->user();
 
-        // 1. Fetch conversations for the current user
-        $conversations = Conversation::query()
-            ->whereHas('participants', function ($q) use ($user) {
-                $q->where('user_id', $user->id);
+        // 1. Fetch all active projects where the user is a member
+        $projects = Project::query()
+            ->whereNull('deleted_at')
+            ->where(function ($q) use ($user) {
+                $q->where('created_by', $user->id)
+                    ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $user->id));
             })
             ->with([
-                'latestMessage' => fn ($q) => $q->withTrashed()->with('sender:id,name'),
-                'users:id,name,email',
-                'project:id,title',
-                'committee:id,name',
+                'chat.latestMessage.sender:id,name,email',
+                'chat.latestMessage.task',
+                'roleAssignments.user:id,name,email',
+                'creator:id,name,email',
             ])
-            ->get()
-            ->map(function (Conversation $conv) use ($user) {
-                $participant = $conv->participants->firstWhere('user_id', $user->id);
-                $lastReadMsgId = $participant?->last_read_message_id;
-                $lastReadAt = $participant?->last_read_at;
+            ->get();
 
-                $unreadCount = $conv->messages()
-                    ->where('sender_id', '!=', $user->id)
-                    ->when($lastReadMsgId, function ($query, $lastReadMsgId) {
-                        return $query->where('id', '>', $lastReadMsgId);
-                    }, function ($query) use ($lastReadAt) {
-                        return $query->when($lastReadAt, fn ($q) => $q->where('created_at', '>', $lastReadAt));
-                    })
-                    ->count();
+        // 2. Map and ensure each project has exactly one group chat (idempotent)
+        $chatItems = $projects->map(function (Project $project) use ($user) {
+            $chat = $project->chat;
 
-                // Compute display title and avatar subtitle
-                $otherUser = $conv->type === 'direct'
-                    ? $conv->users->firstWhere('id', '!=', $user->id)
-                    : null;
+            if (! $chat) {
+                $chat = Chat::create([
+                    'project_id' => $project->id,
+                    'archived_at' => $project->status === Project::STATUS_ARCHIVED ? now() : null,
+                ]);
 
-                $title = match ($conv->type) {
-                    'direct' => $otherUser?->name ?? 'Direct Message',
-                    'project' => $conv->project ? $conv->project->title . ' (Project Team)' : ($conv->title ?? 'Project Channel'),
-                    'committee' => $conv->committee ? $conv->committee->name . ' (Committee)' : ($conv->title ?? 'Committee Channel'),
-                    default => $conv->title ?? 'Conversation',
-                };
+                $chat->messages()->create([
+                    'sender_id' => null,
+                    'type' => Message::TYPE_SYSTEM,
+                    'body' => 'Project chat created. Everyone in this project can message here.',
+                ]);
 
-                $latestMsg = $conv->latestMessage;
-                $latestMsgBody = null;
-                $isDeleted = false;
+                $chat->load('latestMessage');
+            }
 
-                if ($latestMsg) {
-                    $isDeleted = $latestMsg->trashed();
-                    $latestMsgBody = $isDeleted ? 'This message was deleted' : $latestMsg->body;
+            // Read state for this user in this chat
+            $readState = ChatReadState::where('chat_id', $chat->id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            $lastReadMsgId = $readState?->last_read_message_id;
+            $lastReadAt = $readState?->read_at;
+
+            // Unread count: only messages from other users or system messages after last read
+            $unreadCount = $chat->messages()
+                ->where(function ($mq) use ($user) {
+                    $mq->where('sender_id', '!=', $user->id)
+                       ->orWhereNull('sender_id');
+                })
+                ->when($lastReadMsgId, function ($query, $lastReadMsgId) {
+                    return $query->where('id', '>', $lastReadMsgId);
+                }, function ($query) use ($lastReadAt) {
+                    return $query->when($lastReadAt, fn ($q) => $q->where('created_at', '>', $lastReadAt));
+                })
+                ->count();
+
+            // Preferences: is_pinned, is_muted
+            $pref = ChatUserPreference::where('chat_id', $chat->id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            $isPinned = $pref?->is_pinned ?? false;
+            $isMuted = $pref?->is_muted ?? false;
+
+            // Active members count
+            $memberCount = $project->roleAssignments->pluck('user_id')
+                ->push($project->created_by)
+                ->unique()
+                ->count();
+
+            // Format preview text
+            $latestMsg = $chat->latestMessage;
+            $preview = 'No messages yet';
+            $previewTime = null;
+            $isDeleted = false;
+
+            if ($latestMsg) {
+                $isDeleted = $latestMsg->trashed();
+                $previewTime = $latestMsg->created_at->toISOString();
+
+                if ($isDeleted) {
+                    $preview = 'This message was deleted';
+                } elseif ($latestMsg->type === Message::TYPE_SYSTEM || ! $latestMsg->sender_id) {
+                    $preview = $latestMsg->body;
+                } elseif ($latestMsg->type === Message::TYPE_TASK || $latestMsg->task_id) {
+                    $taskTitle = $latestMsg->task?->title ?? 'New Task';
+                    $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
+                    $preview = "{$senderName} assigned task: {$taskTitle}";
+                } elseif ($latestMsg->attachment_name) {
+                    $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
+                    $preview = "{$senderName} shared a file: {$latestMsg->attachment_name}";
+                } else {
+                    $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
+                    $preview = "{$senderName}: {$latestMsg->body}";
                 }
+            }
 
-                return [
-                    'id' => $conv->id,
-                    'type' => $conv->type,
-                    'title' => $title,
-                    'project_id' => $conv->project_id,
-                    'project_name' => $conv->project?->title,
-                    'committee_id' => $conv->committee_id,
-                    'committee_name' => $conv->committee?->name,
-                    'other_user' => $otherUser ? [
-                        'id' => $otherUser->id,
-                        'name' => $otherUser->name,
-                        'email' => $otherUser->email,
-                    ] : null,
-                    'latest_message' => $latestMsg ? [
-                        'id' => $latestMsg->id,
-                        'body' => $latestMsgBody,
-                        'is_deleted' => $isDeleted,
-                        'attachment_name' => $isDeleted ? null : $latestMsg->attachment_name,
-                        'created_at' => $latestMsg->created_at->toISOString(),
-                        'sender_name' => $latestMsg->sender?->name ?? 'Unknown',
-                    ] : null,
-                    'unread_count' => $unreadCount,
-                    'updated_at' => $latestMsg?->created_at?->toISOString() ?? $conv->updated_at->toISOString(),
-                ];
+            $isArchived = $project->status === Project::STATUS_ARCHIVED || $chat->archived_at !== null;
+
+            return [
+                'id' => $chat->id,
+                'chat_id' => $chat->id,
+                'conversation_id' => $chat->id,
+                'project_id' => $project->id,
+                'title' => $project->title,
+                'name' => $project->title,
+                'type' => 'project',
+                'is_archived' => $isArchived,
+                'is_pinned' => $isPinned,
+                'is_muted' => $isMuted,
+                'member_count' => $memberCount,
+                'unread_count' => max(0, $unreadCount),
+                'preview' => $preview,
+                'preview_time' => $previewTime,
+                'updated_at' => $latestMsg?->created_at?->toISOString() ?? $project->updated_at->toISOString(),
+            ];
+        });
+
+        // Split into active and archived chats
+        $activeChats = $chatItems->filter(fn ($c) => ! $c['is_archived'])
+            ->sort(function ($a, $b) {
+                if ($a['is_pinned'] !== $b['is_pinned']) {
+                    return $b['is_pinned'] ? 1 : -1;
+                }
+                return strcmp($b['updated_at'], $a['updated_at']);
             })
+            ->values();
+
+        $archivedChats = $chatItems->filter(fn ($c) => $c['is_archived'])
             ->sortByDesc('updated_at')
             ->values();
 
-        // 2. Determine active conversation
-        $activeConversationId = $request->query('conversation');
-        if (! $activeConversationId && $conversations->isNotEmpty()) {
-            $activeConversationId = $conversations->first()['id'];
-        }
-        $activeConversation = null;
-        $messages = [];
+        // 3. Determine Selected / Active Chat
+        $targetProjectId = $projectId ?? $request->query('project') ?? $request->query('conversation');
+        $selectedChat = null;
 
-        if ($activeConversationId) {
-            $selected = Conversation::query()
-                ->where('id', $activeConversationId)
-                ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
-                ->with(['users:id,name,email', 'project:id,title,created_by', 'committee:id,name', 'participants'])
+        if ($targetProjectId) {
+            // Find chat by project_id or chat_id
+            $candidateChat = Chat::query()
+                ->where('project_id', $targetProjectId)
+                ->orWhere('id', $targetProjectId)
+                ->with(['project.creator', 'project.roleAssignments.user'])
                 ->first();
 
-            if ($selected) {
-                // Load messages including soft deleted ones to display the tombstone
-                $messages = $selected->messages()
-                    ->withTrashed()
-                    ->with(['sender:id,name,email', 'task.assignees:id,name', 'task.assignee:id,name'])
-                    ->orderBy('created_at', 'asc')
-                    ->take(150)
-                    ->get()
-                    ->map(function (Message $m) {
-                        $isDeleted = $m->trashed();
-                        $taskData = null;
-
-                        if (! $isDeleted && $m->task) {
-                            $assignees = $m->task->assignees->isNotEmpty()
-                                ? $m->task->assignees->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values()
-                                : ($m->task->assignee ? [['id' => $m->task->assignee->id, 'name' => $m->task->assignee->name]] : []);
-
-                            $taskData = [
-                                'id' => $m->task->id,
-                                'title' => $m->task->title,
-                                'description' => $m->task->description,
-                                'status' => $m->task->status,
-                                'priority' => $m->task->priority ?? 'Medium',
-                                'due_date' => $m->task->due_date ? Carbon::parse($m->task->due_date)->format('M d, Y') : null,
-                                'assignees' => $assignees,
-                                'action_url' => $m->task->activity ? route('projects.committees.activities.show', [
-                                    'project' => $m->task->activity->project_id,
-                                    'committee' => $m->task->activity->committee_id,
-                                    'activity' => $m->task->activity->id,
-                                ]) : null,
-                            ];
-                        } elseif ($m->task_id && ! $m->task) {
-                            $taskData = [
-                                'is_unavailable' => true,
-                            ];
-                        }
-
-                        return [
-                            'id' => $m->id,
-                            'conversation_id' => $m->conversation_id,
-                            'sender_id' => $m->sender_id,
-                            'body' => $isDeleted ? '' : $m->body,
-                            'is_deleted' => $isDeleted,
-                            'task_id' => $isDeleted ? null : $m->task_id,
-                            'task' => $isDeleted ? null : $taskData,
-                            'attachment_path' => $isDeleted ? null : $m->attachment_path,
-                            'attachment_name' => $isDeleted ? null : $m->attachment_name,
-                            'attachment_type' => $isDeleted ? null : $m->attachment_type,
-                            'attachment_size' => $isDeleted ? null : $m->attachment_size,
-                            'created_at' => $m->created_at->toISOString(),
-                            'sender' => [
-                                'id' => $m->sender->id,
-                                'name' => $m->sender->name,
-                                'email' => $m->sender->email,
-                            ],
-                        ];
-                    });
-
-                $otherUser = $selected->type === 'direct'
-                    ? $selected->users->firstWhere('id', '!=', $user->id)
-                    : null;
-
-                // Shared files from active non-deleted conversation messages
-                $sharedFiles = $selected->messages()
-                    ->whereNotNull('attachment_name')
-                    ->latest()
-                    ->take(8)
-                    ->get(['id', 'attachment_name', 'attachment_path', 'attachment_type', 'attachment_size', 'created_at'])
-                    ->map(fn ($m) => [
-                        'id' => $m->id,
-                        'name' => $m->attachment_name,
-                        'type' => $m->attachment_type,
-                        'size' => $m->attachment_size,
-                        'download_url' => route('chat.attachments.download', $m->id),
-                        'created_at' => $m->created_at->toISOString(),
-                    ]);
-
-                // Pinned tasks from conversation project
-                $pinnedTasks = collect();
-                if ($selected->project_id) {
-                    $pinnedTasks = Task::query()
-                        ->whereHas('activity', fn ($q) => $q->where('project_id', $selected->project_id))
-                        ->with(['assignee:id,name', 'activity.committee'])
-                        ->latest()
-                        ->take(5)
-                        ->get()
-                        ->map(fn ($t) => [
-                            'id' => (string) $t->id,
-                            'title' => $t->title,
-                            'status' => $t->status,
-                            'priority' => $t->priority ?? 'Medium',
-                            'due_date_formatted' => $t->due_date ? $t->due_date->format('M d') : 'No date',
-                            'assignee_name' => $t->assignee?->name ?? 'Unassigned',
-                            'action_url' => route('projects.committees.activities.show', [
-                                'project' => $t->activity->project_id,
-                                'committee' => $t->activity->committee_id,
-                                'activity' => $t->activity->id,
-                            ]),
-                        ]);
-                }
-
-                // Project progress info
-                $projectInfo = null;
-                if ($selected->project) {
-                    $prog = $this->progressService->calculateProjectProgress($selected->project);
-                    $projectInfo = [
-                        'id' => (string) $selected->project->id,
-                        'title' => $selected->project->title,
-                        'progress' => $prog['progress'] ?? 0,
-                        'total_tasks' => $prog['total_tasks'] ?? 0,
-                        'completed_tasks' => $prog['completed_tasks'] ?? 0,
-                    ];
-                }
-
-                // Participants with project role and read receipts tracking
-                $participants = $selected->participants->map(function (ConversationParticipant $p) use ($selected) {
-                    $u = $p->user;
-                    if (! $u) return null;
-
-                    $role = 'Member';
-                    if ($selected->project) {
-                        $assignment = $selected->project->roleAssignments()->where('user_id', $u->id)->first();
-                        if ($assignment) {
-                            $role = $assignment->role;
-                        } elseif ($selected->project->created_by === $u->id) {
-                            $role = 'Project Leader';
-                        }
-                    }
-
-                    return [
-                        'id' => $u->id,
-                        'name' => $u->name,
-                        'email' => $u->email,
-                        'role' => $role,
-                        'is_online' => true,
-                        'last_read_message_id' => $p->last_read_message_id,
-                        'last_read_at' => $p->last_read_at?->toISOString(),
-                    ];
-                })->filter()->values();
-
-                $activeConversation = [
-                    'id' => $selected->id,
-                    'type' => $selected->type,
-                    'title' => match ($selected->type) {
-                        'direct' => $otherUser?->name ?? 'Direct Message',
-                        'project' => $selected->project ? $selected->project->title : ($selected->title ?? 'Project Channel'),
-                        'committee' => $selected->committee ? $selected->committee->name : ($selected->title ?? 'Committee Channel'),
-                        default => $selected->title ?? 'Conversation',
-                    },
-                    'project_id' => $selected->project_id,
-                    'other_user' => $otherUser ? [
-                        'id' => $otherUser->id,
-                        'name' => $otherUser->name,
-                        'email' => $otherUser->email,
-                    ] : null,
-                    'project' => $projectInfo,
-                    'participants' => $participants,
-                    'shared_files' => $sharedFiles,
-                    'pinned_tasks' => $pinnedTasks,
-                ];
+            // If not found or soft-deleted or user is not a member, abort 404 with no info leaked
+            if (! $candidateChat || ! $candidateChat->hasActiveMember($user->id)) {
+                abort(404, "This chat isn't available. You may have been removed from the project.");
             }
+
+            $selectedChat = $candidateChat;
+        } elseif ($activeChats->isNotEmpty()) {
+            $firstChatId = $activeChats->first()['id'];
+            $selectedChat = Chat::with(['project.creator', 'project.roleAssignments.user'])->find($firstChatId);
+        } elseif ($archivedChats->isNotEmpty()) {
+            $firstChatId = $archivedChats->first()['id'];
+            $selectedChat = Chat::with(['project.creator', 'project.roleAssignments.user'])->find($firstChatId);
         }
 
-        // 3. Fetch potential direct chat partners (users with accounts)
-        $availableUsers = User::query()
-            ->where('id', '!=', $user->id)
-            ->select('id', 'name', 'email')
-            ->orderBy('name')
-            ->get();
+        // 4. Load Active Chat Messages, Receipts, and Details
+        $messages = [];
+        $activeChatData = null;
 
-        // 4. Projects user belongs to (for "Create task from message" in direct chats)
-        $userProjects = Project::query()
-            ->where('created_by', $user->id)
-            ->orWhereHas('roleAssignments', fn ($q) => $q->where('user_id', $user->id))
-            ->with(['roleAssignments.user:id,name,email', 'creator:id,name,email'])
-            ->select('id', 'title', 'created_by')
-            ->get()
-            ->map(function ($p) {
-                $members = collect();
-                if ($p->creator) {
-                    $members->push($p->creator);
+        if ($selectedChat) {
+            $project = $selectedChat->project;
+
+            // Access check: Active members only
+            if (! $selectedChat->hasActiveMember($user->id)) {
+                abort(403, "This chat isn't available. You may have been removed from the project.");
+            }
+
+            // Message query: New members see full history per Requirement 1.3
+            $messagesQuery = $selectedChat->messages()
+                ->withTrashed()
+                ->with(['sender:id,name,email', 'task.assignees:id,name', 'task.assignee:id,name', 'task.activity'])
+                ->orderBy('created_at', 'asc');
+
+            if (! Chat::NEW_MEMBERS_SEE_HISTORY) {
+                $assignment = $project->roleAssignments()->where('user_id', $user->id)->first();
+                if ($assignment) {
+                    $messagesQuery->where('created_at', '>=', $assignment->created_at);
                 }
-                if ($p->relationLoaded('roleAssignments')) {
-                    foreach ($p->roleAssignments as $assignment) {
-                        if ($assignment->user) {
-                            $members->push($assignment->user);
-                        }
-                    }
+            }
+
+            $messages = $messagesQuery->get()->map(function (Message $m) {
+                $isDeleted = $m->trashed();
+                $taskData = null;
+
+                if (! $isDeleted && $m->task) {
+                    $t = $m->task;
+                    $assignees = $t->assignees->isNotEmpty()
+                        ? $t->assignees->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])->values()
+                        : ($t->assignee ? [['id' => $t->assignee->id, 'name' => $t->assignee->name]] : []);
+
+                    $taskData = [
+                        'id' => $t->id,
+                        'title' => $t->title,
+                        'description' => $t->description,
+                        'status' => $t->status,
+                        'priority' => $t->priority ?? 'Medium',
+                        'due_date' => $t->due_date ? Carbon::parse($t->due_date)->format('M d, Y') : null,
+                        'assignees' => $assignees,
+                        'action_url' => $t->activity ? route('projects.committees.activities.show', [
+                            'project' => $t->activity->project_id,
+                            'committee' => $t->activity->committee_id,
+                            'activity' => $t->activity->id,
+                        ]) : null,
+                    ];
+                } elseif ($m->task_id && ! $m->task) {
+                    $taskData = [
+                        'is_unavailable' => true,
+                    ];
                 }
+
                 return [
-                    'id' => $p->id,
-                    'title' => $p->title,
-                    'members' => $members->unique('id')->values()->map(fn ($u) => [
-                        'id' => $u->id,
-                        'name' => $u->name,
-                        'email' => $u->email,
-                    ]),
+                    'id' => $m->id,
+                    'chat_id' => $m->chat_id,
+                    'conversation_id' => $m->chat_id,
+                    'sender_id' => $m->sender_id,
+                    'type' => $m->type ?? ($m->sender_id === null ? 'system' : 'text'),
+                    'body' => $isDeleted ? '' : ($m->body ?? ''),
+                    'is_deleted' => $isDeleted,
+                    'task_id' => $isDeleted ? null : $m->task_id,
+                    'task' => $isDeleted ? null : $taskData,
+                    'attachment_path' => $isDeleted ? null : $m->attachment_path,
+                    'attachment_name' => $isDeleted ? null : $m->attachment_name,
+                    'attachment_type' => $isDeleted ? null : $m->attachment_type,
+                    'attachment_size' => $isDeleted ? null : $m->attachment_size,
+                    'created_at' => $m->created_at->toISOString(),
+                    'sender' => $m->sender ? [
+                        'id' => $m->sender->id,
+                        'name' => $m->sender->name,
+                        'email' => $m->sender->email,
+                    ] : null,
                 ];
             });
 
+            // Active Members with roles and read receipts
+            $allActiveMembers = $selectedChat->getActiveMembers();
+            $readStates = ChatReadState::where('chat_id', $selectedChat->id)->get()->keyBy('user_id');
+
+            $participants = $allActiveMembers->map(function (User $u) use ($project, $readStates) {
+                $role = 'Member';
+                if ((int) $project->created_by === (int) $u->id) {
+                    $role = 'Project Leader';
+                } else {
+                    $assignment = $project->roleAssignments->firstWhere('user_id', $u->id);
+                    if ($assignment) {
+                        $role = $assignment->role;
+                    }
+                }
+
+                $userReadState = $readStates->get($u->id);
+
+                return [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'email' => $u->email,
+                    'role' => $role,
+                    'is_online' => true,
+                    'last_read_message_id' => $userReadState?->last_read_message_id,
+                    'last_read_at' => $userReadState?->read_at?->toISOString(),
+                ];
+            })->values();
+
+            // Shared files from non-deleted messages
+            $sharedFiles = $selectedChat->messages()
+                ->whereNotNull('attachment_name')
+                ->latest()
+                ->take(8)
+                ->get(['id', 'attachment_name', 'attachment_path', 'attachment_type', 'attachment_size', 'created_at'])
+                ->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->attachment_name,
+                    'type' => $m->attachment_type,
+                    'size' => $m->attachment_size,
+                    'download_url' => route('chat.attachments.download', $m->id),
+                    'created_at' => $m->created_at->toISOString(),
+                ]);
+
+            // Pinned tasks from project
+            $pinnedTasks = Task::query()
+                ->whereHas('activity', fn ($q) => $q->where('project_id', $project->id))
+                ->with(['assignee:id,name', 'activity.committee'])
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(fn ($t) => [
+                    'id' => (string) $t->id,
+                    'title' => $t->title,
+                    'status' => $t->status,
+                    'priority' => $t->priority ?? 'Medium',
+                    'due_date_formatted' => $t->due_date ? $t->due_date->format('M d') : 'No date',
+                    'assignee_name' => $t->assignee?->name ?? 'Unassigned',
+                    'action_url' => $t->activity ? route('projects.committees.activities.show', [
+                        'project' => $t->activity->project_id,
+                        'committee' => $t->activity->committee_id,
+                        'activity' => $t->activity->id,
+                    ]) : null,
+                ]);
+
+            // Project progress
+            $prog = $this->progressService->calculateProjectProgress($project);
+            $projectInfo = [
+                'id' => (string) $project->id,
+                'title' => $project->title,
+                'progress' => $prog['progress'] ?? 0,
+                'total_tasks' => $prog['total_tasks'] ?? 0,
+                'completed_tasks' => $prog['completed_tasks'] ?? 0,
+            ];
+
+            $pref = ChatUserPreference::where('chat_id', $selectedChat->id)->where('user_id', $user->id)->first();
+
+            $activeChatData = [
+                'id' => $selectedChat->id,
+                'chat_id' => $selectedChat->id,
+                'conversation_id' => $selectedChat->id,
+                'project_id' => $project->id,
+                'title' => $project->title,
+                'name' => $project->title,
+                'type' => 'project',
+                'is_archived' => $selectedChat->isArchived(),
+                'is_pinned' => $pref?->is_pinned ?? false,
+                'is_muted' => $pref?->is_muted ?? false,
+                'is_leader' => $selectedChat->isLeader($user->id),
+                'project' => $projectInfo,
+                'participants' => $participants,
+                'shared_files' => $sharedFiles,
+                'pinned_tasks' => $pinnedTasks,
+            ];
+        }
+
+        // Total unread count for sidebar
+        $totalUnreadMessages = $chatItems->sum('unread_count');
+
+        // Current project members for @mentions and task assignment
+        $projectMembers = $selectedChat ? $selectedChat->getActiveMembers()->map(fn ($u) => [
+            'id' => $u->id,
+            'name' => $u->name,
+            'email' => $u->email,
+        ]) : [];
+
         return Inertia::render('Chat/Index', [
-            'conversations' => $conversations,
-            'activeConversation' => $activeConversation,
+            'chats' => $activeChats,
+            'archivedChats' => $archivedChats,
+            'conversations' => $activeChats, // backward-compat prop alias
+            'activeChat' => $activeChatData,
+            'activeConversation' => $activeChatData, // backward-compat prop alias
             'messages' => $messages,
-            'availableUsers' => $availableUsers,
-            'userProjects' => $userProjects,
+            'projectMembers' => $projectMembers,
             'authUserId' => $user->id,
+            'totalUnreadCount' => $totalUnreadMessages,
         ]);
     }
 
     /**
-     * Send a new message in the conversation.
+     * Send a message in the project group chat.
      */
-    public function store(Request $request, Conversation $conversation)
+    public function store(Request $request, Chat $chat)
     {
         $user = $request->user();
 
-        // 1. Authorize participant
-        if (! $conversation->hasParticipant($user->id)) {
-            abort(403, 'You are not a participant in this conversation.');
+        // 1. Enforce active project membership
+        if (! $chat->hasActiveMember($user->id)) {
+            abort(403, 'You are not a member of this project.');
         }
 
-        // 2. Validate input
+        // 2. Enforce archived read-only check
+        if ($chat->isArchived()) {
+            abort(403, 'This project is archived. Messages are read-only.');
+        }
+
+        // 3. Validate input
         $validated = $request->validate([
             'body' => ['nullable', 'string', 'max:5000'],
             'file' => ['nullable', 'file', 'max:10240'], // 10MB limit
@@ -380,10 +439,13 @@ class ChatController extends Controller
             $attachmentSize = $file->getSize();
         }
 
-        // 3. Create message
-        $message = DB::transaction(function () use ($conversation, $user, $validated, $attachmentPath, $attachmentName, $attachmentType, $attachmentSize) {
-            $msg = $conversation->messages()->create([
+        // 4. Create message & update sender read receipt in transaction
+        $message = DB::transaction(function () use ($chat, $user, $validated, $attachmentPath, $attachmentName, $attachmentType, $attachmentSize) {
+            $msgType = $attachmentPath ? Message::TYPE_FILE : Message::TYPE_TEXT;
+
+            $msg = $chat->messages()->create([
                 'sender_id' => $user->id,
+                'type' => $msgType,
                 'body' => $validated['body'] ?? '',
                 'attachment_path' => $attachmentPath,
                 'attachment_name' => $attachmentName,
@@ -391,20 +453,18 @@ class ChatController extends Controller
                 'attachment_size' => $attachmentSize,
             ]);
 
-            // Advance sender's read marker to this new message
-            $conversation->participants()
-                ->where('user_id', $user->id)
-                ->update([
-                    'last_read_at' => now(),
-                    'last_read_message_id' => $msg->id,
-                ]);
+            // Advance sender's read marker
+            ChatReadState::updateOrCreate(
+                ['chat_id' => $chat->id, 'user_id' => $user->id],
+                ['last_read_message_id' => $msg->id, 'read_at' => now()]
+            );
 
-            $conversation->touch();
+            $chat->touch();
 
             return $msg;
         });
 
-        // 4. Broadcast event in real time to other participants
+        // 5. Broadcast in real time
         try {
             broadcast(new MessageSent($message))->toOthers();
         } catch (\Throwable $e) {
@@ -414,57 +474,57 @@ class ChatController extends Controller
         if ($request->wantsJson()) {
             return response()->json([
                 'id' => $message->id,
-                'conversation_id' => $message->conversation_id,
+                'chat_id' => $message->chat_id,
+                'conversation_id' => $message->chat_id,
                 'sender_id' => $message->sender_id,
+                'type' => $message->type,
                 'body' => $message->body,
                 'is_deleted' => false,
                 'created_at' => $message->created_at->toISOString(),
             ]);
         }
 
-        return redirect()->route('chat.index', ['conversation' => $conversation->id]);
+        return redirect()->route('messages.index', ['projectId' => $chat->project_id]);
     }
 
     /**
-     * Mark messages in a conversation as read.
+     * Mark messages in a chat as read.
      * Enforces server time and strictly advances forward (never moves backward).
      */
-    public function markAsRead(Request $request, Conversation $conversation): JsonResponse
+    public function markAsRead(Request $request, Chat $chat): JsonResponse
     {
         $user = $request->user();
 
-        // 1. Authorize participant
-        if (! $conversation->hasParticipant($user->id)) {
-            abort(403, 'You are not a participant in this conversation.');
+        if (! $chat->hasActiveMember($user->id)) {
+            abort(403, 'You are not a member of this project.');
         }
 
         $validated = $request->validate([
             'last_read_message_id' => ['nullable', 'integer'],
         ]);
 
-        $participant = $conversation->participants()->where('user_id', $user->id)->first();
-        if (! $participant) {
-            return response()->json(['success' => false, 'message' => 'Participant not found.'], 404);
-        }
+        $readState = ChatReadState::firstOrCreate(
+            ['chat_id' => $chat->id, 'user_id' => $user->id]
+        );
 
         $newMsgId = $validated['last_read_message_id'] ?? null;
-        $currentMsgId = $participant->last_read_message_id;
+        $currentMsgId = $readState->last_read_message_id;
 
         // Never move receipt backward
         $shouldUpdateMsgId = $newMsgId && (! $currentMsgId || $newMsgId > $currentMsgId);
         $readAt = now();
 
-        $updateData = ['last_read_at' => $readAt];
+        $updateData = ['read_at' => $readAt];
         if ($shouldUpdateMsgId) {
             $updateData['last_read_message_id'] = $newMsgId;
         }
 
-        $participant->update($updateData);
+        $readState->update($updateData);
 
-        // Broadcast to other participants in this chat channel
+        // Broadcast to other participants
         try {
             broadcast(new MessagesRead(
-                conversationId: $conversation->id,
+                chatId: $chat->id,
                 userId: $user->id,
                 lastReadMessageId: $shouldUpdateMsgId ? $newMsgId : $currentMsgId,
                 readAt: $readAt->toISOString(),
@@ -476,8 +536,8 @@ class ChatController extends Controller
 
         return response()->json([
             'success' => true,
-            'last_read_message_id' => $participant->fresh()->last_read_message_id,
-            'last_read_at' => $participant->fresh()->last_read_at?->toISOString(),
+            'last_read_message_id' => $readState->fresh()->last_read_message_id,
+            'read_at' => $readState->fresh()->read_at?->toISOString(),
         ]);
     }
 
@@ -485,41 +545,32 @@ class ChatController extends Controller
      * Soft delete a message.
      * Enforces server-side permissions: Sender OR Project Leader only.
      */
-    public function destroyMessage(Request $request, Conversation $conversation, Message $message): JsonResponse
+    public function destroyMessage(Request $request, Chat $chat, Message $message): JsonResponse
     {
         $user = $request->user();
 
-        // 1. Authorize participant
-        if (! $conversation->hasParticipant($user->id)) {
-            abort(403, 'You are not a participant in this conversation.');
+        if (! $chat->hasActiveMember($user->id)) {
+            abort(403, 'You are not a member of this project.');
         }
 
-        if ((int) $message->conversation_id !== (int) $conversation->id) {
-            abort(404, 'Message does not belong to this conversation.');
+        if ((int) $message->chat_id !== (int) $chat->id) {
+            abort(404, 'Message does not belong to this chat.');
         }
 
-        // 2. Permission check: Sender OR Project Leader
+        // Permission: Sender OR Project Leader
         $isSender = (int) $message->sender_id === (int) $user->id;
-        $isProjectLeader = false;
+        $isLeader = $chat->isLeader($user->id);
 
-        if ($conversation->project_id && $conversation->project) {
-            $isProjectLeader = ((int) $conversation->project->created_by === (int) $user->id) ||
-                $conversation->project->roleAssignments()
-                    ->where('user_id', $user->id)
-                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-                    ->exists();
-        }
-
-        if (! $isSender && ! $isProjectLeader) {
+        if (! $isSender && ! $isLeader) {
             abort(403, 'You do not have permission to delete this message.');
         }
 
-        // 3. Perform soft delete
+        // Soft delete message (task stays intact if message contained task card)
         $message->delete();
 
-        // 4. Broadcast MessageDeleted to real-time channel
+        // Broadcast MessageDeleted
         try {
-            broadcast(new MessageDeleted($conversation->id, $message->id))->toOthers();
+            broadcast(new MessageDeleted($chat->id, $message->id))->toOthers();
         } catch (\Throwable $e) {
             report($e);
         }
@@ -531,30 +582,22 @@ class ChatController extends Controller
     }
 
     /**
-     * Restore a soft-deleted message (5-second Undo flow).
+     * Restore a soft-deleted message within the 5-second Undo flow.
      */
-    public function restoreMessage(Request $request, Conversation $conversation, int $messageId): JsonResponse
+    public function restoreMessage(Request $request, Chat $chat, int $messageId): JsonResponse
     {
         $user = $request->user();
 
-        if (! $conversation->hasParticipant($user->id)) {
-            abort(403, 'You are not a participant in this conversation.');
+        if (! $chat->hasActiveMember($user->id)) {
+            abort(403, 'You are not a member of this project.');
         }
 
-        $message = $conversation->messages()->withTrashed()->findOrFail($messageId);
+        $message = $chat->messages()->withTrashed()->findOrFail($messageId);
 
         $isSender = (int) $message->sender_id === (int) $user->id;
-        $isProjectLeader = false;
+        $isLeader = $chat->isLeader($user->id);
 
-        if ($conversation->project_id && $conversation->project) {
-            $isProjectLeader = ((int) $conversation->project->created_by === (int) $user->id) ||
-                $conversation->project->roleAssignments()
-                    ->where('user_id', $user->id)
-                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
-                    ->exists();
-        }
-
-        if (! $isSender && ! $isProjectLeader) {
+        if (! $isSender && ! $isLeader) {
             abort(403, 'You do not have permission to restore this message.');
         }
 
@@ -574,16 +617,19 @@ class ChatController extends Controller
 
     /**
      * Create a task from message popup within an atomic database transaction.
-     * Creates: Task -> Task Assignments -> Chat Message -> Assignee Notifications.
-     * Rolls back on any error.
+     * Modal opens first -> fills fields -> "Create task and send" -> atomic commit.
      */
-    public function createTask(Request $request, Conversation $conversation): JsonResponse
+    public function createTask(Request $request, Chat $chat): JsonResponse
     {
         $user = $request->user();
 
-        // 1. Authorize participant
-        if (! $conversation->hasParticipant($user->id)) {
-            abort(403, 'You are not a participant in this conversation.');
+        // 1. Authorize member
+        if (! $chat->hasActiveMember($user->id)) {
+            abort(403, 'You are not a member of this project.');
+        }
+
+        if ($chat->isArchived()) {
+            abort(403, 'This project is archived. Cannot create tasks.');
         }
 
         // 2. Validate input
@@ -594,11 +640,10 @@ class ChatController extends Controller
             'assignee_ids.*' => ['integer', 'exists:users,id'],
             'due_date' => ['required', 'date'],
             'priority' => ['required', 'string', 'in:Low,Medium,High'],
-            'project_id' => ['nullable', 'integer', 'exists:projects,id'],
             'idempotency_key' => ['nullable', 'string', 'max:64'],
         ]);
 
-        // 3. Idempotency check to prevent duplicate double-click submissions
+        // 3. Idempotency check
         $idempotencyKey = $validated['idempotency_key'] ?? null;
         if ($idempotencyKey) {
             $cacheKey = "task_create_idem_{$idempotencyKey}_{$user->id}";
@@ -607,32 +652,18 @@ class ChatController extends Controller
             }
         }
 
-        // 4. Resolve and validate Project
-        $projectId = $conversation->project_id ?? ($validated['project_id'] ?? null);
-        if (! $projectId) {
-            return response()->json(['message' => 'Please select a project for this task.'], 422);
-        }
-
-        $project = Project::find($projectId);
+        $project = $chat->project;
         if (! $project) {
             return response()->json(['message' => 'Project not found.'], 404);
         }
 
-        // Ensure user belongs to the project
-        $isUserInProject = ((int) $project->created_by === (int) $user->id) ||
-            $project->roleAssignments()->where('user_id', $user->id)->exists();
-
-        if (! $isUserInProject) {
-            return response()->json(['message' => 'You do not have access to this project.'], 403);
-        }
-
-        // 5. Timezone-aware date validation: no past dates
+        // 4. Timezone-aware date validation: no past dates
         $dueDate = Carbon::parse($validated['due_date']);
         if ($dueDate->endOfDay()->isPast()) {
             return response()->json(['message' => 'Choose a date that is today or later.'], 422);
         }
 
-        // 6. Validate all assignees belong to this project
+        // 5. Validate all assignees belong to this project
         $assigneeIds = array_values(array_unique($validated['assignee_ids']));
         $projectMemberIds = $project->roleAssignments()->pluck('user_id')->push($project->created_by)->unique();
 
@@ -642,10 +673,9 @@ class ChatController extends Controller
             }
         }
 
-        // 7. Atomic DB Transaction: Task -> Assignments -> Chat Message -> Notifications
+        // 6. Atomic DB Transaction: Task -> Assignments -> Chat Message -> Notifications
         try {
-            $result = DB::transaction(function () use ($conversation, $project, $user, $validated, $assigneeIds, $dueDate) {
-                // Ensure project has a committee and an activity
+            $result = DB::transaction(function () use ($chat, $project, $user, $validated, $assigneeIds, $dueDate) {
                 $committee = $project->committees()->first();
                 if (! $committee) {
                     $committee = $project->committees()->create([
@@ -665,10 +695,10 @@ class ChatController extends Controller
                     ]);
                 }
 
-                // 7a. Create Task
+                // 6a. Create Task
                 $task = Task::create([
                     'activity_id' => $activity->id,
-                    'assigned_to' => $assigneeIds[0], // primary assignee for backwards compatibility
+                    'assigned_to' => $assigneeIds[0],
                     'title' => $validated['title'],
                     'description' => $validated['description'] ?? null,
                     'due_date' => $dueDate->toDateString(),
@@ -677,7 +707,7 @@ class ChatController extends Controller
                     'requires_review' => false,
                 ]);
 
-                // 7b. Create task_assignees records for all assignees
+                // 6b. Create task_assignees records for all assignees
                 foreach ($assigneeIds as $uid) {
                     DB::table('task_assignees')->updateOrInsert(
                         ['task_id' => $task->id, 'user_id' => $uid],
@@ -687,7 +717,7 @@ class ChatController extends Controller
 
                 $assignees = User::whereIn('id', $assigneeIds)->get(['id', 'name', 'email']);
 
-                // 7c. Create Chat Message containing the live task tag
+                // 6c. Create Chat Message containing task payload
                 $taskPayload = [
                     'id' => $task->id,
                     'title' => $task->title,
@@ -704,23 +734,22 @@ class ChatController extends Controller
                     ]),
                 ];
 
-                $message = $conversation->messages()->create([
+                $message = $chat->messages()->create([
                     'sender_id' => $user->id,
+                    'type' => Message::TYPE_TASK,
                     'task_id' => $task->id,
                     'body' => '[task:' . json_encode($taskPayload) . ']',
                 ]);
 
                 // Advance sender's read marker
-                $conversation->participants()
-                    ->where('user_id', $user->id)
-                    ->update([
-                        'last_read_at' => now(),
-                        'last_read_message_id' => $message->id,
-                    ]);
+                ChatReadState::updateOrCreate(
+                    ['chat_id' => $chat->id, 'user_id' => $user->id],
+                    ['last_read_message_id' => $message->id, 'read_at' => now()]
+                );
 
-                $conversation->touch();
+                $chat->touch();
 
-                // 7d. Notifications for each assignee (suppress self-assignment notification noise)
+                // 6d. Notifications for assignees (exclude self)
                 foreach ($assignees as $assigneeUser) {
                     if ((int) $assigneeUser->id !== (int) $user->id) {
                         try {
@@ -738,12 +767,10 @@ class ChatController extends Controller
                 ];
             });
 
-            // Mark idempotency key in cache for 1 hour
             if ($idempotencyKey) {
                 Cache::put("task_create_idem_{$idempotencyKey}_{$user->id}", true, now()->addHour());
             }
 
-            // Broadcast message to chat thread
             try {
                 broadcast(new MessageSent($result['message']))->toOthers();
             } catch (\Throwable $e) {
@@ -755,8 +782,10 @@ class ChatController extends Controller
                 'task' => $result['taskPayload'],
                 'message' => [
                     'id' => $result['message']->id,
-                    'conversation_id' => $result['message']->conversation_id,
+                    'chat_id' => $result['message']->chat_id,
+                    'conversation_id' => $result['message']->chat_id,
                     'sender_id' => $result['message']->sender_id,
+                    'type' => $result['message']->type,
                     'body' => $result['message']->body,
                     'task_id' => $result['task']->id,
                     'created_at' => $result['message']->created_at->toISOString(),
@@ -772,48 +801,56 @@ class ChatController extends Controller
     }
 
     /**
-     * Start or open an existing direct message conversation with another user.
+     * Toggle pin status for the chat for current user.
      */
-    public function startDirectMessage(Request $request, User $recipient): RedirectResponse
+    public function togglePin(Request $request, Chat $chat): JsonResponse
     {
-        $currentUser = $request->user();
+        $user = $request->user();
 
-        if ($recipient->id === $currentUser->id) {
-            return back()->withErrors(['error' => 'You cannot message yourself.']);
+        if (! $chat->hasActiveMember($user->id)) {
+            abort(403, 'You are not a member of this project.');
         }
 
-        // Check if a direct conversation already exists between these 2 users
-        $existing = Conversation::query()
-            ->where('type', 'direct')
-            ->whereHas('participants', fn ($q) => $q->where('user_id', $currentUser->id))
-            ->whereHas('participants', fn ($q) => $q->where('user_id', $recipient->id))
-            ->first();
+        $pref = ChatUserPreference::firstOrCreate(
+            ['chat_id' => $chat->id, 'user_id' => $user->id]
+        );
 
-        if ($existing) {
-            return redirect()->route('chat.index', ['conversation' => $existing->id]);
+        $newPinned = ! $pref->is_pinned;
+        $pref->update(['is_pinned' => $newPinned]);
+
+        return response()->json([
+            'success' => true,
+            'is_pinned' => $newPinned,
+        ]);
+    }
+
+    /**
+     * Toggle mute status for the chat for current user.
+     */
+    public function toggleMute(Request $request, Chat $chat): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $chat->hasActiveMember($user->id)) {
+            abort(403, 'You are not a member of this project.');
         }
 
-        // Create new direct conversation
-        $conversation = DB::transaction(function () use ($currentUser, $recipient) {
-            $conv = Conversation::create([
-                'type' => 'direct',
-                'created_by' => $currentUser->id,
-            ]);
+        $pref = ChatUserPreference::firstOrCreate(
+            ['chat_id' => $chat->id, 'user_id' => $user->id]
+        );
 
-            $conv->participants()->createMany([
-                ['user_id' => $currentUser->id, 'last_read_at' => now()],
-                ['user_id' => $recipient->id, 'last_read_at' => null],
-            ]);
+        $newMuted = ! $pref->is_muted;
+        $pref->update(['is_muted' => $newMuted]);
 
-            return $conv;
-        });
-
-        return redirect()->route('chat.index', ['conversation' => $conversation->id]);
+        return response()->json([
+            'success' => true,
+            'is_muted' => $newMuted,
+        ]);
     }
 
     /**
      * Securely download a chat attachment.
-     * Prevents downloading deleted message attachments.
+     * Prevents downloading deleted message attachments or cross-project leaks.
      */
     public function downloadAttachment(Request $request, Message $message): StreamedResponse
     {
@@ -823,7 +860,7 @@ class ChatController extends Controller
             abort(404, 'Attachment is no longer accessible because the message was deleted.');
         }
 
-        if (! $message->conversation->hasParticipant($user->id)) {
+        if (! $message->chat || ! $message->chat->hasActiveMember($user->id)) {
             abort(403, 'Unauthorized access to chat attachment.');
         }
 

@@ -32,6 +32,10 @@ class StoreProjectRequest extends FormRequest
                 'mimes:pdf,doc,docx,jpg,jpeg,png',
                 'max:10240', // 10 MB maximum
             ],
+            'member_ids' => ['nullable', 'array'],
+            'member_ids.*' => ['integer', 'exists:users,id'],
+            'member_roles' => ['nullable', 'array'],
+            'member_roles.*' => ['string', 'in:Project Member,Project Staff'],
         ];
     }
 

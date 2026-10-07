@@ -21,22 +21,26 @@ export function QuickNewTaskModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px]"
+            onClick={onClose}
+        >
             <div
-                className="w-full max-w-lg bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                className="w-full max-w-lg bg-[color:var(--card)] border border-[color:var(--border)] rounded-[12px] overflow-hidden animate-fade-in text-[color:var(--text)]"
+                style={{ boxShadow: 'none' }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[color:var(--border)]">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-[var(--tint-orange)] flex items-center justify-center text-[#EC7505]">
-                            <CheckSquare className="w-4 h-4" />
+                        <div className="w-8 h-8 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] flex items-center justify-center text-[color:var(--primary)]">
+                            <CheckSquare className="w-4 h-4 stroke-[2px]" />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-[var(--ink)]">
-                                Create New Task
+                            <h3 className="text-[16px] font-semibold text-[color:var(--text)]">
+                                Create new task
                             </h3>
-                            <p className="text-xs text-[var(--muted)]">
+                            <p className="text-[12px] text-[color:var(--muted)]">
                                 Tasks are organized within project activities
                             </p>
                         </div>
@@ -44,17 +48,18 @@ export function QuickNewTaskModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1 rounded-lg text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--tint-neutral)]"
+                        className="p-1 rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                        aria-label="Close modal"
                     >
-                        <X className="w-4 h-4" />
+                        <X className="w-4 h-4 stroke-[2px]" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-4">
+                <div className="p-5 space-y-4">
                     {projects.length > 0 ? (
                         <>
-                            <p className="text-xs font-semibold text-[var(--ink)]">
+                            <p className="text-[13px] font-medium text-[color:var(--text)]">
                                 Select a project to add your task:
                             </p>
                             <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
@@ -66,37 +71,28 @@ export function QuickNewTaskModal({
                                             onClose();
                                             router.visit(`/projects/${proj.id}`);
                                         }}
-                                        className="w-full flex items-center justify-between p-3 rounded-xl border border-[var(--border)] hover:border-[#EC7505] hover:bg-[var(--tint-neutral)]/50 transition-colors text-left group"
+                                        className="w-full flex items-center justify-between p-3 rounded-[8px] border border-[color:var(--border)] hover:border-[color:var(--primary)] hover:bg-[color:var(--soft-surface)] transition-colors text-left cursor-pointer group focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-8 h-8 rounded-lg bg-[var(--tint-yellow)] flex items-center justify-center shrink-0 text-[#8A5A00] dark:text-[#FFBB00]">
-                                                <FolderOpen className="w-4 h-4" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-[var(--ink)] group-hover:text-[#EC7505] truncate">
-                                                    {proj.title}
-                                                </p>
-                                                <p className="text-[11px] text-[var(--muted)]">
-                                                    Open project committee activities
-                                                </p>
-                                            </div>
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <FolderOpen className="w-4 h-4 text-[color:var(--muted)] group-hover:text-[color:var(--primary)] shrink-0 stroke-[2px]" />
+                                            <span className="text-[13px] font-medium text-[color:var(--text)] truncate">
+                                                {proj.title}
+                                            </span>
                                         </div>
-                                        <span className="text-xs font-semibold text-[var(--link-orange)] flex items-center gap-1 shrink-0">
-                                            Open
-                                        </span>
+                                        <ArrowRight className="w-4 h-4 text-[color:var(--muted)] group-hover:text-[color:var(--primary)] group-hover:translate-x-0.5 transition-transform shrink-0 stroke-[2px]" />
                                     </button>
                                 ))}
                             </div>
                         </>
                     ) : (
-                        <div className="p-5 rounded-xl bg-[var(--tint-yellow)] border border-[#FFE9A8] dark:border-[#524410] text-center space-y-3">
-                            <AlertCircle className="w-6 h-6 text-[#8A5A00] dark:text-[#FFBB00] mx-auto" />
+                        <div className="text-center py-6 space-y-3">
+                            <AlertCircle className="w-8 h-8 text-[color:var(--primary)] mx-auto stroke-[2px]" />
                             <div>
-                                <p className="text-xs font-bold text-[var(--ink)]">
-                                    No active project found
-                                </p>
-                                <p className="text-[11px] text-[var(--muted)] mt-1">
-                                    In ITASK, every task belongs to an activity within a project committee. Create or join a project first.
+                                <h4 className="text-[15px] font-semibold text-[color:var(--text)]">
+                                    No active projects yet
+                                </h4>
+                                <p className="text-[12px] text-[color:var(--muted)] max-w-xs mx-auto mt-1">
+                                    Tasks belong to project activities. Create a project first to start adding tasks.
                                 </p>
                             </div>
                             <Button
@@ -104,32 +100,18 @@ export function QuickNewTaskModal({
                                 size="sm"
                                 onClick={() => {
                                     onClose();
-                                    if (onOpenCreateProject) {
-                                        onOpenCreateProject();
-                                    } else {
-                                        router.visit('/projects');
-                                    }
+                                    if (onOpenCreateProject) onOpenCreateProject();
                                 }}
                             >
-                                Create project
+                                Create first project
                             </Button>
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-3.5 border-t border-[var(--border)] bg-[var(--tint-neutral)]/20 flex items-center justify-between">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            onClose();
-                            router.visit('/my-tasks');
-                        }}
-                        className="text-xs font-semibold text-[var(--link-orange)] hover:underline"
-                    >
-                        View all tasks in My Tasks
-                    </button>
-                    <Button variant="secondary" size="sm" onClick={onClose}>
+                <div className="px-5 py-3 border-t border-[color:var(--border)] bg-[color:var(--soft-surface)] flex justify-end">
+                    <Button variant="secondary" size="md" onClick={onClose}>
                         Close
                     </Button>
                 </div>

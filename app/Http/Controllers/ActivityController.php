@@ -153,7 +153,7 @@ class ActivityController extends Controller
                 'update' => $user ? Gate::forUser($user)->allows('update', $activity) : false,
                 'delete' => $user ? Gate::forUser($user)->allows('delete', $activity) : false,
                 'createTask' => $user ? Gate::forUser($user)->allows('create', [Task::class, $activity]) : false,
-                'submit' => $user ? Gate::forUser($user)->allows('submit', $activity) && in_array($activity->status, [Activity::STATUS_TO_DO, Activity::STATUS_IN_PROGRESS, Activity::STATUS_RETURNED_FOR_REVISION], true) : false,
+                'submit' => $user ? Gate::forUser($user)->allows('submit', $activity) && in_array($activity->status, [Activity::STATUS_TO_DO, Activity::STATUS_IN_PROGRESS, Activity::STATUS_RETURNED], true) : false,
                 'review' => $user ? Gate::forUser($user)->allows('review', $activity) && $activity->status === Activity::STATUS_UNDER_REVIEW : false,
                 'sendReminder' => $user ? Gate::forUser($user)->allows('sendReminder', $activity) : false,
             ],
@@ -365,7 +365,7 @@ class ActivityController extends Controller
             ]);
             $message = 'Activity marked as completed.';
         } else {
-            $status = Activity::STATUS_RETURNED_FOR_REVISION;
+            $status = Activity::STATUS_RETURNED;
             $feedback = $request->validated('review_feedback');
             $activity->update([
                 'status' => $status,

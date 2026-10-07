@@ -94,22 +94,30 @@ class CommitteeController extends Controller
 
         // Retrieve available Project Members in this project who are not yet in this committee
         $availableMembers = $canManage
-            ? ProjectRoleAssignment::where('project_id', $project->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-                ->whereNotIn('user_id', $alreadyInCommitteeMemberIds)
-                ->whereHas('user', function ($q) {
-                    $q->whereNotNull('email_verified_at');
-                })
-                ->with('user')
-                ->get()
-                ->unique('user_id')
-                ->map(function ($assignment) use ($project, $committee) {
-                    $otherCommittees = ProjectRoleAssignment::where('project_id', $project->id)
-                        ->where('user_id', $assignment->user_id)
-                        ->whereNotNull('committee_id')
-                        ->where('committee_id', '!=', $committee->id)
-                        ->with('committee:id,name')
-                        ->get()
+            ? (function () use ($project, $committee, $alreadyInCommitteeMemberIds) {
+                $candidateAssignments = ProjectRoleAssignment::where('project_id', $project->id)
+                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
+                    ->whereNotIn('user_id', $alreadyInCommitteeMemberIds)
+                    ->whereHas('user', function ($q) {
+                        $q->whereNotNull('email_verified_at');
+                    })
+                    ->with('user')
+                    ->get()
+                    ->unique('user_id');
+
+                $candidateUserIds = $candidateAssignments->pluck('user_id')->unique()->values();
+
+                // Batch-load all other-committee assignments for these users in ONE query
+                $otherCommitteeAssignments = ProjectRoleAssignment::where('project_id', $project->id)
+                    ->whereIn('user_id', $candidateUserIds)
+                    ->whereNotNull('committee_id')
+                    ->where('committee_id', '!=', $committee->id)
+                    ->with('committee:id,name')
+                    ->get()
+                    ->groupBy('user_id');
+
+                return $candidateAssignments->map(function ($assignment) use ($otherCommitteeAssignments) {
+                    $otherCommittees = ($otherCommitteeAssignments->get($assignment->user_id) ?? collect())
                         ->pluck('committee.name')
                         ->filter()
                         ->values();
@@ -122,15 +130,14 @@ class CommitteeController extends Controller
                     }
 
                     return [
-                        'id' => $assignment->user->id,
-                        'name' => $assignment->user->name,
-                        'email' => $assignment->user->email,
-                        'context' => $context,
+                        'id'                   => $assignment->user->id,
+                        'name'                 => $assignment->user->name,
+                        'email'                => $assignment->user->email,
+                        'context'              => $context,
                         'other_committees_count' => $otherCommittees->count(),
                     ];
-                })
-                ->values()
-                ->all()
+                })->values()->all();
+            })()
             : [];
 
         // Available Project Staff in this project for changing committee staff

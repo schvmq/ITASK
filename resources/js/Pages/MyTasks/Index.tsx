@@ -1,12 +1,27 @@
-import React, { useState, useMemo } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import {
     Search,
     ChevronDown,
     X,
     CheckSquare,
+    AlertCircle,
+    Clock,
+    Filter,
+    Calendar,
+    FolderOpen,
+    CheckCircle2,
+    ClipboardCheck,
+    Shield,
+    AlertTriangle,
 } from 'lucide-react';
+import { Button } from '@/Components/Button';
+import { Badge } from '@/Components/Badge';
+import { Card } from '@/Components/Card';
+import { Checkbox } from '@/Components/Checkbox';
+import { Pagination } from '@/Components/Pagination';
+import { EmptyState } from '@/Components/EmptyState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,8 +79,6 @@ interface MyTasksIndexProps {
     roleContext: 'leader' | 'staff' | 'member';
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function formatDueDate(dueDateStr: string | null): string {
     if (!dueDateStr) return '—';
     const parts = dueDateStr.split('-');
@@ -81,153 +94,287 @@ function formatDueDate(dueDateStr: string | null): string {
     return dueDateStr;
 }
 
-function renderDaysLeft(task: MyTask) {
-    if (task.status === 'Completed') {
-        return <span className="text-slate-400 font-medium text-xs sm:text-[13px]">Done</span>;
-    }
-
-    if (!task.due_date) {
-        return <span className="text-slate-400 font-medium text-xs sm:text-[13px]">—</span>;
-    }
-
+function getDaysDiff(dueDateStr: string | null): number | null {
+    if (!dueDateStr) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const parts = task.due_date.split('-');
+    const parts = dueDateStr.split('-');
+    if (parts.length !== 3) return null;
     const dueDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     dueDate.setHours(0, 0, 0, 0);
 
     const diffTime = dueDate.getTime() - today.getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return Math.round(diffTime / (1000 * 60 * 60 * 24));
+}
 
-    if (diffDays < 0) {
-        const absDays = Math.abs(diffDays);
+function renderDaysBadge(task: MyTask, isDone: boolean) {
+    if (isDone) {
+        return <Badge variant="accent">Completed</Badge>;
+    }
+
+    const diffDays = getDaysDiff(task.due_date);
+    if (diffDays === null) {
+        return <span className="text-[13px] text-[color:var(--muted)]">—</span>;
+    }
+
+    if (diffDays < 0 || task.is_overdue) {
         return (
-            <span className="text-rose-600 font-bold text-xs sm:text-[13px] whitespace-nowrap">
-                {absDays}d overdue
-            </span>
+            <Badge variant="danger">
+                {Math.abs(diffDays)}d overdue
+            </Badge>
         );
     }
 
     if (diffDays === 0) {
-        return (
-            <span className="text-amber-600 font-bold text-xs sm:text-[13px] whitespace-nowrap">
-                Due today
-            </span>
-        );
+        return <Badge variant="secondary">Due today</Badge>;
     }
 
-    if (diffDays <= 3) {
-        return (
-            <span className="text-amber-600 font-bold text-xs sm:text-[13px] whitespace-nowrap">
-                {diffDays}d
-            </span>
-        );
+    if (diffDays <= 7) {
+        return <Badge variant="secondary">{diffDays}d left</Badge>;
     }
 
     return (
-        <span className="text-slate-600 font-medium text-xs sm:text-[13px] whitespace-nowrap">
+        <span className="text-[13px] text-[color:var(--muted)] tabular-nums">
             {diffDays}d
         </span>
     );
 }
 
-// ─── Task Row ─────────────────────────────────────────────────────────────────
-
-function TaskRow({ task }: { task: MyTask }) {
-    return (
-        <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60 transition-colors group">
-            {/* Task */}
-            <td className="pl-4 sm:pl-5 pr-2 py-3 overflow-hidden">
-                <Link
-                    href={task.action_url}
-                    className="font-semibold text-[13px] text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors leading-snug block truncate"
-                    title={task.title}
-                >
-                    {task.title}
-                </Link>
-            </td>
-
-            {/* Activity */}
-            <td className="px-2.5 sm:px-3 py-3 overflow-hidden">
-                <div className="text-slate-500 text-[13px] truncate" title={task.activity.title}>
-                    {task.activity.title}
-                </div>
-                {task.activity.status === 'Under Review' && (
-                    <div className="mt-1">
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                            Under Review
-                        </span>
-                    </div>
-                )}
-                {task.activity.status === 'Returned' && (
-                    <div className="mt-1">
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                            Returned
-                        </span>
-                    </div>
-                )}
-            </td>
-
-            {/* Committee */}
-            <td className="px-2.5 sm:px-3 py-3 overflow-hidden" title={task.committee.name}>
-                <div className="text-slate-500 text-[13px] truncate">{task.committee.name}</div>
-            </td>
-
-            {/* Project */}
-            <td className="px-2.5 sm:px-3 py-3 overflow-hidden" title={task.project.title}>
-                <div className="text-slate-500 text-[13px] truncate">{task.project.title}</div>
-            </td>
-
-            {/* Due */}
-            <td className="px-2 sm:px-2.5 py-3 text-slate-500 text-[13px] whitespace-nowrap overflow-hidden">
-                {formatDueDate(task.due_date)}
-            </td>
-
-            {/* Days Left */}
-            <td className="px-2 sm:px-2.5 py-3 whitespace-nowrap overflow-hidden">
-                {renderDaysLeft(task)}
-            </td>
-
-            {/* Status */}
-            <td className="pl-2 pr-4 sm:pr-5 py-3 whitespace-nowrap overflow-hidden">
-                <Link
-                    href={task.action_url}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
-                    title="Open task"
-                >
-                    <span>{task.status}</span>
-                    <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-                </Link>
-            </td>
-        </tr>
-    );
+function getHierarchyRank(task: MyTask, isDone: boolean): number {
+    if (isDone) return 7;
+    const diff = getDaysDiff(task.due_date);
+    if (task.is_overdue || (diff !== null && diff < 0)) return 1;
+    if (task.status === 'Returned') return 2;
+    if (diff === 0) return 3;
+    if (task.status === 'Under Review') return 4;
+    if (task.is_approaching || (diff !== null && diff <= 7)) return 5;
+    return 6; // In Progress / To Do
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+function getImportanceBadge(task: MyTask, isDone: boolean) {
+    if (isDone) {
+        return <Badge variant="accent">Done</Badge>;
+    }
+    const diff = getDaysDiff(task.due_date);
+    if (task.is_overdue || (diff !== null && diff < 0)) {
+        return <Badge variant="danger">Overdue</Badge>;
+    }
+    if (task.status === 'Returned') {
+        return <Badge variant="danger">Revision</Badge>;
+    }
+    if (diff === 0) {
+        return <Badge variant="secondary">Due Today</Badge>;
+    }
+    if (task.status === 'Under Review') {
+        return <Badge variant="secondary">In Review</Badge>;
+    }
+    if (task.is_approaching || (diff !== null && diff <= 7)) {
+        return <Badge variant="primary">Due Soon</Badge>;
+    }
+    return <Badge variant="soft">{task.status}</Badge>;
+}
 
-export default function MyTasksIndex({ tasks, roleContext }: MyTasksIndexProps) {
-    const [projectFilter, setProjectFilter] = useState<string>('ALL');
-    const [searchTerm, setSearchTerm] = useState('');
+export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasksIndexProps) {
+    // ── URL Synchronization for Filters & Pagination ──
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+    const initialStatus = searchParams.get('status') || 'ALL';
+    const initialProject = searchParams.get('project') || 'ALL';
+    const initialSearch = searchParams.get('q') || '';
+    const initialPage = parseInt(searchParams.get('page') || '1', 10);
+    const initialSize = parseInt(searchParams.get('size') || '10', 10);
 
-    // Derive unique projects from tasks for the project filter
+    const [statusFilter, setStatusFilter] = useState<string>(initialStatus);
+    const [projectFilter, setProjectFilter] = useState<string>(initialProject);
+    const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
+    const [currentPage, setCurrentPage] = useState<number>(Number.isInteger(initialPage) && initialPage > 0 ? initialPage : 1);
+    const [pageSize, setPageSize] = useState<number>([10, 25, 50].includes(initialSize) ? initialSize : 10);
+
+    // Track locally completing tasks for optimistic UI
+    const [completingTaskIds, setCompletingTaskIds] = useState<Set<string>>(new Set());
+    const [locallyCompletedTaskIds, setLocallyCompletedTaskIds] = useState<Set<string>>(new Set());
+    const [locallyUncompletedTaskIds, setLocallyUncompletedTaskIds] = useState<Set<string>>(new Set());
+
+    const isTaskCompleted = useCallback((taskId: string, initialStatus: string) => {
+        const idStr = String(taskId);
+        if (locallyCompletedTaskIds.has(idStr)) return true;
+        if (locallyUncompletedTaskIds.has(idStr)) return false;
+        return initialStatus === 'Completed';
+    }, [locallyCompletedTaskIds, locallyUncompletedTaskIds]);
+
+    const updateUrlParams = useCallback((newStatus: string, newProject: string, newQuery: string, newPage: number, newSize: number) => {
+        if (typeof window === 'undefined') return;
+        const url = new URL(window.location.href);
+        if (newStatus !== 'ALL') url.searchParams.set('status', newStatus); else url.searchParams.delete('status');
+        if (newProject !== 'ALL') url.searchParams.set('project', newProject); else url.searchParams.delete('project');
+        if (newQuery) url.searchParams.set('q', newQuery); else url.searchParams.delete('q');
+        url.searchParams.set('page', String(newPage));
+        url.searchParams.set('size', String(newSize));
+        window.history.replaceState({}, '', url.toString());
+    }, []);
+
+    const handleStatusFilterChange = (status: string) => {
+        setStatusFilter(status);
+        setCurrentPage(1);
+        updateUrlParams(status, projectFilter, searchTerm, 1, pageSize);
+    };
+
+    const handleProjectFilterChange = (proj: string) => {
+        setProjectFilter(proj);
+        setCurrentPage(1);
+        updateUrlParams(statusFilter, proj, searchTerm, 1, pageSize);
+    };
+
+    const handleSearchChange = (query: string) => {
+        setSearchTerm(query);
+        setCurrentPage(1);
+        updateUrlParams(statusFilter, projectFilter, query, 1, pageSize);
+    };
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        updateUrlParams(statusFilter, projectFilter, searchTerm, page, pageSize);
+    };
+
+    const handlePageSizeChange = (size: number) => {
+        setPageSize(size);
+        setCurrentPage(1);
+        updateUrlParams(statusFilter, projectFilter, searchTerm, 1, size);
+    };
+
+    // Derive project options
     const projectOptions = useMemo(() => {
         const map = new Map<string, string>();
         tasks.forEach((t) => map.set(t.project.id, t.project.title));
         return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
     }, [tasks]);
 
-    // Filtered tasks across search and project dropdown
+    // ── Universal Task Completion Toggle (updates Progress Bar immediately) ──
+    const handleToggleTaskCompletion = (task: MyTask) => {
+        const isDone = isTaskCompleted(task.id, task.status);
+
+        if (isDone) {
+            setLocallyCompletedTaskIds((prev) => {
+                const next = new Set(prev);
+                next.delete(task.id);
+                return next;
+            });
+            setLocallyUncompletedTaskIds((prev) => new Set(prev).add(task.id));
+        } else {
+            setLocallyUncompletedTaskIds((prev) => {
+                const next = new Set(prev);
+                next.delete(task.id);
+                return next;
+            });
+            setLocallyCompletedTaskIds((prev) => new Set(prev).add(task.id));
+        }
+
+        const newCompleting = new Set(completingTaskIds);
+        newCompleting.add(task.id);
+        setCompletingTaskIds(newCompleting);
+
+        if (!isDone && task.requires_review) {
+            router.post(
+                `/projects/${task.project.id}/committees/${task.committee.id}/activities/${task.activity.id}/tasks/${task.id}/submit`,
+                {},
+                {
+                    preserveScroll: true,
+                    onFinish: () => {
+                        setCompletingTaskIds((prev) => {
+                            const next = new Set(prev);
+                            next.delete(task.id);
+                            return next;
+                        });
+                    },
+                }
+            );
+        } else {
+            const nextStatus = isDone ? 'In Progress' : 'Completed';
+            router.patch(
+                `/projects/${task.project.id}/committees/${task.committee.id}/activities/${task.activity.id}/tasks/${task.id}`,
+                { status: nextStatus },
+                {
+                    preserveScroll: true,
+                    onFinish: () => {
+                        setCompletingTaskIds((prev) => {
+                            const next = new Set(prev);
+                            next.delete(task.id);
+                            return next;
+                        });
+                    },
+                }
+            );
+        }
+    };
+
+    // ── Reactive Progress Bar & Metrics Calculations ──
+    const completedTasksCount = useMemo(() => {
+        return tasks.filter((t) => isTaskCompleted(t.id, t.status)).length;
+    }, [tasks, isTaskCompleted]);
+
+    const totalTasksCount = tasks.length;
+    const percentDone = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 100;
+
+    const overdueCount = useMemo(() => {
+        return tasks.filter((t) => {
+            if (isTaskCompleted(t.id, t.status)) return false;
+            const diff = getDaysDiff(t.due_date);
+            return t.is_overdue || (diff !== null && diff < 0);
+        }).length;
+    }, [tasks, isTaskCompleted]);
+
+    const returnedCount = useMemo(() => {
+        return tasks.filter((t) => !isTaskCompleted(t.id, t.status) && t.status === 'Returned').length;
+    }, [tasks, isTaskCompleted]);
+
+    const dueTodayCount = useMemo(() => {
+        return tasks.filter((t) => {
+            if (isTaskCompleted(t.id, t.status)) return false;
+            const diff = getDaysDiff(t.due_date);
+            return diff === 0;
+        }).length;
+    }, [tasks, isTaskCompleted]);
+
+    const inReviewCount = useMemo(() => {
+        return tasks.filter((t) => !isTaskCompleted(t.id, t.status) && t.status === 'Under Review').length;
+    }, [tasks, isTaskCompleted]);
+
+    const dueThisWeekCount = useMemo(() => {
+        return tasks.filter((t) => {
+            if (isTaskCompleted(t.id, t.status)) return false;
+            const diff = getDaysDiff(t.due_date);
+            return diff !== null && diff > 0 && diff <= 7;
+        }).length;
+    }, [tasks, isTaskCompleted]);
+
+    // ── Hierarchy of Importance Ordered Tasks for the Quick Checklist ──
+    const hierarchyOrderedTasks = useMemo(() => {
+        return [...tasks].sort((a, b) => {
+            const aDone = isTaskCompleted(a.id, a.status);
+            const bDone = isTaskCompleted(b.id, b.status);
+            if (aDone !== bDone) return aDone ? 1 : -1;
+
+            const rankDiff = getHierarchyRank(a, aDone) - getHierarchyRank(b, bDone);
+            if (rankDiff !== 0) return rankDiff;
+
+            return (a.due_date || '9999-99-99').localeCompare(b.due_date || '9999-99-99');
+        });
+    }, [tasks, isTaskCompleted]);
+
+    // Filter tasks based on search, project, and status
     const filteredTasks = useMemo(() => {
         return tasks.filter((task) => {
-            // Project filter
             if (projectFilter !== 'ALL' && task.project.id !== projectFilter) {
                 return false;
             }
 
-            // Search filter
+            const isDone = isTaskCompleted(task.id, task.status);
+            if (statusFilter !== 'ALL') {
+                if (statusFilter === 'ACTIVE' && isDone) return false;
+                if (statusFilter === 'Completed' && !isDone) return false;
+                if (statusFilter !== 'ACTIVE' && statusFilter !== 'Completed' && task.status !== statusFilter) return false;
+            }
+
             if (searchTerm.trim() !== '') {
                 const query = searchTerm.toLowerCase();
                 const matchesTask = task.title.toLowerCase().includes(query);
@@ -242,199 +389,414 @@ export default function MyTasksIndex({ tasks, roleContext }: MyTasksIndexProps) 
 
             return true;
         });
-    }, [tasks, projectFilter, searchTerm]);
+    }, [tasks, projectFilter, statusFilter, searchTerm, isTaskCompleted]);
 
-    // Group tasks into the 3 prototype sections in exact order:
-    // 1. In Progress (includes In Progress, Under Review, Returned)
-    // 2. To Do
-    // 3. Completed
-    const inProgressTasks = useMemo(() => {
-        return filteredTasks.filter(
-            (t) => t.status === 'In Progress' || t.status === 'Under Review' || t.status === 'Returned'
-        );
-    }, [filteredTasks]);
+    // Client-side pagination calculations
+    const totalItems = filteredTasks.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    const safePage = Math.min(currentPage, totalPages);
 
-    const toDoTasks = useMemo(() => {
-        return filteredTasks.filter((t) => t.status === 'To Do');
-    }, [filteredTasks]);
+    const paginatedTasks = useMemo(() => {
+        const start = (safePage - 1) * pageSize;
+        return filteredTasks.slice(start, start + pageSize);
+    }, [filteredTasks, safePage, pageSize]);
 
-    const completedTasks = useMemo(() => {
-        return filteredTasks.filter((t) => t.status === 'Completed');
-    }, [filteredTasks]);
+    // ── Grouping into Strict Hierarchy of Importance Categories ──
+    // Tier 1: Overdue -> Tier 2: Revision -> Tier 3: Due Today -> Tier 4: In Review -> Tier 5: Due This Week -> Tier 6: Later -> Tier 7: Completed
+    const groupedTasks = useMemo(() => {
+        const overdue: MyTask[] = [];
+        const returned: MyTask[] = [];
+        const today: MyTask[] = [];
+        const inReview: MyTask[] = [];
+        const thisWeek: MyTask[] = [];
+        const later: MyTask[] = [];
+        const completed: MyTask[] = [];
 
-    const hasAnyFilteredTasks = filteredTasks.length > 0;
-    const isFiltered = projectFilter !== 'ALL' || searchTerm.trim() !== '';
+        paginatedTasks.forEach((task) => {
+            const isDone = isTaskCompleted(task.id, task.status);
+            if (isDone) {
+                completed.push(task);
+                return;
+            }
 
-    const handleClearFilters = () => {
-        setProjectFilter('ALL');
-        setSearchTerm('');
-    };
+            if (task.status === 'Returned') {
+                returned.push(task);
+                return;
+            }
 
-    const activeTasksCount = useMemo(() => {
-        return tasks.filter((t) => t.status !== 'Completed').length;
-    }, [tasks]);
+            if (task.status === 'Under Review') {
+                inReview.push(task);
+                return;
+            }
+
+            const diff = getDaysDiff(task.due_date);
+            if (diff === null) {
+                later.push(task);
+            } else if (diff < 0 || task.is_overdue) {
+                overdue.push(task);
+            } else if (diff === 0) {
+                today.push(task);
+            } else if (diff <= 7) {
+                thisWeek.push(task);
+            } else {
+                later.push(task);
+            }
+        });
+
+        return [
+            { id: 'overdue', title: 'Overdue (Critical)', tasks: overdue, badgeVariant: 'danger' as const },
+            { id: 'returned', title: 'Revision Required', tasks: returned, badgeVariant: 'danger' as const },
+            { id: 'today', title: 'Due Today', tasks: today, badgeVariant: 'secondary' as const },
+            { id: 'under_review', title: 'Under Review', tasks: inReview, badgeVariant: 'secondary' as const },
+            { id: 'this_week', title: 'Due This Week', tasks: thisWeek, badgeVariant: 'primary' as const },
+            { id: 'later', title: 'Later & Active', tasks: later, badgeVariant: 'secondary' as const },
+            ...(completed.length > 0 ? [{ id: 'completed', title: 'Completed', tasks: completed, badgeVariant: 'accent' as const }] : []),
+        ].filter((group) => group.tasks.length > 0);
+    }, [paginatedTasks, isTaskCompleted]);
 
     return (
-        <AppLayout
-            title="My Tasks"
-            subtitle={`${activeTasksCount} active ${activeTasksCount === 1 ? 'task' : 'tasks'} across all projects`}
-        >
-            <Head title="My Tasks — ITASK" />
+        <AppLayout hidePageHeadingBanner={true}>
+            <Head title="My Tasks" />
 
             <div className="space-y-6">
-
-                {/* ── Top Bar: Search Tasks + All Projects Dropdown ── */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    {/* Search Input */}
-                    <div className="relative w-full sm:w-72">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search tasks..."
-                            className="w-full pl-9 pr-8 py-2 text-xs text-slate-800 bg-white rounded-lg border border-slate-200 placeholder:text-slate-400 focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] focus:ring-1 focus:ring-[color:var(--color-brand-action-orange)] transition-all shadow-2xs"
-                        />
-                        {searchTerm && (
-                            <button
-                                type="button"
-                                onClick={() => setSearchTerm('')}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
-                                aria-label="Clear search"
-                            >
-                                <X className="w-3.5 h-3.5" />
-                            </button>
-                        )}
+                {/* ══ 1. Page Header ══ */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[color:var(--border)]">
+                    <div>
+                        <h1 className="text-[26px] font-bold text-[color:var(--text)] tracking-tight">
+                            My Tasks
+                        </h1>
+                        <p className="text-[15px] text-[color:var(--muted)] mt-1">
+                            Cross-project deliverables assigned to you, organized by Hierarchy of Importance.
+                        </p>
                     </div>
 
-                    {/* All Projects Dropdown */}
-                    <div className="relative w-full sm:w-auto">
-                        <select
-                            value={projectFilter}
-                            onChange={(e) => setProjectFilter(e.target.value)}
-                            className="appearance-none w-full sm:w-auto h-[35px] pl-3 pr-8 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg focus:outline-hidden focus:border-[color:var(--color-brand-action-orange)] cursor-pointer shadow-2xs"
-                            aria-label="Filter by project"
-                        >
-                            <option value="ALL">All Projects</option>
-                            {projectOptions.map((p) => (
-                                <option key={p.id} value={p.id}>{p.title}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Link href="/calendar">
+                            <Button variant="secondary" size="md">
+                                <Calendar className="w-4 h-4 mr-1.5" strokeWidth={2} />
+                                <span>Calendar view</span>
+                            </Button>
+                        </Link>
                     </div>
                 </div>
 
-                {/* ── Overall Empty State (when zero tasks exist across the board or after search) ── */}
-                {!hasAnyFilteredTasks ? (
-                    <div className="bg-white rounded-xl border border-dashed border-slate-300 p-10 text-center">
-                        <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mx-auto mb-3 shadow-2xs">
-                            <CheckSquare className="w-6 h-6" />
+                {/* ══ 2. Deliverables Progress Bar & Interactive Checklist Card ══ */}
+                <Card className="p-5 space-y-4">
+                    {/* Header and Live Completion Stats */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[color:var(--border)]">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <ClipboardCheck className="w-5 h-5 text-[color:var(--primary)]" />
+                                <h2 className="text-[17px] font-bold text-[color:var(--text)]">
+                                    Deliverables Progress
+                                </h2>
+                            </div>
+                            <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
+                                Check off deliverables below to advance your progress in real time.
+                            </p>
                         </div>
-                        <h3 className="text-base font-bold text-slate-800">
-                            {tasks.length === 0
-                                ? "You don't have any assigned tasks yet."
-                                : 'No tasks match your search or filter.'}
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                            {tasks.length === 0
-                                ? 'Tasks assigned to you across projects will appear here in your work queue.'
-                                : 'Try adjusting your search query or selecting "All Projects" to view your tasks.'}
-                        </p>
-                        {isFiltered && (
-                            <button
-                                type="button"
-                                onClick={handleClearFilters}
-                                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[color:var(--color-brand-dark-green)] bg-[color:var(--color-brand-active-warm-orange)] hover:bg-orange-100 transition-colors cursor-pointer border border-orange-200"
-                            >
-                                <span>Reset Filters</span>
-                            </button>
+                        <div className="sm:text-right shrink-0">
+                            <span className="text-[18px] font-bold text-[color:var(--text)] tabular-nums block">
+                                {percentDone}% done
+                            </span>
+                            <span className="text-[12px] font-medium text-[color:var(--muted)] tabular-nums">
+                                {completedTasksCount} of {totalTasksCount} tasks completed
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* ── Dynamic Progress Bar ── */}
+                    <div className="space-y-1.5">
+                        <div className="w-full h-3.5 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden shadow-2xs">
+                            <div
+                                className="h-full bg-gradient-to-r from-[color:var(--primary)] via-indigo-500 to-emerald-500 rounded-full transition-all duration-500 ease-out"
+                                style={{ width: `${percentDone}%` }}
+                                role="progressbar"
+                                aria-valuenow={percentDone}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Hierarchy of Importance Metric Badges */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        <div className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                            <span className="text-[11px] font-medium text-[color:var(--muted)] block">1. Overdue</span>
+                            <span className="text-[14px] font-bold text-[color:var(--status-danger-text)] tabular-nums">
+                                {overdueCount}
+                            </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                            <span className="text-[11px] font-medium text-[color:var(--muted)] block">2. Revision</span>
+                            <span className="text-[14px] font-bold text-rose-600 tabular-nums">
+                                {returnedCount}
+                            </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                            <span className="text-[11px] font-medium text-[color:var(--muted)] block">3. Due Today</span>
+                            <span className="text-[14px] font-bold text-amber-600 tabular-nums">
+                                {dueTodayCount}
+                            </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                            <span className="text-[11px] font-medium text-[color:var(--muted)] block">4. In Review</span>
+                            <span className="text-[14px] font-bold text-purple-600 tabular-nums">
+                                {inReviewCount}
+                            </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                            <span className="text-[11px] font-medium text-[color:var(--muted)] block">5. Due This Week</span>
+                            <span className="text-[14px] font-bold text-[color:var(--text)] tabular-nums">
+                                {dueThisWeekCount}
+                            </span>
+                        </div>
+
+                        <div className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                            <span className="text-[11px] font-medium text-[color:var(--muted)] block">Completed</span>
+                            <span className="text-[14px] font-bold text-[color:var(--status-success-text)] tabular-nums">
+                                {completedTasksCount}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* ── Progress Bar Checklist ── */}
+                    <div className="pt-3 border-t border-[color:var(--border)] space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <CheckSquare className="w-4 h-4 text-[color:var(--primary)]" />
+                                <h3 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--text)]">
+                                    Quick Task Checklist
+                                </h3>
+                            </div>
+                            <span className="text-[11px] font-medium text-[color:var(--muted)]">
+                                Sorted by Hierarchy of Importance
+                            </span>
+                        </div>
+
+                        {hierarchyOrderedTasks.length === 0 ? (
+                            <div className="py-4 text-center text-[13px] text-[color:var(--muted)]">
+                                No assigned tasks found.
+                            </div>
+                        ) : (
+                            <div className="space-y-1 max-h-60 overflow-y-auto pr-1 divide-y divide-[color:var(--border)]">
+                                {hierarchyOrderedTasks.slice(0, 8).map((task) => {
+                                    const isDone = isTaskCompleted(task.id, task.status);
+                                    const isCompleting = completingTaskIds.has(task.id);
+
+                                    return (
+                                        <div
+                                            key={`checklist-${task.id}`}
+                                            className={`py-2 first:pt-1 last:pb-1 flex items-center justify-between gap-3 text-[13px] transition-opacity ${
+                                                isCompleting ? 'opacity-40 pointer-events-none' : ''
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                                <Checkbox
+                                                    checked={isDone}
+                                                    onChange={() => handleToggleTaskCompletion(task)}
+                                                    aria-label={`Toggle task ${task.title}`}
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                    <Link
+                                                        href={task.action_url}
+                                                        className={`font-medium text-[color:var(--text)] hover:text-[color:var(--primary)] truncate block transition-colors ${
+                                                            isDone ? 'line-through text-[color:var(--muted)]' : ''
+                                                        }`}
+                                                    >
+                                                        {task.title}
+                                                    </Link>
+                                                    <span className="text-[11px] text-[color:var(--muted)] truncate block">
+                                                        {task.project.title} · {task.activity.title}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="shrink-0 flex items-center gap-2">
+                                                {getImportanceBadge(task, isDone)}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
+                </Card>
+
+                {/* ══ 3. Filters & Search Bar ══ */}
+                <Card className="p-4 space-y-3">
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                        {/* Search Input */}
+                        <div className="relative flex-1">
+                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] pointer-events-none" />
+                            <input
+                                type="text"
+                                placeholder="Search by task, activity, or project..."
+                                value={searchTerm}
+                                onChange={(e) => handleSearchChange(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] placeholder:text-[color:var(--muted)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors"
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSearchChange('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer"
+                                    aria-label="Clear search"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Project Filter */}
+                        <div className="shrink-0 w-full md:w-56">
+                            <select
+                                value={projectFilter}
+                                onChange={(e) => handleProjectFilterChange(e.target.value)}
+                                className="w-full py-2 px-3 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
+                                aria-label="Filter by project"
+                            >
+                                <option value="ALL">All projects ({projectOptions.length})</option>
+                                {projectOptions.map((proj) => (
+                                    <option key={proj.id} value={proj.id}>
+                                        {proj.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Status Filter */}
+                        <div className="shrink-0 w-full md:w-48">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => handleStatusFilterChange(e.target.value)}
+                                className="w-full py-2 px-3 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
+                                aria-label="Filter by status"
+                            >
+                                <option value="ALL">All statuses</option>
+                                <option value="ACTIVE">All active</option>
+                                <option value="To Do">To Do</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Under Review">Under Review</option>
+                                <option value="Returned">Returned</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                </Card>
+
+                {/* ══ 4. Grouped Task Sections (Hierarchy of Importance) ══ */}
+                {totalItems === 0 ? (
+                    <EmptyState
+                        title="No tasks found"
+                        description={searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' ? 'No tasks matched your active filter settings.' : 'You do not have any assigned tasks currently.'}
+                        actionLabel={searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' ? 'Reset filters' : undefined}
+                        onAction={searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' ? () => {
+                            setStatusFilter('ALL');
+                            setProjectFilter('ALL');
+                            setSearchTerm('');
+                            updateUrlParams('ALL', 'ALL', '', 1, pageSize);
+                        } : undefined}
+                    />
                 ) : (
-                    /* ── Single unified table card — fits box with no horizontal scroll ── */
-                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] shadow-[0_1px_3px_0_rgb(0,0,0,0.03)] overflow-hidden">
-                        <table className="w-full text-left" style={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
-                            {/* Single colgroup — every section shares these widths */}
-                            <colgroup>
-                                <col style={{ width: '23%' }} />
-                                <col style={{ width: '20%' }} />
-                                <col style={{ width: '14%' }} />
-                                <col style={{ width: '14%' }} />
-                                <col style={{ width: '9%' }} />
-                                <col style={{ width: '9%' }} />
-                                <col style={{ width: '11%' }} />
-                            </colgroup>
+                    <div className="space-y-6">
+                        {groupedTasks.map((group) => (
+                            <Card key={group.id} className="p-5 space-y-3">
+                                {/* Group Header */}
+                                <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border)]">
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-[16px] font-bold text-[color:var(--text)]">
+                                            {group.title}
+                                        </h2>
+                                        <span className="text-[12px] font-bold px-2 py-0.5 rounded-full bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)] tabular-nums">
+                                            {group.tasks.length}
+                                        </span>
+                                    </div>
+                                </div>
 
-                            {/* Sticky column header */}
-                            <thead>
-                                <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider bg-white">
-                                    <th className="pl-4 sm:pl-5 pr-2 py-3 text-left">Task</th>
-                                    <th className="px-2.5 sm:px-3 py-3 text-left">Activity</th>
-                                    <th className="px-2.5 sm:px-3 py-3 text-left">Committee</th>
-                                    <th className="px-2.5 sm:px-3 py-3 text-left">Project</th>
-                                    <th className="px-2 sm:px-2.5 py-3 text-left">Due</th>
-                                    <th className="px-2 sm:px-2.5 py-3 text-left">Days Left</th>
-                                    <th className="pl-2 pr-4 sm:pr-5 py-3 text-left">Status</th>
-                                </tr>
-                            </thead>
+                                {/* Task Rows */}
+                                <div className="divide-y divide-[color:var(--border)]">
+                                    {group.tasks.map((task) => {
+                                        const isCompleting = completingTaskIds.has(task.id);
+                                        const isCompleted = isTaskCompleted(task.id, task.status);
 
-                            {/* ── In Progress ── */}
-                            <tbody>
-                                <tr className="bg-slate-50/70 border-y border-slate-100">
-                                    <td colSpan={7} className="px-4 sm:px-5 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-blue-500 inline-block shrink-0" />
-                                            <span className="text-[12px] font-semibold text-slate-700">In Progress</span>
-                                            <span className="text-[12px] font-normal text-slate-400">{inProgressTasks.length}</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {inProgressTasks.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-4 sm:px-5 py-5 text-center text-xs text-slate-400">No tasks currently in progress.</td></tr>
-                                ) : (
-                                    inProgressTasks.map((task) => <TaskRow key={task.id} task={task} />)
-                                )}
-                            </tbody>
+                                        return (
+                                            <div
+                                                key={task.id}
+                                                className={`py-3.5 first:pt-1 last:pb-1 flex items-start gap-3 transition-opacity ${
+                                                    isCompleting ? 'opacity-40 pointer-events-none' : ''
+                                                }`}
+                                            >
+                                                {/* Inline Completion Checkbox */}
+                                                <div className="pt-0.5 shrink-0">
+                                                    <Checkbox
+                                                        checked={isCompleted}
+                                                        onChange={() => handleToggleTaskCompletion(task)}
+                                                        aria-label={`Mark task ${task.title} as ${isCompleted ? 'incomplete' : 'completed'}`}
+                                                    />
+                                                </div>
 
-                            {/* ── To Do ── */}
-                            <tbody>
-                                <tr className="bg-slate-50/70 border-y border-slate-100">
-                                    <td colSpan={7} className="px-4 sm:px-5 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-slate-400 inline-block shrink-0" />
-                                            <span className="text-[12px] font-semibold text-slate-700">To Do</span>
-                                            <span className="text-[12px] font-normal text-slate-400">{toDoTasks.length}</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {toDoTasks.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-4 sm:px-5 py-5 text-center text-xs text-slate-400">No tasks to do.</td></tr>
-                                ) : (
-                                    toDoTasks.map((task) => <TaskRow key={task.id} task={task} />)
-                                )}
-                            </tbody>
+                                                {/* Task Details */}
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                                                        <Link
+                                                            href={task.action_url}
+                                                            className={`text-[14px] font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors truncate ${
+                                                                isCompleted ? 'line-through text-[color:var(--muted)]' : ''
+                                                            }`}
+                                                        >
+                                                            {task.title}
+                                                        </Link>
 
-                            {/* ── Completed ── */}
-                            <tbody>
-                                <tr className="bg-slate-50/70 border-y border-slate-100">
-                                    <td colSpan={7} className="px-4 sm:px-5 py-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shrink-0" />
-                                            <span className="text-[12px] font-semibold text-slate-700">Completed</span>
-                                            <span className="text-[12px] font-normal text-slate-400">{completedTasks.length}</span>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {completedTasks.length === 0 ? (
-                                    <tr><td colSpan={7} className="px-4 sm:px-5 py-5 text-center text-xs text-slate-400">No completed tasks yet.</td></tr>
-                                ) : (
-                                    completedTasks.map((task) => <TaskRow key={task.id} task={task} />)
-                                )}
-                            </tbody>
-                        </table>
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            {renderDaysBadge(task, isCompleted)}
+                                                            <Badge variant={isCompleted ? 'accent' : task.status === 'Under Review' ? 'secondary' : task.status === 'Returned' ? 'danger' : 'soft'}>
+                                                                {isCompleted ? 'Completed' : task.status}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 text-[12px] text-[color:var(--muted)] mt-1 flex-wrap">
+                                                        <span className="font-medium text-[color:var(--text)]">
+                                                            {task.project.title}
+                                                        </span>
+                                                        <span>·</span>
+                                                        <span>{task.committee.name}</span>
+                                                        <span>·</span>
+                                                        <span>{task.activity.title}</span>
+                                                        {task.due_date_formatted && (
+                                                            <>
+                                                                <span>·</span>
+                                                                <span className="tabular-nums">Due {task.due_date_formatted}</span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </Card>
+                        ))}
+
+                        {/* Real Pagination */}
+                        <Card className="p-4">
+                            <Pagination
+                                currentPage={safePage}
+                                totalPages={totalPages}
+                                totalItems={totalItems}
+                                pageSize={pageSize}
+                                onPageChange={handlePageChange}
+                                onPageSizeChange={handlePageSizeChange}
+                                pageSizeOptions={[10, 25, 50]}
+                            />
+                        </Card>
                     </div>
                 )}
-
             </div>
         </AppLayout>
     );
