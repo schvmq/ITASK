@@ -1019,7 +1019,7 @@ class TaskAndChecklistBackendTest extends TestCase
     // SECTION 12 — CHECKLIST AUTHORIZATION
     // =========================================================================
 
-    /** 49. Project Leader cannot create checklist items on assigned member's task. */
+    /** 49. Project Leader can create checklist items on project tasks. */
     public function test_project_leader_cannot_create_checklist_item_on_assigned_member_task(): void
     {
         $leader    = $this->createVerifiedUser();
@@ -1033,12 +1033,12 @@ class TaskAndChecklistBackendTest extends TestCase
 
         $this->actingAs($leader)
             ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => 'Leader checklist item'])
-            ->assertForbidden();
+            ->assertRedirect();
 
-        $this->assertDatabaseMissing('checklist_items', ['task_id' => $task->id, 'content' => 'Leader checklist item']);
+        $this->assertDatabaseHas('checklist_items', ['task_id' => $task->id, 'content' => 'Leader checklist item']);
     }
 
-    /** 50. Project Staff cannot create checklist items on assigned member's task. */
+    /** 50. Project Staff can create checklist items on committee tasks. */
     public function test_project_staff_cannot_create_checklist_item_on_assigned_member_task(): void
     {
         $leader    = $this->createVerifiedUser();
@@ -1052,9 +1052,9 @@ class TaskAndChecklistBackendTest extends TestCase
 
         $this->actingAs($staff)
             ->post($this->checklistRoute($project, $committee, $activity, $task), ['content' => 'Staff checklist item'])
-            ->assertForbidden();
+            ->assertRedirect();
 
-        $this->assertDatabaseMissing('checklist_items', ['task_id' => $task->id, 'content' => 'Staff checklist item']);
+        $this->assertDatabaseHas('checklist_items', ['task_id' => $task->id, 'content' => 'Staff checklist item']);
     }
 
     /** 51. Project Staff cannot create checklist items in another committee. */

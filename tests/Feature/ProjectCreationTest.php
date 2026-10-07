@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Chat;
+use App\Models\Message;
 use App\Models\Project;
 use App\Models\ProjectApprovalDocument;
 use App\Models\ProjectRoleAssignment;
@@ -357,5 +359,108 @@ class ProjectCreationTest extends TestCase
 
         $this->assertSame(1, $leaderAssignmentsCount);
         $this->assertSame(1, $totalAssignmentsCount);
+    }
+
+    /**
+     * 14. Project creation with initial members assigns roles and posts chat messages.
+     */
+    public function test_project_creation_with_initial_members_assigns_correct_roles_and_creates_chat_messages(): void
+    {
+        Storage::fake('local');
+        $leader = $this->createVerifiedUser(['name' => 'Leader User']);
+        $member1 = $this->createVerifiedUser(['name' => 'Member Alpha']);
+        $member2 = $this->createVerifiedUser(['name' => 'Staff Beta']);
+
+        $response = $this->actingAs($leader)->post('/projects', [
+            'title' => 'Team Collaboration Project',
+            'description' => 'A project with members',
+            'approval_document' => $this->createFakeApprovalDocument(),
+            'member_ids' => [$member1->id, $member2->id],
+            'member_roles' => [
+                $member1->id => 'Project Member',
+                $member2->id => 'Project Staff',
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $project = Project::where('title', 'Team Collaboration Project')->firstOrFail();
+
+        // Verify leader assignment
+        $this->assertDatabaseHas('project_role_assignments', [
+            'project_id' => $project->id,
+            'user_id' => $leader->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_LEADER,
+        ]);
+
+        // Verify member1 assignment
+        $this->assertDatabaseHas('project_role_assignments', [
+            'project_id' => $project->id,
+            'user_id' => $member1->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+        ]);
+
+        // Verify member2 assignment
+        $this->assertDatabaseHas('project_role_assignments', [
+            'project_id' => $project->id,
+            'user_id' => $member2->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+        ]);
+
+        // Verify chat and system messages
+        $chat = Chat::where('project_id', $project->id)->first();
+        $this->assertNotNull($chat);
+
+        $this->assertDatabaseHas('messages', [
+            'chat_id' => $chat->id,
+            'type' => Message::TYPE_SYSTEM,
+            'body' => 'Member Alpha joined the project',
+        ]);
+
+        $this->assertDatabaseHas('messages', [
+            'chat_id' => $chat->id,
+            'type' => Message::TYPE_SYSTEM,
+            'body' => 'Staff Beta joined the project',
+        ]);
+    }
+
+    /**
+     * 15. Project creation rejects invalid member role.
+     */
+    public function test_project_creation_rejects_invalid_member_role(): void
+    {
+        Storage::fake('local');
+        $leader = $this->createVerifiedUser();
+        $member = $this->createVerifiedUser();
+
+        $response = $this->actingAs($leader)->post('/projects', [
+            'title' => 'Invalid Role Project',
+            'approval_document' => $this->createFakeApprovalDocument(),
+            'member_ids' => [$member->id],
+            'member_roles' => [
+                $member->id => 'SuperAdmin',
+            ],
+        ]);
+
+        $response->assertSessionHasErrors(['member_roles.' . $member->id]);
+        $this->assertDatabaseCount('projects', 0);
+    }
+
+    /**
+     * 16. Project creation rejects non-existent member id.
+     */
+    public function test_project_creation_rejects_nonexistent_member_id(): void
+    {
+        Storage::fake('local');
+        $leader = $this->createVerifiedUser();
+
+        $response = $this->actingAs($leader)->post('/projects', [
+            'title' => 'Nonexistent Member Project',
+            'approval_document' => $this->createFakeApprovalDocument(),
+            'member_ids' => [999999],
+        ]);
+
+        $response->assertSessionHasErrors(['member_ids.0']);
+        $this->assertDatabaseCount('projects', 0);
     }
 }

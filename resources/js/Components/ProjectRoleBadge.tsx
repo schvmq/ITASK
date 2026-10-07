@@ -9,22 +9,22 @@ export interface ProjectRoleBadgeProps {
 
 const ROLE_STYLES: Record<string, { bg: string; text: string; border: string; iconColor: string }> = {
     'Project Leader': {
-        bg: 'bg-emerald-50/90',
-        text: 'text-[color:var(--color-brand-dark-green)]',
-        border: 'border-emerald-300/80',
-        iconColor: 'text-[color:var(--color-brand-dark-green)]',
+        bg: 'bg-[color:var(--status-success-bg)]',
+        text: 'text-[color:var(--status-success-text)]',
+        border: 'border-[color:var(--status-success-border)]',
+        iconColor: 'text-[color:var(--accent)]',
     },
     'Project Staff': {
-        bg: 'bg-[color:var(--color-brand-active-warm-orange)]',
-        text: 'text-[color:var(--color-brand-action-orange)]',
-        border: 'border-orange-200',
-        iconColor: 'text-[color:var(--color-brand-action-orange)]',
+        bg: 'bg-[color:var(--status-neutral-bg)]',
+        text: 'text-[color:var(--status-neutral-text)]',
+        border: 'border-[color:var(--status-neutral-border)]',
+        iconColor: 'text-[color:var(--secondary)]',
     },
     'Project Member': {
-        bg: 'bg-slate-100',
-        text: 'text-slate-700',
-        border: 'border-slate-300/80',
-        iconColor: 'text-slate-600',
+        bg: 'bg-[color:var(--soft-surface)]',
+        text: 'text-[color:var(--text)]',
+        border: 'border-[color:var(--border)]',
+        iconColor: 'text-[color:var(--muted)]',
     },
 };
 
@@ -32,28 +32,28 @@ export const ProjectRoleBadge: React.FC<ProjectRoleBadgeProps> = ({ role, classN
     if (!role) {
         return (
             <span
-                className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wide uppercase border bg-slate-50 text-slate-500 border-slate-200 ${className}`}
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] text-[11px] font-medium border bg-[color:var(--soft-surface)] text-[color:var(--muted)] border-[color:var(--border)] ${className}`}
                 title="No project role assigned"
             >
-                <Shield className="w-3 h-3 text-slate-400" />
-                <span>No project role</span>
+                <Shield className="w-3 h-3 text-[color:var(--muted)] stroke-[2px]" />
+                <span>No role</span>
             </span>
         );
     }
 
     const style = ROLE_STYLES[role] ?? {
-        bg: 'bg-slate-50',
-        text: 'text-slate-700',
-        border: 'border-slate-200',
-        iconColor: 'text-slate-500',
+        bg: 'bg-[color:var(--soft-surface)]',
+        text: 'text-[color:var(--text)]',
+        border: 'border-[color:var(--border)]',
+        iconColor: 'text-[color:var(--muted)]',
     };
 
     return (
         <span
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold tracking-wide uppercase border ${style.bg} ${style.text} ${style.border} ${className}`}
-            title={`Your role in this project: ${role}`}
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] text-[11px] font-medium border ${style.bg} ${style.text} ${style.border} ${className}`}
+            title={`Project role: ${role}`}
         >
-            <Shield className={`w-3 h-3 ${style.iconColor}`} />
+            <Shield className={`w-3 h-3 ${style.iconColor} stroke-[2px]`} />
             <span>{role}</span>
         </span>
     );

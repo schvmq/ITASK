@@ -67,6 +67,60 @@ class HandleInertiaRequests extends Middleware
                         ];
                     }) : [],
             ],
+            'unread_messages_count' => $request->user() ? (function () use ($request) {
+                $user = $request->user();
+                $chats = \App\Models\Chat::query()
+                    ->whereHas('project', function ($q) use ($user) {
+                        $q->whereNull('deleted_at')
+                            ->where(function ($pq) use ($user) {
+                                $pq->where('created_by', $user->id)
+                                    ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $user->id));
+                            });
+                    })
+                    ->with('readStates')
+                    ->get();
+
+                $total = 0;
+                foreach ($chats as $chat) {
+                    $readState = $chat->readStates->firstWhere('user_id', $user->id);
+                    $lastReadMsgId = $readState?->last_read_message_id;
+                    $lastReadAt = $readState?->read_at;
+
+                    $count = $chat->messages()
+                        ->where(function ($mq) use ($user) {
+                            $mq->where('sender_id', '!=', $user->id)
+                                ->orWhereNull('sender_id');
+                        })
+                        ->when($lastReadMsgId, fn ($q) => $q->where('id', '>', $lastReadMsgId))
+                        ->when(! $lastReadMsgId && $lastReadAt, fn ($q) => $q->where('created_at', '>', $lastReadAt))
+                        ->count();
+
+                    $total += $count;
+                }
+
+                return max(0, $total);
+            })() : 0,
+            'my_tasks_count' => $request->user() ? \App\Models\Task::query()
+                ->whereHas('activity.project')
+                ->where(function ($q) use ($request) {
+                    $q->where('assigned_to', $request->user()->id)
+                      ->orWhereHas('assignees', fn ($uq) => $uq->where('user_id', $request->user()->id));
+                })
+                ->where('status', '!=', \App\Models\Task::STATUS_COMPLETED)
+                ->count() : 0,
+            'available_users' => $request->user() ? \App\Models\User::query()
+                ->where('id', '!=', $request->user()->id)
+                ->whereNotNull('email_verified_at')
+                ->select(['id', 'name', 'email'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($u) => [
+                    'id' => $u->id,
+                    'name' => $u->name,
+                    'email' => $u->email,
+                ])
+                ->values()
+                ->all() : [],
         ];
     }
 }

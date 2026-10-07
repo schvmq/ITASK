@@ -12,11 +12,11 @@ export const Label: React.FC<LabelProps> = ({
 }) => {
     return (
         <label
-            className={`block text-xs font-semibold uppercase tracking-wider text-slate-700 select-none mb-1.5 ${className}`}
+            className={`block text-[13px] font-medium text-[color:var(--text)] select-none mb-1 ${className}`}
             {...props}
         >
             {children}
-            {required && <span className="text-rose-500 ml-1 font-bold">*</span>}
+            {required && <span className="text-[color:var(--primary)] ml-1 font-semibold">*</span>}
         </label>
     );
 };

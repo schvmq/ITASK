@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ChecklistItemController;
 use App\Http\Controllers\CommitteeController;
 use App\Http\Controllers\MyTasksController;
@@ -79,12 +80,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead'])->name('notifications.read');
     Route::post('/notifications/mark-all-read', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->name('notifications.mark-all-read');
 
+    // Chat / Messaging System (Project Group Chats Only)
+    Route::get('/chat/{projectId?}', [ChatController::class, 'index'])->name('chat.index');
+    Route::get('/messages/{projectId?}', [ChatController::class, 'index'])->name('messages.index');
+    Route::post('/chat/{chat}/messages', [ChatController::class, 'store'])->name('chat.messages.store');
+    Route::post('/chat/{chat}/messages/{message}/delete', [ChatController::class, 'destroyMessage'])->name('chat.messages.destroy');
+    Route::post('/chat/{chat}/messages/{messageId}/restore', [ChatController::class, 'restoreMessage'])->name('chat.messages.restore');
+    Route::post('/chat/{chat}/tasks', [ChatController::class, 'createTask'])->name('chat.tasks.store');
+    Route::post('/chat/{chat}/read', [ChatController::class, 'markAsRead'])->name('chat.markAsRead');
+    Route::post('/chat/{chat}/pin', [ChatController::class, 'togglePin'])->name('chat.pin');
+    Route::post('/chat/{chat}/mute', [ChatController::class, 'toggleMute'])->name('chat.mute');
+    Route::get('/chat/attachments/{message}', [ChatController::class, 'downloadAttachment'])->name('chat.attachments.download');
+
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
     Route::get('/projects/{project}/timeline', [\App\Http\Controllers\ProjectTimelineController::class, 'show'])->name('projects.timeline');
     Route::match(['put', 'patch'], '/projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
     Route::post('/projects/{project}/archive', [ProjectController::class, 'archive'])->name('projects.archive');
+    Route::post('/projects/{project}/unarchive', [ProjectController::class, 'unarchive'])->name('projects.unarchive');
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('projects.destroy');
+    Route::post('/projects/{projectId}/restore', [ProjectController::class, 'restore'])->name('projects.restore');
     Route::get('/projects/{project}/documents/{document}', [ProjectController::class, 'downloadApprovalDocument'])->name('projects.documents.download');
     Route::post('/projects/{project}/documents', [ProjectController::class, 'uploadDocument'])->name('projects.documents.store');
 

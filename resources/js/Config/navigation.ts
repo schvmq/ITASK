@@ -13,6 +13,7 @@ import {
     ListTodo,
     Send,
     Sparkles,
+    MessageSquare,
 } from 'lucide-react';
 
 // ─── Project-Scoped Roles ────────────────────────────────────────────────────
@@ -74,6 +75,12 @@ export const MAIN_NAV_ITEMS: NavItem[] = [
         href: '/timeline',
         icon: GanttChartSquare,
         description: 'CCIS project schedules and Gantt timelines',
+    },
+    {
+        name: 'Messages',
+        href: '/messages',
+        icon: MessageSquare,
+        description: 'Project collaboration and group chat',
     },
 ];
 

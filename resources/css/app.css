@@ -8,135 +8,332 @@
 @source '../**/*.tsx';
 @source '../**/*.ts';
 
-@theme {
-    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+/* ==========================================================================
+   DESIGN TOKENS (Strictly 5 base tokens + color-mix derivations)
+   ========================================================================== */
 
-    /* Core Brand Colors */
-    --color-primary: #F68233;
-    --color-primary-hover: #E06D1F;
-    --color-primary-active: #C85E17;
-    --color-primary-50: #FFF7ED;
-    --color-primary-100: #FFEDD5;
-    --color-primary-200: #FED7AA;
+:root,
+:root[data-theme="light"] {
+    --text: #191410;
+    --background: #fdfcfb;
+    --primary: #fa8c38;
+    --secondary: #f4c28d;
+    --accent: #fbd361;
 
-    --color-secondary: #003300;
-    --color-secondary-hover: #002600;
-    --color-secondary-50: #F0FDF4;
-    --color-secondary-100: #DCFCE7;
+    /* Primary button (vibrant light orange with high-contrast text) */
+    --primary-btn: #f97316;
+    --primary-btn-hover: #ea580c;
+    --primary-btn-active: #c2410c;
+    --primary-btn-text: #ffffff;
 
-    /* Neutral Surface and Text */
-    --color-surface: #FFFFFF;
-    --color-surface-subtle: #F9FAFB;
-    --color-surface-muted: #F3F4F6;
+    /* Derived surfaces & boundaries */
+    --card: color-mix(in srgb, var(--background) 96%, var(--text) 4%);
+    --card-surface: color-mix(in srgb, var(--background) 98%, var(--text) 2%);
+    --border: color-mix(in srgb, var(--text) 14%, var(--background));
+    --muted: color-mix(in srgb, var(--text) 68%, var(--background));
+    --soft-surface: color-mix(in srgb, var(--text) 5%, var(--background));
 
-    --color-border-light: #E5E7EB;
-    --color-border-subtle: #F3F4F6;
-    --color-border-dark: #D1D5DB;
+    /* Semantic Status Mixes (using strictly accent, secondary, danger red) */
+    /* Success / On Track (accent) */
+    --status-success: var(--accent);
+    --status-success-bg: color-mix(in srgb, var(--accent) 22%, var(--background));
+    --status-success-border: color-mix(in srgb, var(--accent) 45%, var(--background));
+    --status-success-text: color-mix(in srgb, var(--accent) 20%, var(--text));
 
-    --color-text-main: #111827;
-    --color-text-muted: #6B7280;
-    --color-text-subtle: #9CA3AF;
+    /* In Review / Neutral (secondary) */
+    --status-neutral: var(--secondary);
+    --status-neutral-bg: color-mix(in srgb, var(--secondary) 22%, var(--background));
+    --status-neutral-border: color-mix(in srgb, var(--secondary) 45%, var(--background));
+    --status-neutral-text: color-mix(in srgb, var(--secondary) 25%, var(--text));
 
-    /* ITASK Brand Palette */
-    --color-brand-dark-green: #003300;
-    --color-brand-orange: #E8752F;
-    --color-brand-action-orange: #F68233;
-    --color-brand-active-warm-orange: #FFF1E8;
-    --color-brand-project-darker-orange: #D9692B;
+    /* At Risk / Overdue / Critical (danger red) */
+    --status-danger: #ef4444;
+    --status-danger-bg: color-mix(in srgb, var(--status-danger) 12%, var(--background));
+    --status-danger-border: color-mix(in srgb, var(--status-danger) 32%, var(--background));
+    --status-danger-text: color-mix(in srgb, var(--status-danger) 85%, var(--text));
 
-    /* Shadcn Semantic Colors linked to ITASK Tokens */
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
-    --color-card: var(--card);
-    --color-card-foreground: var(--card-foreground);
-    --color-popover: var(--popover);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-muted: var(--muted);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-accent: var(--accent);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-destructive: var(--destructive);
-    --color-destructive-foreground: var(--destructive-foreground);
-    --color-border: var(--border);
-    --color-input: var(--input);
-    --color-ring: var(--ring);
+    /* Primary Accent / Active States (light orange) */
+    --status-primary: var(--primary);
+    --status-primary-bg: color-mix(in srgb, var(--primary) 14%, var(--background));
+    --status-primary-border: color-mix(in srgb, var(--primary) 36%, var(--background));
+    --status-primary-text: color-mix(in srgb, var(--primary) 85%, var(--text));
 
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 4px);
+    /* Compatibility aliases */
+    --color-bg-page: var(--background);
+    --color-bg-card: var(--card);
+    --color-ink: var(--text);
+    --color-ink-muted: var(--muted);
+    --color-border-token: var(--border);
 }
 
-:root {
-    --background: var(--color-surface);
-    --foreground: var(--color-text-main);
+:root[data-theme="dark"],
+html.dark {
+    --text: #fceede;
+    --background: #0d0906;
+    --primary: #fb923c;
+    --secondary: #8c571c;
+    --accent: #b59520;
 
-    --card: var(--color-surface);
-    --card-foreground: var(--color-text-main);
+    /* Primary button for dark mode */
+    --primary-btn: #ea580c;
+    --primary-btn-hover: #f97316;
+    --primary-btn-active: #c2410c;
+    --primary-btn-text: #ffffff;
 
-    --popover: var(--color-surface);
-    --popover-foreground: var(--color-text-main);
+    /* Derived surfaces & boundaries */
+    --card: color-mix(in srgb, var(--background) 90%, var(--text) 10%);
+    --card-surface: color-mix(in srgb, var(--background) 94%, var(--text) 6%);
+    --border: color-mix(in srgb, var(--text) 14%, var(--background));
+    --muted: color-mix(in srgb, var(--text) 68%, var(--background));
+    --soft-surface: color-mix(in srgb, var(--text) 5%, var(--background));
 
-    --primary: var(--color-primary);
-    --primary-foreground: #FFFFFF;
+    /* Semantic Status Mixes */
+    /* Success / On Track (accent) */
+    --status-success: var(--accent);
+    --status-success-bg: color-mix(in srgb, var(--accent) 26%, var(--background));
+    --status-success-border: color-mix(in srgb, var(--accent) 50%, var(--background));
+    --status-success-text: color-mix(in srgb, var(--accent) 45%, var(--text));
 
-    --secondary: var(--color-secondary);
-    --secondary-foreground: #FFFFFF;
+    /* In Review / Neutral (secondary) */
+    --status-neutral: var(--secondary);
+    --status-neutral-bg: color-mix(in srgb, var(--secondary) 26%, var(--background));
+    --status-neutral-border: color-mix(in srgb, var(--secondary) 50%, var(--background));
+    --status-neutral-text: color-mix(in srgb, var(--secondary) 45%, var(--text));
 
-    --muted: var(--color-surface-muted);
-    --muted-foreground: var(--color-text-muted);
+    /* At Risk / Overdue / Critical */
+    --status-danger: #f87171;
+    --status-danger-bg: color-mix(in srgb, var(--status-danger) 18%, var(--background));
+    --status-danger-border: color-mix(in srgb, var(--status-danger) 40%, var(--background));
+    --status-danger-text: color-mix(in srgb, var(--status-danger) 70%, var(--text));
 
-    --accent: var(--color-brand-active-warm-orange);
-    --accent-foreground: var(--color-primary-active);
+    /* Primary Accent */
+    --status-primary: var(--primary);
+    --status-primary-bg: color-mix(in srgb, var(--primary) 18%, var(--background));
+    --status-primary-border: color-mix(in srgb, var(--primary) 40%, var(--background));
+    --status-primary-text: color-mix(in srgb, var(--primary) 70%, var(--text));
 
-    --destructive: #EF4444;
-    --destructive-foreground: #FFFFFF;
-
-    --border: var(--color-border-light);
-    --input: var(--color-border-light);
-    --ring: var(--color-primary);
-
-    --radius: 0.5rem;
+    /* Compatibility aliases */
+    --color-bg-page: var(--background);
+    --color-bg-card: var(--card);
+    --color-ink: var(--text);
+    --color-ink-muted: var(--muted);
+    --color-border-token: var(--border);
 }
 
-.dark {
-    --background: #111827;
-    --foreground: #F9FAFB;
+/* ==========================================================================
+   GLOBAL TYPOGRAPHY & RESETS
+   ========================================================================== */
 
-    --card: #1F2937;
-    --card-foreground: #F9FAFB;
-
-    --popover: #1F2937;
-    --popover-foreground: #F9FAFB;
-
-    --primary: var(--color-primary);
-    --primary-foreground: #FFFFFF;
-
-    --secondary: #004D00;
-    --secondary-foreground: #FFFFFF;
-
-    --muted: #1F2937;
-    --muted-foreground: #9CA3AF;
-
-    --accent: #2D1E16;
-    --accent-foreground: #FED7AA;
-
-    --destructive: #7F1D1D;
-    --destructive-foreground: #FEE2E2;
-
-    --border: #374151;
-    --input: #374151;
-    --ring: var(--color-primary);
+* {
+    border-color: var(--border);
 }
 
-@layer base {
-    * {
-        border-color: var(--color-border-light);
+body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text);
+    background-color: var(--background);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numerals for numbers, dates, stats, and tables */
+.tabular-nums,
+table,
+.stats-number,
+time {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Typography Scale */
+h1, .page-title {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+h2, .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
+}
+
+h3, .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text);
+}
+
+p, span, div {
+    /* Sentence case guidance maintained */
+}
+
+/* ==========================================================================
+   FLAT CARDS (No gradients, glows, or decorative shadows; 1px border, 12px radius)
+   ========================================================================== */
+
+.itask-card {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+/* Attention Card: The only card with a primary left edge */
+.itask-card-attention {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+/* ==========================================================================
+   KEYBOARD FOCUS RING (3px primary, 2px offset on all interactive elements)
+   ========================================================================== */
+
+:focus-visible {
+    outline: 3px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* ==========================================================================
+   BUTTONS & CONTROLS
+   ========================================================================== */
+
+.btn-primary {
+    background-color: var(--primary-btn);
+    color: #ffffff;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+    box-shadow: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--primary-btn-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+    background-color: var(--primary-btn-active);
+    transform: scale(0.99);
+}
+
+.btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background-color: var(--soft-surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--text) 9%, var(--background));
+}
+
+.btn-secondary:active:not(:disabled) {
+    transform: scale(0.99);
+}
+
+/* ==========================================================================
+   SUBTLE MOTION & REDUCED MOTION SUPPORT
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
-    body {
-        color: var(--color-text-main);
-        background-color: #FFFFFF;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.18s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
     }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+    0% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.85;
+    }
+    100% {
+        opacity: 0.5;
+    }
+}
+
+.skeleton-shimmer {
+    background-color: var(--soft-surface);
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 6px;
+}
+
+/* Clean scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
 }

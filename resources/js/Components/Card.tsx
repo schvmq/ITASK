@@ -8,13 +8,14 @@ export interface CardProps {
     children: React.ReactNode;
     className?: string;
     padding?: 'none' | 'sm' | 'md' | 'lg';
+    isAttention?: boolean;
 }
 
 const paddingStyles = {
     none: '',
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8',
+    sm: 'p-3 sm:p-4',
+    md: 'p-4 sm:p-5',
+    lg: 'p-5 sm:p-6',
 };
 
 export const Card: React.FC<CardProps> = ({
@@ -25,16 +26,20 @@ export const Card: React.FC<CardProps> = ({
     children,
     className = '',
     padding = 'md',
+    isAttention = false,
 }) => {
     return (
         <div
-            className={`bg-white rounded-xl border border-slate-200/80 shadow-xs transition-shadow duration-150 ${className}`}
+            className={`bg-[color:var(--card)] rounded-[12px] border border-[color:var(--border)] text-[color:var(--text)] transition-colors duration-150 ${
+                isAttention ? 'border-l-4 border-l-[color:var(--primary)]' : ''
+            } ${className}`}
+            style={{ boxShadow: 'none' }}
         >
             {(title || headerAction) && (
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-[color:var(--border)]">
                     <div>
-                        {title && <h3 className="text-base font-semibold text-slate-900">{title}</h3>}
-                        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+                        {title && <h3 className="text-[16px] font-semibold text-[color:var(--text)] leading-snug">{title}</h3>}
+                        {subtitle && <p className="text-[13px] text-[color:var(--muted)] mt-0.5">{subtitle}</p>}
                     </div>
                     {headerAction && <div>{headerAction}</div>}
                 </div>
@@ -43,7 +48,7 @@ export const Card: React.FC<CardProps> = ({
             <div className={paddingStyles[padding]}>{children}</div>
 
             {footer && (
-                <div className="px-6 py-3.5 bg-slate-50/70 border-t border-slate-100 rounded-b-xl flex items-center justify-between">
+                <div className="px-4 sm:px-5 py-3 bg-[color:var(--soft-surface)] border-t border-[color:var(--border)] rounded-b-[12px] flex items-center justify-between text-[13px]">
                     {footer}
                 </div>
             )}

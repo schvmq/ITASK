@@ -12,3 +12,8 @@ export * from './LoadingState';
 export * from './EmptyState';
 export * from './ProjectRoleBadge';
 export * from './GanttTimeline';
+export * from './Pagination';
+export * from './Tabs';
+export * from './ErrorBoundary';
+export * from './ThemeToggle';
+export * from './CommandPalette';

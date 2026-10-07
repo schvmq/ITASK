@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
-import { PageProps, NotificationItem } from '@/types';
+import { PageProps } from '@/types';
 import {
     Bell,
     CheckSquare,
@@ -10,45 +10,41 @@ import {
     Send,
     ClipboardCheck,
     Check,
-    ExternalLink,
 } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/Components/ui/dropdown-menu';
 
 function getNotificationIcon(type: string, status?: string) {
     if (type === 'task_assigned') {
-        return <CheckSquare className="w-4 h-4 text-emerald-600" />;
+        return <CheckSquare className="w-4 h-4 text-[color:var(--accent)] stroke-[2px]" />;
     }
     if (type === 'task_deadline_approaching') {
-        return <Clock className="w-4 h-4 text-amber-600" />;
+        return <Clock className="w-4 h-4 text-[color:var(--primary)] stroke-[2px]" />;
     }
     if (type === 'task_submitted_for_review') {
-        return <Send className="w-4 h-4 text-blue-600" />;
+        return <Send className="w-4 h-4 text-[color:var(--secondary)] stroke-[2px]" />;
     }
     if (type === 'task_reviewed') {
         return status === 'Completed' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-[color:var(--accent)] stroke-[2px]" />
         ) : (
-            <AlertCircle className="w-4 h-4 text-rose-600" />
+            <AlertCircle className="w-4 h-4 text-[color:var(--primary)] stroke-[2px]" />
         );
     }
     if (type === 'activity_submitted_for_review') {
-        return <ClipboardCheck className="w-4 h-4 text-indigo-600" />;
+        return <ClipboardCheck className="w-4 h-4 text-[color:var(--secondary)] stroke-[2px]" />;
     }
     if (type === 'activity_reviewed') {
         return status === 'Completed' ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-[color:var(--accent)] stroke-[2px]" />
         ) : (
-            <AlertCircle className="w-4 h-4 text-rose-600" />
+            <AlertCircle className="w-4 h-4 text-[color:var(--primary)] stroke-[2px]" />
         );
     }
-    return <Bell className="w-4 h-4 text-[color:var(--color-brand-action-orange)]" />;
+    return <Bell className="w-4 h-4 text-[color:var(--primary)] stroke-[2px]" />;
 }
 
 export function NotificationDropdown() {
@@ -95,30 +91,32 @@ export function NotificationDropdown() {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="relative p-2 rounded-lg text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-surface-muted)] transition-colors cursor-pointer"
+                    className="relative p-2 rounded-[8px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                     aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
                 >
-                    <Bell className="w-4.5 h-4.5" />
+                    <Bell className="w-[18px] h-[18px] stroke-[2px]" />
                     {unreadCount > 0 && (
                         <span
-                            className="absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white rounded-full ring-2 ring-white"
-                            style={{ backgroundColor: 'var(--color-brand-action-orange)' }}
-                        >
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
+                            className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[color:var(--primary)] ring-2 ring-[color:var(--card)]"
+                            title={`${unreadCount} unread`}
+                        />
                     )}
                 </button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-80 sm:w-96 p-0 shadow-lg border border-[color:var(--color-border-light)] bg-white rounded-xl">
+            <DropdownMenuContent
+                align="end"
+                className="w-80 sm:w-96 p-0 border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] rounded-[12px] overflow-hidden"
+                style={{ boxShadow: 'none' }}
+            >
                 {/* ── Header ── */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[color:var(--color-border-light)] bg-[color:var(--color-surface-subtle)] rounded-t-xl">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[color:var(--border)] bg-[color:var(--soft-surface)]">
                     <div className="flex items-center gap-2">
-                        <span className="font-semibold text-xs text-[color:var(--color-text-main)]">
+                        <span className="font-semibold text-[13px] text-[color:var(--text)]">
                             Notifications
                         </span>
                         {unreadCount > 0 && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-orange-100 text-orange-800 rounded-full">
+                            <span className="px-2 py-0.5 text-[11px] font-semibold bg-[color:var(--status-danger-bg)] text-[color:var(--primary)] border border-[color:var(--status-danger-border)] rounded-full tabular-nums">
                                 {unreadCount} new
                             </span>
                         )}
@@ -128,22 +126,22 @@ export function NotificationDropdown() {
                             type="button"
                             onClick={handleMarkAllAsRead}
                             disabled={isMarkingAll}
-                            className="text-[11px] font-medium text-[color:var(--color-brand-action-orange)] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            className="text-[12px] font-medium text-[color:var(--primary)] hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
                         >
-                            <Check className="w-3 h-3" />
+                            <Check className="w-3.5 h-3.5" />
                             Mark all read
                         </button>
                     )}
                 </div>
 
                 {/* ── Notification List ── */}
-                <div className="max-h-80 overflow-y-auto divide-y divide-[color:var(--color-border-light)]">
+                <div className="max-h-80 overflow-y-auto divide-y divide-[color:var(--border)]">
                     {items.length === 0 ? (
                         <div className="py-8 px-4 text-center">
-                            <Bell className="w-6 h-6 mx-auto text-slate-300 mb-2" />
-                            <p className="text-xs font-medium text-slate-500">No notifications yet</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                                You'll be notified of task assignments and reviews here.
+                            <Bell className="w-6 h-6 mx-auto text-[color:var(--muted)] mb-2 stroke-[2px]" />
+                            <p className="text-[13px] font-semibold text-[color:var(--text)]">You're up to date</p>
+                            <p className="text-[12px] text-[color:var(--muted)] mt-0.5">
+                                Task updates and feedback will show here.
                             </p>
                         </div>
                     ) : (
@@ -165,37 +163,37 @@ export function NotificationDropdown() {
                                         }
                                         setIsOpen(false);
                                     }}
-                                    className={`px-4 py-3 flex items-start gap-3 hover:bg-[color:var(--color-surface-subtle)] transition-colors cursor-pointer group ${
-                                        isUnread ? 'bg-orange-50/40' : 'bg-white'
+                                    className={`px-4 py-3 flex items-start gap-3 hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer group ${
+                                        isUnread ? 'bg-[color:color-mix(in_srgb,var(--primary)_5%,var(--card))]' : 'bg-transparent'
                                     }`}
                                 >
-                                    <div className="mt-0.5 shrink-0 w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
+                                    <div className="mt-0.5 shrink-0 w-7 h-7 rounded-[6px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] flex items-center justify-center">
                                         {getNotificationIcon(item.data.notification_type, status)}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-1">
-                                            <p className={`text-xs truncate ${isUnread ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>
+                                            <p className={`text-[13px] truncate ${isUnread ? 'font-semibold text-[color:var(--text)]' : 'font-normal text-[color:var(--text)]'}`}>
                                                 {title}
                                             </p>
                                             {isUnread && (
-                                                <span className="w-2 h-2 rounded-full bg-[color:var(--color-brand-action-orange)] shrink-0" />
+                                                <span className="w-2 h-2 rounded-full bg-[color:var(--primary)] shrink-0" />
                                             )}
                                         </div>
-                                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-snug">
+                                        <p className="text-[12px] text-[color:var(--muted)] line-clamp-2 mt-0.5 leading-snug">
                                             {message}
                                         </p>
                                         {item.data.review_feedback && (
-                                            <p className="text-[10px] text-rose-600 bg-rose-50 rounded px-1.5 py-0.5 mt-1 border border-rose-100 italic">
+                                            <p className="text-[11px] text-[color:var(--status-danger-text)] bg-[color:var(--status-danger-bg)] rounded-[4px] px-2 py-0.5 mt-1 border border-[color:var(--status-danger-border)] italic">
                                                 "{item.data.review_feedback}"
                                             </p>
                                         )}
                                         <div className="flex items-center justify-between mt-1.5">
-                                            <span className="text-[10px] text-slate-400">
+                                            <span className="text-[11px] text-[color:var(--muted)] tabular-nums">
                                                 {item.created_at_human || 'Recently'}
                                             </span>
                                             {actionUrl && (
-                                                <span className="text-[10px] text-[color:var(--color-brand-action-orange)] font-medium flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    View <ExternalLink className="w-2.5 h-2.5" />
+                                                <span className="text-[11px] text-[color:var(--primary)] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    View details →
                                                 </span>
                                             )}
                                         </div>
@@ -207,11 +205,11 @@ export function NotificationDropdown() {
                 </div>
 
                 {/* ── Footer ── */}
-                <div className="px-4 py-2.5 border-t border-[color:var(--color-border-light)] bg-white text-center rounded-b-xl">
+                <div className="px-4 py-2.5 border-t border-[color:var(--border)] bg-[color:var(--card)] text-center">
                     <Link
                         href="/notifications"
                         onClick={() => setIsOpen(false)}
-                        className="text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline inline-block"
+                        className="text-[12px] font-semibold text-[color:var(--primary)] hover:underline inline-block"
                     >
                         View all notifications
                     </Link>

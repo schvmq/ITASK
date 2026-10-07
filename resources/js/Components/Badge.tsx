@@ -9,29 +9,41 @@ export interface BadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, { badge: string; dot: string }> = {
-    primary: {
-        badge: 'bg-[#FFF7ED] text-[#F68233] border-[#FED7AA]',
-        dot: 'bg-[#F68233]',
-    },
-    secondary: {
-        badge: 'bg-[#F0FDF4] text-[#003300] border-[#BBF7D0]',
-        dot: 'bg-[#003300]',
-    },
+    // Accent for "On track" and success states
     success: {
-        badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        dot: 'bg-emerald-500',
+        badge: 'bg-[color:var(--status-success-bg)] text-[color:var(--status-success-text)] border-[color:var(--status-success-border)]',
+        dot: 'bg-[color:var(--accent)]',
+    },
+    // Secondary for neutral or "In review" states
+    secondary: {
+        badge: 'bg-[color:var(--status-neutral-bg)] text-[color:var(--status-neutral-text)] border-[color:var(--status-neutral-border)]',
+        dot: 'bg-[color:var(--secondary)]',
     },
     warning: {
-        badge: 'bg-amber-50 text-amber-800 border-amber-200',
-        dot: 'bg-amber-500',
+        badge: 'bg-[color:var(--status-neutral-bg)] text-[color:var(--status-neutral-text)] border-[color:var(--status-neutral-border)]',
+        dot: 'bg-[color:var(--secondary)]',
     },
+    // Danger for "At risk" and "Overdue"
     danger: {
-        badge: 'bg-rose-50 text-rose-700 border-rose-200',
-        dot: 'bg-rose-500',
+        badge: 'bg-[color:var(--status-danger-bg)] text-[color:var(--status-danger-text)] border-[color:var(--status-danger-border)]',
+        dot: 'bg-[color:var(--status-danger)]',
+    },
+    // Primary light orange tint for active or highlighted badges
+    primary: {
+        badge: 'bg-[color:var(--status-primary-bg)] text-[color:var(--status-primary-text)] border-[color:var(--status-primary-border)]',
+        dot: 'bg-[color:var(--primary)]',
     },
     neutral: {
-        badge: 'bg-slate-50 text-slate-700 border-slate-200',
-        dot: 'bg-slate-400',
+        badge: 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border-[color:var(--border)]',
+        dot: 'bg-[color:var(--muted)]',
+    },
+    accent: {
+        badge: 'bg-[color:var(--status-success-bg)] text-[color:var(--status-success-text)] border-[color:var(--status-success-border)]',
+        dot: 'bg-[color:var(--accent)]',
+    },
+    soft: {
+        badge: 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border-[color:var(--border)]',
+        dot: 'bg-[color:var(--muted)]',
     },
 };
 
@@ -41,13 +53,13 @@ export const Badge: React.FC<BadgeProps> = ({
     className = '',
     dot = false,
 }) => {
-    const style = variantStyles[variant];
+    const style = variantStyles[variant] || variantStyles.neutral;
 
     return (
         <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style.badge} ${className}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-medium border ${style.badge} ${className}`}
         >
-            {dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} />}
+            {dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} aria-hidden="true" />}
             <span>{children}</span>
         </span>
     );

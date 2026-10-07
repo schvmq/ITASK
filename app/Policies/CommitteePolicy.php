@@ -17,7 +17,11 @@ class CommitteePolicy
     {
         $project = $committee->project;
 
-        // 1. Project Leader of the project can view all committees
+        // 1. Project Creator or Leader of the project can view all committees
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
         $isLeader = $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
@@ -39,6 +43,10 @@ class CommitteePolicy
      */
     public function create(User $user, Project $project): bool
     {
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
         return $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
@@ -51,7 +59,12 @@ class CommitteePolicy
      */
     public function update(User $user, Committee $committee): bool
     {
-        return $committee->project->roleAssignments()
+        $project = $committee->project;
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
+        return $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
             ->exists();
@@ -63,7 +76,12 @@ class CommitteePolicy
      */
     public function delete(User $user, Committee $committee): bool
     {
-        return $committee->project->roleAssignments()
+        $project = $committee->project;
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
+        return $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
             ->exists();
@@ -75,7 +93,12 @@ class CommitteePolicy
      */
     public function manageMembers(User $user, Committee $committee): bool
     {
-        return $committee->project->roleAssignments()
+        $project = $committee->project;
+        if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
+        return $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
             ->exists();

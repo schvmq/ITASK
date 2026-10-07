@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -76,5 +77,37 @@ class User extends Authenticatable implements MustVerifyEmail
     public function projectApprovalDocuments(): HasMany
     {
         return $this->hasMany(ProjectApprovalDocument::class, 'uploaded_by');
+    }
+
+    public function chats()
+    {
+        return Chat::query()
+            ->whereHas('project', function ($q) {
+                $q->whereNull('deleted_at')
+                    ->where(function ($pq) {
+                        $pq->where('created_by', $this->id)
+                            ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $this->id));
+                    });
+            });
+    }
+
+    public function chatReadStates(): HasMany
+    {
+        return $this->hasMany(ChatReadState::class);
+    }
+
+    public function chatUserPreferences(): HasMany
+    {
+        return $this->hasMany(ChatUserPreference::class);
+    }
+
+    public function conversations()
+    {
+        return $this->chats();
+    }
+
+    public function sentMessages(): HasMany
+    {
+        return $this->hasMany(Message::class, 'sender_id');
     }
 }

@@ -30,7 +30,7 @@ export const FormField: React.FC<FormFieldProps> = ({
             </Label>
             <Input id={inputId} hasError={Boolean(error)} required={required} {...inputProps} />
             {helperText && !error && (
-                <p className="text-xs text-slate-500 mt-1">{helperText}</p>
+                <p className="text-[12px] text-[color:var(--muted)] mt-1">{helperText}</p>
             )}
             <InputError message={error} />
         </div>

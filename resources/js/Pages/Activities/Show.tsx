@@ -406,6 +406,10 @@ export default function ActivityShow({
     const handleTaskStatusChange = (task: TaskItem, newStatus: TaskItem['status']) => {
         if (task.status === newStatus) return;
 
+        if (viewingTask && viewingTask.id === task.id) {
+            setViewingTask({ ...viewingTask, status: newStatus });
+        }
+
         setStatusUpdatingTaskId(task.id);
         router.patch(
             `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}`,
@@ -584,6 +588,16 @@ export default function ActivityShow({
     const handleToggleChecklist = (task: TaskItem, item: ChecklistItemData) => {
         if (!task.can.manageChecklist) return;
 
+        // Optimistically update viewingTask checklist items so the progress bar updates immediately
+        if (viewingTask && viewingTask.id === task.id) {
+            setViewingTask({
+                ...viewingTask,
+                checklist_items: (viewingTask.checklist_items || []).map((ci) =>
+                    ci.id === item.id ? { ...ci, is_completed: !ci.is_completed } : ci
+                ),
+            });
+        }
+
         setChecklistProcessing(true);
         router.patch(
             `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
@@ -659,6 +673,14 @@ export default function ActivityShow({
     };
 
     const handleDeleteChecklist = (task: TaskItem, item: ChecklistItemData) => {
+        // Optimistically update viewingTask checklist items
+        if (viewingTask && viewingTask.id === task.id) {
+            setViewingTask({
+                ...viewingTask,
+                checklist_items: (viewingTask.checklist_items || []).filter((ci) => ci.id !== item.id),
+            });
+        }
+
         setChecklistProcessing(true);
         router.delete(
             `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
@@ -1941,7 +1963,7 @@ export default function ActivityShow({
                                                                     ? item.is_completed
                                                                         ? 'Mark incomplete'
                                                                         : 'Mark complete'
-                                                                    : 'Only Project Staff or Leader can toggle checklist items'
+                                                                    : 'Only assigned personnel, Project Staff, or Leader can toggle checklist items'
                                                             }
                                                         >
                                                             {item.is_completed && (
