@@ -114,6 +114,21 @@ class ProjectProgressService
      */
     public function calculateProjectProgress(Project $project): array
     {
+        // If relations are preloaded, calculate directly
+        if ($project->relationLoaded('activities') && $project->relationLoaded('committees')) {
+            return $this->computeProjectProgressDirect($project);
+        }
+
+        $cacheKey = "project_progress_{$project->id}";
+        return \Illuminate\Support\Facades\Cache::remember(
+            $cacheKey,
+            now()->addMinutes(10),
+            fn () => $this->computeProjectProgressDirect($project)
+        );
+    }
+
+    protected function computeProjectProgressDirect(Project $project): array
+    {
         $activities = $project->relationLoaded('activities')
             ? $project->activities
             : $project->activities()->with('tasks')->get();
@@ -150,5 +165,10 @@ class ProjectProgressService
             'completed_activities' => $completedActivities,
             'progress' => $progress,
         ];
+    }
+
+    public static function clearProjectProgressCache(int|string $projectId): void
+    {
+        \Illuminate\Support\Facades\Cache::forget("project_progress_{$projectId}");
     }
 }

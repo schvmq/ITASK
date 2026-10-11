@@ -22,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -303,30 +304,32 @@ class ActivityController extends Controller
         // 2. Authorize
         Gate::authorize('submit', $activity);
 
-        // 3. Update status & submission notes
-        $activity->update([
-            'status' => Activity::STATUS_UNDER_REVIEW,
-            'submission_notes' => $request->validated('submission_notes'),
-        ]);
+        DB::transaction(function () use ($activity, $request, $committee, $project) {
+            // 3. Update status & submission notes
+            $activity->update([
+                'status' => Activity::STATUS_UNDER_REVIEW,
+                'submission_notes' => $request->validated('submission_notes'),
+            ]);
 
-        // Notify committee staff reviewer(s)
-        $staffUsers = $committee->roleAssignments()
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-            ->with('user')
-            ->get()
-            ->pluck('user')
-            ->filter();
+            // Notify committee staff reviewer(s)
+            $staffUsers = $committee->roleAssignments()
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+                ->with('user')
+                ->get()
+                ->pluck('user')
+                ->filter();
 
-        foreach ($staffUsers as $staff) {
-            if ($staff->id !== $request->user()->id) {
-                $staff->notify(new ActivitySubmittedForReviewNotification(
-                    $activity,
-                    $committee,
-                    $project,
-                    $request->user()
-                ));
+            foreach ($staffUsers as $staff) {
+                if ($staff->id !== $request->user()->id) {
+                    $staff->notify(new ActivitySubmittedForReviewNotification(
+                        $activity,
+                        $committee,
+                        $project,
+                        $request->user()
+                    ));
+                }
             }
-        }
+        });
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
@@ -353,46 +356,49 @@ class ActivityController extends Controller
         Gate::authorize('review', $activity);
 
         $action = $request->validated('action');
+        $message = '';
 
-        if (in_array($action, ['complete', 'mark_completed'], true)) {
-            $status = Activity::STATUS_COMPLETED;
-            $feedback = null;
-            $activity->update([
-                'status' => $status,
-                'reviewed_by' => $request->user()->id,
-                'reviewed_at' => now(),
-                'review_feedback' => null,
-            ]);
-            $message = 'Activity marked as completed.';
-        } else {
-            $status = Activity::STATUS_RETURNED;
-            $feedback = $request->validated('review_feedback');
-            $activity->update([
-                'status' => $status,
-                'reviewed_by' => $request->user()->id,
-                'reviewed_at' => now(),
-                'review_feedback' => $feedback,
-            ]);
-            $message = 'Activity returned for revision.';
-        }
+        DB::transaction(function () use ($action, $request, $activity, $committee, $project, &$message) {
+            if (in_array($action, ['complete', 'mark_completed'], true)) {
+                $status = Activity::STATUS_COMPLETED;
+                $feedback = null;
+                $activity->update([
+                    'status' => $status,
+                    'reviewed_by' => $request->user()->id,
+                    'reviewed_at' => now(),
+                    'review_feedback' => null,
+                ]);
+                $message = 'Activity marked as completed.';
+            } else {
+                $status = Activity::STATUS_RETURNED;
+                $feedback = $request->validated('review_feedback');
+                $activity->update([
+                    'status' => $status,
+                    'reviewed_by' => $request->user()->id,
+                    'reviewed_at' => now(),
+                    'review_feedback' => $feedback,
+                ]);
+                $message = 'Activity returned for revision.';
+            }
 
-        // Notify relevant owning/submitting members and creator
-        $recipients = collect([$activity->creator])
-            ->merge($activity->tasks()->with('assignee')->get()->pluck('assignee'))
-            ->filter()
-            ->unique('id')
-            ->reject(fn ($u) => $u->id === $request->user()->id);
+            // Notify relevant owning/submitting members and creator
+            $recipients = collect([$activity->creator])
+                ->merge($activity->tasks()->with('assignee')->get()->pluck('assignee'))
+                ->filter()
+                ->unique('id')
+                ->reject(fn ($u) => $u->id === $request->user()->id);
 
-        foreach ($recipients as $recipient) {
-            $recipient->notify(new ActivityReviewedNotification(
-                $activity,
-                $committee,
-                $project,
-                $request->user(),
-                $status,
-                $feedback
-            ));
-        }
+            foreach ($recipients as $recipient) {
+                $recipient->notify(new ActivityReviewedNotification(
+                    $activity,
+                    $committee,
+                    $project,
+                    $request->user(),
+                    $status,
+                    $feedback
+                ));
+            }
+        });
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,

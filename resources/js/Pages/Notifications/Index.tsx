@@ -335,8 +335,8 @@ export default function NotificationsIndex({
                         ))}
 
                         {/* Server-side Pagination */}
-                        {notifications.last_page > 1 && (
-                            <Card className="p-4">
+                        {notifications.total > 0 && (
+                            <Card className="p-4 flex justify-center w-full">
                                 <Pagination
                                     currentPage={notifications.current_page}
                                     totalPages={notifications.last_page}

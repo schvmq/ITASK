@@ -340,14 +340,15 @@ class ActivityTaskChecklistWorkflowTest extends TestCase
         );
         $leaderStatusPatch->assertStatus(403);
 
-        // Step 9: Verify Unassigned Member cannot modify checklist items (403 Forbidden)
-        $forbiddenChecklistCreate = $this->actingAs($otherMember)->post(
+        // Step 9: Verify Outsider cannot modify checklist items (403 Forbidden) and project members are permitted
+        $outsider = $this->createVerifiedUser(['name' => 'Outsider Test']);
+        $forbiddenChecklistCreate = $this->actingAs($outsider)->post(
             route('projects.committees.activities.tasks.checklist.store', [$project, $committee, $activity, $task]),
             ['content' => 'Unauthorized item']
         );
         $forbiddenChecklistCreate->assertStatus(403);
 
-        $forbiddenChecklistDelete = $this->actingAs($otherMember)->delete(
+        $forbiddenChecklistDelete = $this->actingAs($outsider)->delete(
             route('projects.committees.activities.tasks.checklist.destroy', [$project, $committee, $activity, $task, $item3])
         );
         $forbiddenChecklistDelete->assertStatus(403);

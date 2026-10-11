@@ -12,10 +12,18 @@ Broadcast::channel('user.{id}', function (User $user, $id) {
 });
 
 Broadcast::channel('chat.{chatId}', function (User $user, int $chatId) {
-    $chat = \App\Models\Chat::with('project')->find($chatId);
+    $chat = \App\Models\Chat::with('project')->find($chatId)
+        ?: \App\Models\Chat::with('project')->where('project_id', $chatId)->first();
     if (! $chat || ! $chat->project || $chat->trashed() || $chat->project->trashed()) {
         return false;
     }
 
-    return $chat->hasActiveMember((int) $user->id);
+    if (! $chat->hasActiveMember((int) $user->id)) {
+        return false;
+    }
+
+    return [
+        'id' => (int) $user->id,
+        'name' => $user->name,
+    ];
 });

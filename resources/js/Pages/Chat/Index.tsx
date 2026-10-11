@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import axios from 'axios';
 import { Head, router, usePage, Link } from '@inertiajs/react';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { useEcho, useConnectionStatus, echo } from '@laravel/echo-react';
@@ -47,6 +48,7 @@ import { ReadReceiptPopover } from '@/Components/Chat/ReadReceiptPopover';
 import { DeleteMessageModal } from '@/Components/Chat/DeleteMessageModal';
 import { UndoToast } from '@/Components/Chat/UndoToast';
 import { CreateTaskModal } from '@/Components/Chat/CreateTaskModal';
+import './messaging.css';
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -186,6 +188,24 @@ function getInitials(name: string): string {
         .join('');
 }
 
+function getCsrfHeader(): Record<string, string> {
+    const metaToken = typeof document !== 'undefined'
+        ? (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content
+        : null;
+    const match = typeof document !== 'undefined'
+        ? document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)
+        : null;
+    const xsrfCookie = match ? decodeURIComponent(match[1]) : '';
+
+    const headers: Record<string, string> = {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+    };
+    if (metaToken) headers['X-CSRF-TOKEN'] = metaToken;
+    if (xsrfCookie) headers['X-XSRF-TOKEN'] = xsrfCookie;
+    return headers;
+}
+
 // ─── Main Chat Component ────────────────────────────────────────────────────
 
 export default function ChatIndex({
@@ -215,6 +235,8 @@ export default function ChatIndex({
     const [messageText, setMessageText] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isSending, setIsSending] = useState(false);
+    const [sendError, setSendError] = useState<string | null>(null);
+    const [failedMessageText, setFailedMessageText] = useState<string>('');
 
     // Filters and Search
     const [searchQuery, setSearchQuery] = useState('');
@@ -321,6 +343,19 @@ export default function ChatIndex({
         }
     }, [initialMessages, activeChat?.id]);
 
+    // Lock page scroll so only internal panes scroll
+    useEffect(() => {
+        const originalOverflow = document.body.style.overflow;
+        const originalHeight = document.body.style.height;
+        document.body.style.overflow = 'hidden';
+        document.body.style.height = '100vh';
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            document.body.style.height = originalHeight;
+        };
+    }, []);
+
     // Dismiss history notice
     const handleDismissHistoryNotice = () => {
         if (!activeChat) return;
@@ -330,10 +365,13 @@ export default function ChatIndex({
         setShowHistoryNotice(false);
     };
 
-    // Scroll to bottom on initial load or chat switch
+    // Scroll to bottom on initial load or chat switch (scoped to messages container only)
     useEffect(() => {
-        if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: 'auto',
+            });
             setHasUnreadBelow(false);
         }
     }, [activeChat?.id]);
@@ -351,7 +389,12 @@ export default function ChatIndex({
     };
 
     const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
-        messagesEndRef.current?.scrollIntoView({ behavior });
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior,
+            });
+        }
         setHasUnreadBelow(false);
     };
 
@@ -364,23 +407,14 @@ export default function ChatIndex({
 
             lastMarkedReadIdRef.current = messageId;
 
-            const csrfToken =
-                (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-
-            fetch(`/chat/${activeChat.id}/read`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify({
-                    last_read_message_id: messageId,
-                }),
+            axios.post(`/chat/${activeChat.id}/read`, {
+                last_read_message_id: messageId,
+            }, {
+                headers: getCsrfHeader(),
             })
-                .then((res) => res.json())
-                .then((data) => {
-                    if (data.success) {
+                .then((res) => {
+                    const data = res.data;
+                    if (data?.success) {
                         setParticipants((prev) =>
                             prev.map((p) =>
                                 p.id === currentUserId
@@ -479,6 +513,18 @@ export default function ChatIndex({
                     }
                 }
             }
+
+            // Clear typing state for sender who just delivered a message
+            const incomingSenderId = Number(data.sender_id || data.sender?.id);
+            if (incomingSenderId) {
+                setTypingUsers((prev) => {
+                    if (!prev[incomingSenderId]) return prev;
+                    clearTimeout(prev[incomingSenderId].timeout);
+                    const updated = { ...prev };
+                    delete updated[incomingSenderId];
+                    return updated;
+                });
+            }
         });
 
         // 2. Read Receipts
@@ -536,30 +582,35 @@ export default function ChatIndex({
         });
 
         // 6. Typing Whispers
-        const handleWhisper = (data: { id?: number; name?: string; is_typing: boolean }) => {
-            if (!data.id || data.id === currentUserId) return;
+        const handleWhisper = (data: any) => {
+            if (!data) return;
+            const senderId = Number(data.id ?? data.user_id);
+            if (!senderId || senderId === currentUserId) return;
+
+            const isTyping = data.is_typing !== false;
+            const senderName = data.name || data.userName || 'Someone';
 
             setTypingUsers((prev) => {
                 const next = { ...prev };
-                if (next[data.id!]?.timeout) {
-                    clearTimeout(next[data.id!].timeout);
+                if (next[senderId]?.timeout) {
+                    clearTimeout(next[senderId].timeout);
                 }
 
-                if (data.is_typing) {
+                if (isTyping) {
                     const timeout = setTimeout(() => {
                         setTypingUsers((curr) => {
                             const updated = { ...curr };
-                            delete updated[data.id!];
+                            delete updated[senderId];
                             return updated;
                         });
-                    }, 3000);
+                    }, 3500);
 
-                    next[data.id!] = {
-                        name: data.name || 'Someone',
+                    next[senderId] = {
+                        name: senderName,
                         timeout,
                     };
                 } else {
-                    delete next[data.id!];
+                    delete next[senderId];
                 }
 
                 return next;
@@ -587,9 +638,9 @@ export default function ChatIndex({
     const typingNames = useMemo(() => Object.values(typingUsers).map((u) => u.name), [typingUsers]);
     const typingLabel = useMemo(() => {
         if (typingNames.length === 0) return '';
-        if (typingNames.length === 1) return `${typingNames[0]} is typing…`;
-        if (typingNames.length === 2) return `${typingNames[0]} and ${typingNames[1]} are typing…`;
-        return `${typingNames[0]} and ${typingNames.length - 1} others are typing…`;
+        if (typingNames.length === 1) return `${typingNames[0]} is typing...`;
+        if (typingNames.length === 2) return `${typingNames[0]} and ${typingNames[1]} are typing...`;
+        return `${typingNames[0]} and ${typingNames.length - 1} others are typing...`;
     }, [typingNames]);
 
     // Fallback polling every 6s if websocket disconnected
@@ -634,8 +685,8 @@ export default function ChatIndex({
         setShowMobileThread(true);
     };
 
-    // Send message
-    const handleSendMessage = (customBody?: string) => {
+    // Send message (Instant optimistic dispatch without loading screen)
+    const handleSendMessage = async (customBody?: string) => {
         if (!activeChat || activeChat.is_archived) return;
         const bodyToSend = customBody ?? messageText;
         if (!bodyToSend.trim() && !selectedFile) return;
@@ -645,31 +696,104 @@ export default function ChatIndex({
         }
         sendTypingWhisper(false);
 
-        setIsSending(true);
+        const currentFile = selectedFile;
+        const tempId = -Date.now();
 
+        // 1. Instantly append message to local UI state (0ms latency feel)
+        const optimisticMsg: MessageItem = {
+            id: tempId,
+            chat_id: activeChat.id,
+            conversation_id: activeChat.id,
+            sender_id: currentUserId,
+            type: currentFile ? 'file' : 'text',
+            body: bodyToSend.trim(),
+            attachment_name: currentFile?.name,
+            attachment_size: currentFile?.size,
+            attachment_type: currentFile?.type,
+            created_at: new Date().toISOString(),
+            sender: {
+                id: currentUserId,
+                name: currentUserName,
+                email: page.props.auth?.user?.email ?? '',
+            },
+            is_deleted: false,
+        };
+
+        setMessages((prev) => [...prev, optimisticMsg]);
+
+        // 2. Instantly update chat list preview
+        setChats((prev) =>
+            prev.map((c) =>
+                c.id === activeChat.id
+                    ? {
+                          ...c,
+                          preview: bodyToSend.trim() || (currentFile ? `Shared file: ${currentFile.name}` : 'New message'),
+                          preview_time: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                      }
+                    : c
+            )
+        );
+
+        // 3. Instantly clear composer inputs and anchor scroll to bottom
+        setMessageText('');
+        setSelectedFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setTimeout(() => scrollToBottom('smooth'), 10);
+        setSendError(null);
+
+        // 4. Send in background via axios (automatic XSRF cookie handling, multipart boundary, resilient credentials)
         const formData = new FormData();
         if (bodyToSend.trim()) {
             formData.append('body', bodyToSend.trim());
         }
-        if (selectedFile) {
-            formData.append('file', selectedFile);
+        if (currentFile) {
+            formData.append('file', currentFile);
         }
 
-        router.post(`/chat/${activeChat.id}/messages`, formData, {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => {
-                setMessageText('');
-                setSelectedFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = '';
-                setIsSending(false);
-                setTimeout(() => scrollToBottom('smooth'), 50);
-            },
-            onError: (err) => {
-                console.error('Failed to send message:', err);
-                setIsSending(false);
-            },
-        });
+        try {
+            const res = await axios.post(`/chat/${activeChat.id}/messages`, formData, {
+                headers: getCsrfHeader(),
+            });
+            const data = res.data;
+
+            // Reconcile optimistic message with real server ID
+            setMessages((prev) =>
+                prev.map((m) =>
+                    m.id === tempId
+                        ? {
+                              ...m,
+                              id: data.id,
+                              chat_id: data.chat_id || m.chat_id,
+                              created_at: data.created_at || m.created_at,
+                              attachment_path: data.attachment_path || m.attachment_path,
+                              attachment_name: data.attachment_name || m.attachment_name,
+                              attachment_type: data.attachment_type || m.attachment_type,
+                              attachment_size: data.attachment_size || m.attachment_size,
+                          }
+                        : m
+                )
+            );
+            setFailedMessageText('');
+            setSendError(null);
+        } catch (err: any) {
+            console.error('Failed to send message:', err);
+            const serverMessage =
+                err.response?.data?.message ||
+                (err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(' ') : null) ||
+                err.message;
+            setSendError(
+                serverMessage && typeof serverMessage === 'string'
+                    ? serverMessage
+                    : 'Failed to send message. Please check your connection and try again.'
+            );
+            setFailedMessageText(bodyToSend);
+            // Remove optimistic message so phantom messages don't confuse user
+            setMessages((prev) => prev.filter((m) => m.id !== tempId));
+            // Restore text and file to composer so nothing is lost
+            setMessageText(bodyToSend);
+            if (currentFile) setSelectedFile(currentFile);
+        }
     };
 
     // Typing whisper trigger
@@ -697,17 +821,24 @@ export default function ChatIndex({
 
         // Throttle typing whispers
         const now = Date.now();
-        if (now - lastTypingWhisperRef.current > 1500) {
-            lastTypingWhisperRef.current = now;
-            sendTypingWhisper(true);
-        }
-
-        if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
-        }
-        typingTimeoutRef.current = setTimeout(() => {
+        if (val.trim() === '') {
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
             sendTypingWhisper(false);
-        }, 2000);
+        } else {
+            if (now - lastTypingWhisperRef.current > 1200) {
+                lastTypingWhisperRef.current = now;
+                sendTypingWhisper(true);
+            }
+
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
+            typingTimeoutRef.current = setTimeout(() => {
+                sendTypingWhisper(false);
+            }, 2500);
+        }
     };
 
     // Filter project members for @mentions (current project members only)
@@ -731,20 +862,12 @@ export default function ChatIndex({
     // Toggle Pin
     const handleTogglePin = async () => {
         if (!activeChat) return;
-        const csrfToken =
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-
         try {
-            const res = await fetch(`/chat/${activeChat.id}/pin`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                },
+            const res = await axios.post(`/chat/${activeChat.id}/pin`, {}, {
+                headers: getCsrfHeader(),
             });
-            const data = await res.json();
-            if (data.success) {
+            const data = res.data;
+            if (data?.success) {
                 setIsPinned(data.is_pinned);
                 setChats((prev) =>
                     prev.map((c) =>
@@ -760,20 +883,12 @@ export default function ChatIndex({
     // Toggle Mute
     const handleToggleMute = async () => {
         if (!activeChat) return;
-        const csrfToken =
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-
         try {
-            const res = await fetch(`/chat/${activeChat.id}/mute`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                },
+            const res = await axios.post(`/chat/${activeChat.id}/mute`, {}, {
+                headers: getCsrfHeader(),
             });
-            const data = await res.json();
-            if (data.success) {
+            const data = res.data;
+            if (data?.success) {
                 setIsMuted(data.is_muted);
                 setChats((prev) =>
                     prev.map((c) =>
@@ -792,65 +907,52 @@ export default function ChatIndex({
         const msgId = messagePendingDelete.id;
         setIsDeletingMessage(true);
 
-        const csrfToken =
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-
         try {
-            const res = await fetch(`/chat/${activeChat.id}/messages/${msgId}/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                },
+            const res = await axios.post(`/chat/${activeChat.id}/messages/${msgId}/delete`, {}, {
+                headers: getCsrfHeader(),
             });
 
-            if (!res.ok) {
-                throw new Error('Failed to delete message');
+            if (res.data?.success) {
+                // Replace message with tombstone locally
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.id === msgId ? { ...m, is_deleted: true, body: '' } : m
+                    )
+                );
+
+                setMessagePendingDelete(null);
+                setIsDeletingMessage(false);
+                setUndoMessageId(msgId);
             }
-
-            // Replace message with tombstone locally
-            setMessages((prev) =>
-                prev.map((m) =>
-                    m.id === msgId ? { ...m, is_deleted: true, body: '' } : m
-                )
-            );
-
-            setMessagePendingDelete(null);
+        } catch (err: any) {
+            console.error('Failed to delete message:', err);
             setIsDeletingMessage(false);
-            setUndoMessageId(msgId);
-        } catch (err) {
-            console.error(err);
-            setIsDeletingMessage(false);
-            alert('Failed to delete message. Please try again.');
+            const msg = err.response?.data?.message || 'Failed to delete message. Please try again.';
+            alert(msg);
         }
     };
 
     // Undo delete flow (5 seconds)
     const handleUndoDelete = async (msgId: number) => {
         if (!activeChat) return;
-        const csrfToken =
-            (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-
         try {
-            const res = await fetch(`/chat/${activeChat.id}/messages/${msgId}/restore`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                },
+            const res = await axios.post(`/chat/${activeChat.id}/messages/${msgId}/restore`, {}, {
+                headers: getCsrfHeader(),
             });
 
-            if (!res.ok) {
-                throw new Error('Failed to restore message');
+            if (res.data?.success) {
+                setUndoMessageId(null);
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.id === msgId ? { ...m, is_deleted: false } : m
+                    )
+                );
+                router.reload({ only: ['messages'] });
             }
-
-            setUndoMessageId(null);
-            router.reload({ only: ['messages'] });
-        } catch (err) {
-            console.error(err);
-            alert('Failed to restore message.');
+        } catch (err: any) {
+            console.error('Failed to restore message:', err);
+            const msg = err.response?.data?.message || 'Failed to restore message.';
+            alert(msg);
         }
     };
 
@@ -945,31 +1047,30 @@ export default function ChatIndex({
     }, [messages, currentUserId]);
 
     return (
-        <AppLayout title="Messages" subtitle="Project collaboration and team chat">
+        <AppLayout hidePageHeadingBanner={true}>
             <Head title={activeChat ? `${activeChat.title} — Chat` : 'Messages — ITASK'} />
 
-            {/* ══ Three-Pane Messages Layout ═══════════════════════════════════ */}
-            <div className="h-[calc(100vh-4.25rem)] max-w-full overflow-hidden p-3 sm:p-4 min-[820px]:p-4 select-none">
-                <div className="flex h-full gap-4 min-w-0">
+            {/* ══ Full-Width Unified Messages Layout (Scoped under .messaging-root) ════ */}
+            <div className="messaging-root w-full h-full min-h-0 flex overflow-hidden bg-[color:var(--card)] select-none">
 
-                    {/* ─────────────────────────────────────────────────────────────
-                       PANE 1: CONVERSATION LIST (330px fixed, hidden on mobile thread)
-                       ───────────────────────────────────────────────────────────── */}
-                    <div
-                        className={`w-full min-[820px]:w-[330px] shrink-0 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm flex flex-col overflow-hidden transition-all duration-200 ${
-                            showMobileThread ? 'hidden min-[820px]:flex' : 'flex'
-                        }`}
-                        aria-label="Project chats list"
-                    >
+                {/* ─────────────────────────────────────────────────────────────
+                   PANE 1: CONVERSATION LIST (320px fixed, hidden on mobile thread)
+                   ───────────────────────────────────────────────────────────── */}
+                <div
+                    className={`w-full min-[820px]:w-[320px] shrink-0 border-r border-[color:var(--border)] flex flex-col h-full bg-[color:var(--card)] overflow-hidden transition-all duration-200 ${
+                        showMobileThread ? 'hidden min-[820px]:flex' : 'flex'
+                    }`}
+                    aria-label="Project chats list"
+                >
                         {/* Header: Project chats title & Search */}
-                        <div className="p-3.5 pb-2 border-b border-[var(--border)] space-y-3 shrink-0">
+                        <div className="p-3.5 pb-2 border-b border-[color:var(--border)] space-y-3 shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <h1 className="text-lg font-extrabold text-[var(--ink)] tracking-tight">
+                                    <h1 className="text-lg font-extrabold text-[color:var(--text)] tracking-tight">
                                         Project chats
                                     </h1>
                                     {totalUnreadCount > 0 && (
-                                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#EC7505] text-[#2A2A2A] animate-badge-pop">
+                                        <span className="msg-badge-pulse px-2 py-0.5 rounded-full text-xs font-bold bg-[color:var(--primary)] text-white">
                                             {totalUnreadCount}
                                         </span>
                                     )}
@@ -978,20 +1079,20 @@ export default function ChatIndex({
 
                             {/* Search bar */}
                             <div className="relative">
-                                <Search className="w-4 h-4 text-[var(--muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                <Search className="w-4 h-4 text-[color:var(--muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 <input
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="Search project chats..."
-                                    className="w-full pl-9 pr-7 py-2 rounded-xl text-xs bg-[var(--tint-neutral)] border border-transparent focus:border-[#EC7505] text-[var(--ink)] outline-none placeholder:text-[var(--muted)] transition-all"
+                                    className="w-full pl-9 pr-7 py-2 rounded-xl text-xs bg-[color:var(--soft-surface)] border border-[color:var(--border)] focus:border-[color:var(--primary)] text-[color:var(--text)] outline-none placeholder:text-[color:var(--muted)] transition-all"
                                     aria-label="Search project chats"
                                 />
                                 {searchQuery && (
                                     <button
                                         type="button"
                                         onClick={() => setSearchQuery('')}
-                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer"
                                         aria-label="Clear search"
                                     >
                                         <X className="w-3.5 h-3.5" />
@@ -1017,10 +1118,10 @@ export default function ChatIndex({
                                             key={tab.key}
                                             type="button"
                                             onClick={() => setFilterTab(tab.key)}
-                                            className={`px-3 py-1 rounded-full text-xs font-bold tracking-tight transition-all cursor-pointer select-none shrink-0 ${
+                                            className={`px-3 py-1 rounded-full text-xs font-bold tracking-tight transition-all cursor-pointer select-none shrink-0 msg-interactive ${
                                                 isActive
-                                                    ? 'bg-[#FFBB00] text-[#2A2A2A] shadow-xs'
-                                                    : 'bg-[var(--tint-neutral)] text-[var(--muted)] hover:text-[var(--ink)]'
+                                                    ? 'bg-[color:var(--primary)] text-white shadow-xs'
+                                                    : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] hover:text-[color:var(--text)]'
                                             }`}
                                         >
                                             {tab.label}
@@ -1031,14 +1132,14 @@ export default function ChatIndex({
                         </div>
 
                         {/* Chats Scrollable List */}
-                        <div className="flex-1 overflow-y-auto divide-y divide-[var(--border)]/50 divide-dashed p-1.5 space-y-1">
+                        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain divide-y divide-[color:var(--border)]/50 divide-dashed p-1.5 space-y-1">
                             {filteredChats.length === 0 ? (
-                                <div className="p-6 text-center space-y-2 text-[var(--muted)]">
-                                    <FolderOpen className="w-8 h-8 mx-auto opacity-40 text-[#EC7505]" />
-                                    <p className="text-xs font-semibold text-[var(--ink)]">
+                                <div className="p-6 text-center space-y-2 text-[color:var(--muted)]">
+                                    <FolderOpen className="w-8 h-8 mx-auto opacity-40 text-[color:var(--primary)]" />
+                                    <p className="text-xs font-semibold text-[color:var(--text)]">
                                         {searchQuery ? 'No matching chats found' : 'Chats appear with your projects'}
                                     </p>
-                                    <p className="text-[11px] leading-relaxed text-[var(--muted)]">
+                                    <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
                                         {searchQuery
                                             ? 'Try searching with different keywords.'
                                             : 'When you create or join a project, its group chat shows up here.'}
@@ -1047,7 +1148,7 @@ export default function ChatIndex({
                                         <div className="pt-2">
                                             <Link
                                                 href="/projects"
-                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#EC7505] text-[#2A2A2A] font-bold text-xs hover:bg-[#D96904] transition-colors"
+                                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[color:var(--primary)] text-white font-bold text-xs hover:opacity-90 transition-opacity"
                                             >
                                                 <Plus className="w-3.5 h-3.5" />
                                                 <span>Go to Projects</span>
@@ -1065,14 +1166,14 @@ export default function ChatIndex({
                                             key={chat.id}
                                             type="button"
                                             onClick={() => handleSelectChat(chat.project_id)}
-                                            className={`w-full p-3 rounded-xl flex items-start gap-3 transition-colors text-left cursor-pointer group relative ${
+                                            className={`w-full p-3 rounded-xl flex items-start gap-3 transition-colors text-left cursor-pointer group relative msg-interactive ${
                                                 isSelected
-                                                    ? 'bg-[var(--tint-yellow)] border-l-4 border-[#FFBB00] shadow-xs'
-                                                    : 'hover:bg-[var(--tint-neutral)]/60'
+                                                    ? 'bg-[color:var(--soft-surface)] border-l-4 border-[color:var(--primary)] shadow-xs'
+                                                    : 'hover:bg-[color:var(--soft-surface)]/60'
                                             }`}
                                         >
                                             {/* Project Avatar */}
-                                            <div className="w-10 h-10 rounded-xl bg-[#FFBB00] text-[#2A2A2A] flex items-center justify-center font-extrabold text-sm shrink-0 shadow-xs">
+                                            <div className="w-10 h-10 rounded-xl bg-[color:var(--primary)] text-white flex items-center justify-center font-extrabold text-sm shrink-0 shadow-xs">
                                                 {getInitials(chat.title)}
                                             </div>
 
@@ -1082,21 +1183,21 @@ export default function ChatIndex({
                                                     <div className="flex items-center gap-1.5 min-w-0">
                                                         <span
                                                             className={`text-xs truncate ${
-                                                                hasUnread ? 'font-black text-[var(--ink)]' : 'font-bold text-[var(--ink)]'
+                                                                hasUnread ? 'font-black text-[color:var(--text)]' : 'font-bold text-[color:var(--text)]'
                                                             }`}
                                                         >
                                                             {chat.title}
                                                         </span>
                                                         {chat.is_pinned && (
-                                                            <Pin className="w-3 h-3 text-[#EC7505] shrink-0 fill-current" />
+                                                            <Pin className="w-3 h-3 text-[color:var(--primary)] shrink-0 fill-current" />
                                                         )}
                                                         {chat.is_muted && (
-                                                            <VolumeX className="w-3 h-3 text-[var(--muted)] shrink-0" />
+                                                            <VolumeX className="w-3 h-3 text-[color:var(--muted)] shrink-0" />
                                                         )}
                                                     </div>
 
                                                     {chat.preview_time && (
-                                                        <span className="text-[10px] text-[var(--muted)] shrink-0 font-medium">
+                                                        <span className="text-[10px] text-[color:var(--muted)] shrink-0 font-medium">
                                                             {formatConversationTime(chat.preview_time)}
                                                         </span>
                                                     )}
@@ -1106,8 +1207,8 @@ export default function ChatIndex({
                                                     <p
                                                         className={`text-xs truncate leading-snug ${
                                                             hasUnread
-                                                                ? 'font-bold text-[var(--ink)]'
-                                                                : 'text-[var(--muted)] font-normal'
+                                                                ? 'font-bold text-[color:var(--text)]'
+                                                                : 'text-[color:var(--muted)] font-normal'
                                                         }`}
                                                     >
                                                         {chat.preview}
@@ -1115,14 +1216,14 @@ export default function ChatIndex({
 
                                                     <div className="flex items-center gap-1 shrink-0">
                                                         {hasUnread && (
-                                                            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#EC7505] text-[#2A2A2A]">
+                                                            <span className="msg-badge-pulse px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[color:var(--primary)] text-white">
                                                                 {chat.unread_count}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-1 text-[10px] text-[var(--muted)]">
+                                                <div className="flex items-center gap-1 text-[10px] text-[color:var(--muted)]">
                                                     <Users className="w-3 h-3" />
                                                     <span>{chat.member_count} members</span>
                                                 </div>
@@ -1134,14 +1235,14 @@ export default function ChatIndex({
 
                             {/* Collapsible Archived Projects Section at Bottom */}
                             {archivedChats.length > 0 && (
-                                <div className="pt-2 border-t border-[var(--border)]">
+                                <div className="pt-2 border-t border-[color:var(--border)]">
                                     <button
                                         type="button"
                                         onClick={() => setIsArchivedSectionOpen(!isArchivedSectionOpen)}
-                                        className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--tint-neutral)]/50 transition-colors cursor-pointer"
+                                        className="w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)]/50 transition-colors cursor-pointer"
                                     >
                                         <div className="flex items-center gap-1.5">
-                                            <Archive className="w-3.5 h-3.5 text-[var(--muted)]" />
+                                            <Archive className="w-3.5 h-3.5 text-[color:var(--muted)]" />
                                             <span>Archived ({archivedChats.length})</span>
                                         </div>
                                         {isArchivedSectionOpen ? (
@@ -1160,20 +1261,20 @@ export default function ChatIndex({
                                                         key={archived.id}
                                                         type="button"
                                                         onClick={() => handleSelectChat(archived.project_id)}
-                                                        className={`w-full p-2.5 rounded-xl flex items-center gap-2.5 text-left text-xs transition-colors cursor-pointer opacity-80 hover:opacity-100 ${
+                                                        className={`w-full p-2.5 rounded-xl flex items-center gap-2.5 text-left text-xs transition-colors cursor-pointer opacity-80 hover:opacity-100 msg-interactive ${
                                                             isSelected
-                                                                ? 'bg-[var(--tint-yellow)] border-l-4 border-[#FFBB00]'
-                                                                : 'hover:bg-[var(--tint-neutral)]/50'
+                                                                ? 'bg-[color:var(--soft-surface)] border-l-4 border-[color:var(--primary)]'
+                                                                : 'hover:bg-[color:var(--soft-surface)]/50'
                                                         }`}
                                                     >
-                                                        <div className="w-7 h-7 rounded-lg bg-[var(--tint-neutral)] text-[var(--muted)] flex items-center justify-center font-bold text-xs shrink-0">
+                                                        <div className="w-7 h-7 rounded-lg bg-[color:var(--soft-surface)] text-[color:var(--muted)] flex items-center justify-center font-bold text-xs shrink-0">
                                                             {getInitials(archived.title)}
                                                         </div>
                                                         <div className="min-w-0 flex-1">
-                                                            <p className="font-semibold text-[var(--ink)] truncate">
+                                                            <p className="font-semibold text-[color:var(--text)] truncate">
                                                                 {archived.title}
                                                             </p>
-                                                            <p className="text-[10px] text-[var(--muted)] truncate">
+                                                            <p className="text-[10px] text-[color:var(--muted)] truncate">
                                                                 Archived project
                                                             </p>
                                                         </div>
@@ -1191,60 +1292,63 @@ export default function ChatIndex({
                        PANE 2: CHAT THREAD (flexible, scrollable)
                        ───────────────────────────────────────────────────────────── */}
                     <div
-                        className={`flex-1 min-w-0 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm flex flex-col overflow-hidden relative ${
+                        className={`flex-1 min-w-0 flex flex-col h-full bg-[color:var(--card)] relative overflow-hidden ${
                             showMobileThread ? 'flex' : 'hidden min-[820px]:flex'
                         }`}
                         aria-label="Chat thread"
                     >
                         {/* Access Revoked Overlay State (Requirement 1.2) */}
                         {isAccessRevoked ? (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4 bg-[var(--card)] animate-backdrop-in">
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4 bg-[color:var(--card)] animate-backdrop-in">
                                 <div className="w-14 h-14 rounded-2xl bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center">
                                     <Shield className="w-7 h-7" />
                                 </div>
                                 <div className="space-y-1.5 max-w-sm">
-                                    <h2 className="text-lg font-black text-[var(--ink)]">
+                                    <h2 className="text-lg font-black text-[color:var(--text)]">
                                         This chat isn't available
                                     </h2>
-                                    <p className="text-xs text-[var(--muted)] leading-relaxed">
+                                    <p className="text-xs text-[color:var(--muted)] leading-relaxed">
                                         You may have been removed from the project, or the project was deleted.
                                     </p>
                                 </div>
                                 <Button
                                     variant="primary"
                                     onClick={() => router.visit('/messages')}
-                                    className="btn-primary-orange"
+                                    className="px-4 py-2 rounded-xl font-bold bg-[color:var(--primary-btn)] hover:bg-[color:var(--primary-btn-hover)] text-white shadow-xs msg-interactive"
                                 >
                                     Back to Messages
                                 </Button>
                             </div>
                         ) : activeChat ? (
                             <>
-                                {/* ── Thread Header ── */}
-                                <div className="h-16 px-4 border-b border-[var(--border)] flex items-center justify-between gap-3 shrink-0 bg-[var(--card)] z-10">
+                                {/* ── Group Thread Header ── */}
+                                <div className="h-16 px-4 border-b border-[color:var(--border)] flex items-center justify-between gap-3 shrink-0 bg-[color:var(--card)] z-10">
                                     <div className="flex items-center gap-3 min-w-0">
-                                        {/* Mobile Back Button */}
+                                        {/* Mobile Back Button (≥40px touch target) */}
                                         <button
                                             type="button"
                                             onClick={() => setShowMobileThread(false)}
-                                            className="min-[820px]:hidden p-1.5 rounded-xl hover:bg-[var(--tint-neutral)] text-[var(--ink)] cursor-pointer"
+                                            className="min-[820px]:hidden msg-touch-target p-1.5 rounded-xl hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] cursor-pointer msg-interactive"
                                             aria-label="Back to project chats"
                                         >
                                             <ArrowLeft className="w-5 h-5" />
                                         </button>
 
-                                        {/* Project Avatar */}
-                                        <div className="w-9 h-9 rounded-xl bg-[#FFBB00] text-[#2A2A2A] font-extrabold flex items-center justify-center text-sm shrink-0 shadow-xs">
+                                        {/* Project Group Avatar */}
+                                        <div className="w-10 h-10 rounded-xl bg-[color:var(--primary)] text-white font-extrabold flex items-center justify-center text-sm shrink-0 shadow-xs">
                                             {getInitials(activeChat.title)}
                                         </div>
 
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <h2 className="text-sm font-extrabold text-[var(--ink)] truncate">
+                                                <h2 className="text-sm font-extrabold text-[color:var(--text)] truncate">
                                                     {activeChat.title}
                                                 </h2>
+                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)] shrink-0 select-none">
+                                                    Group Chat
+                                                </span>
                                                 {activeChat.is_archived && (
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFE9A8] text-[#8A5A00] dark:bg-[#3A3210] dark:text-[#FFBB00] flex items-center gap-1">
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[color:var(--status-neutral-bg)] text-[color:var(--status-neutral-text)] border border-[color:var(--status-neutral-border)] flex items-center gap-1 shrink-0">
                                                         <Lock className="w-2.5 h-2.5" />
                                                         Archived
                                                     </span>
@@ -1252,24 +1356,31 @@ export default function ChatIndex({
                                             </div>
 
                                             {/* Subtitle: Overlapping avatar stack & members count */}
-                                            <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                                            <div className="flex items-center gap-2 text-xs text-[color:var(--muted)]">
                                                 <div className="flex -space-x-1.5 overflow-hidden items-center">
                                                     {participants.slice(0, 4).map((m) => (
                                                         <div
                                                             key={m.id}
                                                             title={m.name}
-                                                            className="inline-block w-5 h-5 rounded-full ring-2 ring-[var(--card)] bg-[#EC7505] text-[#2A2A2A] text-[9px] font-black text-center leading-5 select-none shrink-0"
+                                                            className="inline-block w-5 h-5 rounded-full ring-2 ring-[color:var(--card)] bg-[color:var(--soft-surface)] text-[color:var(--text)] text-[9px] font-black text-center leading-5 select-none shrink-0"
                                                         >
                                                             {getInitials(m.name)}
                                                         </div>
                                                     ))}
                                                     {participants.length > 4 && (
-                                                        <span className="w-5 h-5 rounded-full ring-2 ring-[var(--card)] bg-[var(--tint-neutral)] text-[var(--muted)] text-[9px] font-bold flex items-center justify-center shrink-0">
+                                                        <span className="w-5 h-5 rounded-full ring-2 ring-[color:var(--card)] bg-[color:var(--soft-surface)] text-[color:var(--muted)] text-[9px] font-bold flex items-center justify-center shrink-0">
                                                             +{participants.length - 4}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <span>{participants.length} members</span>
+                                                {typingLabel ? (
+                                                    <span className="text-[11px] font-bold text-[color:var(--primary)] italic flex items-center gap-1.5 animate-modal-in">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--primary)] animate-pulse shrink-0" />
+                                                        <span className="truncate max-w-[200px]">{typingLabel}</span>
+                                                    </span>
+                                                ) : (
+                                                    <span>{participants.length} members</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -1280,10 +1391,10 @@ export default function ChatIndex({
                                             type="button"
                                             onClick={handleTogglePin}
                                             aria-label={isPinned ? 'Unpin chat' : 'Pin chat'}
-                                            className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                                            className={`msg-touch-target p-2 rounded-xl transition-colors cursor-pointer msg-interactive ${
                                                 isPinned
-                                                    ? 'bg-[var(--tint-yellow)] text-[#EC7505]'
-                                                    : 'text-[var(--muted)] hover:bg-[var(--tint-neutral)] hover:text-[var(--ink)]'
+                                                    ? 'bg-[color:var(--status-primary-bg)] text-[color:var(--primary)]'
+                                                    : 'text-[color:var(--muted)] hover:bg-[color:var(--soft-surface)] hover:text-[color:var(--text)]'
                                             }`}
                                             title={isPinned ? 'Unpin chat' : 'Pin chat'}
                                         >
@@ -1294,15 +1405,15 @@ export default function ChatIndex({
                                             type="button"
                                             onClick={handleToggleMute}
                                             aria-label={isMuted ? 'Unmute chat' : 'Mute chat'}
-                                            className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                                            className={`msg-touch-target p-2 rounded-xl transition-colors cursor-pointer msg-interactive ${
                                                 isMuted
-                                                    ? 'bg-[var(--tint-neutral)] text-[#EC7505]'
-                                                    : 'text-[var(--muted)] hover:bg-[var(--tint-neutral)] hover:text-[var(--ink)]'
+                                                    ? 'bg-[color:var(--status-primary-bg)] text-[color:var(--primary)]'
+                                                    : 'text-[color:var(--muted)] hover:bg-[color:var(--soft-surface)] hover:text-[color:var(--text)]'
                                             }`}
                                             title={isMuted ? 'Unmute notifications' : 'Mute notifications'}
                                         >
                                             {isMuted ? (
-                                                <VolumeX className="w-4 h-4 text-[#EC7505]" />
+                                                <VolumeX className="w-4 h-4 text-[color:var(--primary)]" />
                                             ) : (
                                                 <Volume2 className="w-4 h-4" />
                                             )}
@@ -1310,18 +1421,18 @@ export default function ChatIndex({
 
                                         <Link
                                             href={`/projects/${activeChat.project_id}`}
-                                            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--ink)] hover:bg-[var(--tint-neutral)] transition-colors"
+                                            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[color:var(--border)] text-xs font-bold text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors msg-interactive"
                                             aria-label="Open project page"
                                         >
                                             <span>Open project</span>
-                                            <ExternalLink className="w-3.5 h-3.5 text-[var(--muted)]" />
+                                            <ExternalLink className="w-3.5 h-3.5 text-[color:var(--muted)]" />
                                         </Link>
                                     </div>
                                 </div>
 
                                 {/* Archived Read-Only Banner */}
                                 {activeChat.is_archived && (
-                                    <div className="bg-[#FFE9A8] dark:bg-[#3A3210] border-b border-[#E1DDC6] dark:border-[#524410] px-4 py-2 text-xs font-bold text-[#8A5A00] dark:text-[#FFBB00] flex items-center justify-center gap-2">
+                                    <div className="bg-[color:var(--status-neutral-bg)] border-b border-[color:var(--status-neutral-border)] px-4 py-2 text-xs font-bold text-[color:var(--status-neutral-text)] flex items-center justify-center gap-2">
                                         <Lock className="w-3.5 h-3.5" />
                                         <span>This project is archived. Messages are read-only.</span>
                                     </div>
@@ -1329,15 +1440,15 @@ export default function ChatIndex({
 
                                 {/* One-Time History Notice (Requirement 1.3) */}
                                 {showHistoryNotice && (
-                                    <div className="bg-[var(--tint-yellow)] border-b border-[#FFE9A8] dark:border-[#524410] px-4 py-2 text-xs text-[var(--ink)] flex items-center justify-between gap-3">
+                                    <div className="bg-[color:var(--status-primary-bg)] border-b border-[color:var(--status-primary-border)] px-4 py-2 text-xs text-[color:var(--text)] flex items-center justify-between gap-3">
                                         <div className="flex items-center gap-2">
-                                            <Sparkles className="w-3.5 h-3.5 text-[#EC7505]" />
+                                            <Sparkles className="w-3.5 h-3.5 text-[color:var(--primary)]" />
                                             <span>You can see earlier messages in this chat.</span>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={handleDismissHistoryNotice}
-                                            className="text-[var(--muted)] hover:text-[var(--ink)] text-[11px] font-bold underline cursor-pointer"
+                                            className="text-[color:var(--muted)] hover:text-[color:var(--text)] text-[11px] font-bold underline cursor-pointer"
                                         >
                                             Dismiss
                                         </button>
@@ -1348,19 +1459,19 @@ export default function ChatIndex({
                                 <div
                                     ref={messagesContainerRef}
                                     onScroll={handleScroll}
-                                    className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4"
+                                    className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-4"
                                     style={{ paddingBottom: '24px' }}
                                 >
                                     {messages.length === 0 ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-center space-y-3 p-6 text-[var(--muted)]">
-                                            <div className="w-12 h-12 rounded-2xl bg-[#FFBB00]/20 text-[#EC7505] flex items-center justify-center">
+                                        <div className="h-full flex flex-col items-center justify-center text-center space-y-3 p-6 text-[color:var(--muted)]">
+                                            <div className="w-12 h-12 rounded-2xl bg-[color:var(--status-primary-bg)] text-[color:var(--primary)] flex items-center justify-center">
                                                 <MessageSquare className="w-6 h-6" />
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-sm font-bold text-[var(--ink)]">
+                                                <p className="text-sm font-bold text-[color:var(--text)]">
                                                     No messages yet
                                                 </p>
-                                                <p className="text-xs text-[var(--muted)]">
+                                                <p className="text-xs text-[color:var(--muted)]">
                                                     Say hello to your team and collaborate.
                                                 </p>
                                             </div>
@@ -1371,7 +1482,7 @@ export default function ChatIndex({
                                                 {/* Date Divider (24px margin scale) */}
                                                 {group.dateDivider && (
                                                     <div className="flex items-center justify-center my-6">
-                                                        <span className="px-3.5 py-1 rounded-full text-[11px] font-bold bg-[var(--tint-neutral)] text-[var(--muted)] shadow-xs select-none">
+                                                        <span className="px-3.5 py-1 rounded-full text-[11px] font-bold bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)] shadow-xs select-none">
                                                             {group.dateDivider}
                                                         </span>
                                                     </div>
@@ -1380,7 +1491,7 @@ export default function ChatIndex({
                                                 {/* System Message Pill */}
                                                 {group.isSystem ? (
                                                     <div className="flex justify-center my-2 animate-modal-in">
-                                                        <div className="max-w-md px-3.5 py-1 rounded-full text-xs bg-[var(--tint-neutral)] border border-[var(--border)] text-[var(--muted)] text-center font-medium shadow-xs">
+                                                        <div className="max-w-md px-3.5 py-1 rounded-full text-xs bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-[color:var(--muted)] text-center font-medium shadow-xs">
                                                             {group.items[0]?.body}
                                                         </div>
                                                     </div>
@@ -1393,19 +1504,19 @@ export default function ChatIndex({
                                                     >
                                                         {/* Avatar for other senders (Aligned to first bubble) */}
                                                         {group.senderId !== currentUserId && (
-                                                            <div className="w-8 h-8 rounded-xl bg-[#EC7505] text-[#2A2A2A] font-extrabold flex items-center justify-center text-xs shrink-0 select-none shadow-xs mt-1">
+                                                            <div className="w-8 h-8 rounded-xl bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] font-extrabold flex items-center justify-center text-xs shrink-0 select-none shadow-xs mt-1">
                                                                 {getInitials(group.sender?.name ?? 'Member')}
                                                             </div>
                                                         )}
 
                                                         <div
-                                                            className={`flex flex-col space-y-1 max-w-[75%] max-[640px]:max-w-[92%] ${
+                                                            className={`flex flex-col space-y-1 max-w-[70%] max-[640px]:max-w-[88%] ${
                                                                 group.senderId === currentUserId ? 'items-end' : 'items-start'
                                                             }`}
                                                         >
                                                             {/* Sender Name on first bubble for others */}
                                                             {group.senderId !== currentUserId && (
-                                                                <span className="text-[11px] font-bold text-[var(--muted)] px-1">
+                                                                <span className="text-[11px] font-bold text-[color:var(--muted)] px-1">
                                                                     {group.sender?.name ?? 'Teammate'}
                                                                 </span>
                                                             )}
@@ -1422,7 +1533,7 @@ export default function ChatIndex({
                                                                 return (
                                                                     <div
                                                                         key={msg.id}
-                                                                        className="relative group/msg flex flex-col"
+                                                                        className="relative group/msg flex flex-col msg-bubble-anim"
                                                                         style={{ marginTop: isFirstInGroup ? 0 : '4px' }}
                                                                     >
                                                                         <div className="flex items-center gap-1.5">
@@ -1436,14 +1547,14 @@ export default function ChatIndex({
                                                                                                 openMenuMessageId === msg.id ? null : msg.id
                                                                                             );
                                                                                         }}
-                                                                                        className="p-1 rounded-lg hover:bg-[var(--tint-neutral)] text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
+                                                                                        className="p-1 rounded-lg hover:bg-[color:var(--soft-surface)] text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer msg-interactive"
                                                                                         aria-label="Message actions"
                                                                                     >
                                                                                         <MoreVertical className="w-3.5 h-3.5" />
                                                                                     </button>
 
                                                                                     {openMenuMessageId === msg.id && (
-                                                                                        <div className="absolute right-0 bottom-full mb-1 w-32 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg p-1 z-30 animate-modal-in">
+                                                                                        <div className="absolute right-0 bottom-full mb-1 w-32 bg-[color:var(--card)] border border-[color:var(--border)] rounded-xl shadow-lg p-1 z-30 animate-modal-in">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 onClick={() => {
@@ -1462,12 +1573,12 @@ export default function ChatIndex({
 
                                                                             {/* Message Bubble */}
                                                                             <div
-                                                                                className={`px-3.5 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-2xs break-words [overflow-wrap:anywhere] ${
+                                                                                className={`px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-2xs break-words [overflow-wrap:anywhere] msg-interactive ${
                                                                                     msg.is_deleted
-                                                                                        ? 'italic bg-[var(--tint-neutral)] text-[var(--muted)] border border-[var(--border)]'
+                                                                                        ? 'italic bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)]'
                                                                                         : isMine
-                                                                                        ? 'bg-[#FFBB00] text-[#2A2A2A] font-normal rounded-tr-xs shadow-xs'
-                                                                                        : 'bg-[var(--card)] border border-[var(--border)] text-[var(--ink)] rounded-tl-xs'
+                                                                                        ? 'bg-[color:var(--primary)] text-white font-normal rounded-tr-xs shadow-xs'
+                                                                                        : 'bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-tl-xs'
                                                                                 }`}
                                                                             >
                                                                                 {msg.is_deleted ? (
@@ -1484,15 +1595,15 @@ export default function ChatIndex({
                                                                                         {/* Task Card in Chat (Section 1 & 6) */}
                                                                                         {msg.task && (
                                                                                             <div
-                                                                                                className={`border-l-4 border-[#EC7505] p-3 rounded-xl min-w-[280px] max-w-full space-y-2 mt-1 ${
+                                                                                                className={`border-l-4 border-[color:var(--primary)] p-3 rounded-xl min-w-[280px] max-w-full space-y-2 mt-1.5 ${
                                                                                                     isMine
-                                                                                                        ? 'bg-[#2A2A2A]/10 text-[#2A2A2A]'
-                                                                                                        : 'bg-[var(--tint-neutral)]/40 text-[var(--ink)]'
+                                                                                                        ? 'bg-black/10 dark:bg-white/10 text-white'
+                                                                                                        : 'bg-[color:var(--soft-surface)]/60 text-[color:var(--text)]'
                                                                                                 } ${msg.isJustCreatedTask ? 'animate-task-highlight' : ''}`}
                                                                                             >
                                                                                                 <div className="flex items-center justify-between gap-2">
                                                                                                     <div className="flex items-center gap-1.5 font-bold text-xs">
-                                                                                                        <CheckSquare className="w-4 h-4 text-[#EC7505]" />
+                                                                                                        <CheckSquare className={`w-4 h-4 ${isMine ? 'text-white' : 'text-[color:var(--primary)]'}`} />
                                                                                                         <span className="truncate">
                                                                                                             {msg.task.title}
                                                                                                         </span>
@@ -1532,7 +1643,9 @@ export default function ChatIndex({
                                                                                                 {msg.task.action_url && (
                                                                                                     <Link
                                                                                                         href={msg.task.action_url}
-                                                                                                        className="inline-flex items-center gap-1 text-[11px] font-bold text-[#EC7505] hover:underline pt-1"
+                                                                                                        className={`inline-flex items-center gap-1 text-[11px] font-bold hover:underline pt-1 ${
+                                                                                                            isMine ? 'text-white/90 underline' : 'text-[color:var(--primary)]'
+                                                                                                        }`}
                                                                                                     >
                                                                                                         <span>View task</span>
                                                                                                         <ExternalLink className="w-3 h-3" />
@@ -1547,9 +1660,13 @@ export default function ChatIndex({
                                                                                                 href={`/chat/attachments/${msg.id}`}
                                                                                                 target="_blank"
                                                                                                 rel="noopener noreferrer"
-                                                                                                className="mt-1 flex items-center gap-2 p-2 rounded-xl bg-black/5 dark:bg-white/10 hover:bg-black/10 transition-colors"
+                                                                                                className={`mt-1.5 flex items-center gap-2 p-2 rounded-xl transition-colors ${
+                                                                                                    isMine
+                                                                                                        ? 'bg-black/10 dark:bg-white/10 text-white hover:bg-black/20'
+                                                                                                        : 'bg-[color:var(--soft-surface)] text-[color:var(--text)] hover:bg-[color:var(--border)]/50'
+                                                                                                }`}
                                                                                             >
-                                                                                                <FileText className="w-4 h-4 text-[#EC7505] shrink-0" />
+                                                                                                <FileText className={`w-4 h-4 shrink-0 ${isMine ? 'text-white' : 'text-[color:var(--primary)]'}`} />
                                                                                                 <span className="text-xs font-semibold truncate underline">
                                                                                                     {msg.attachment_name}
                                                                                                 </span>
@@ -1570,14 +1687,14 @@ export default function ChatIndex({
                                                                                                 openMenuMessageId === msg.id ? null : msg.id
                                                                                             );
                                                                                         }}
-                                                                                        className="p-1 rounded-lg hover:bg-[var(--tint-neutral)] text-[var(--muted)] hover:text-[var(--ink)] cursor-pointer"
+                                                                                        className="p-1 rounded-lg hover:bg-[color:var(--soft-surface)] text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer msg-interactive"
                                                                                         aria-label="Message actions"
                                                                                     >
                                                                                         <MoreVertical className="w-3.5 h-3.5" />
                                                                                     </button>
 
                                                                                     {openMenuMessageId === msg.id && (
-                                                                                        <div className="absolute left-0 bottom-full mb-1 w-32 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg p-1 z-30 animate-modal-in">
+                                                                                        <div className="absolute left-0 bottom-full mb-1 w-32 bg-[color:var(--card)] border border-[color:var(--border)] rounded-xl shadow-lg p-1 z-30 animate-modal-in">
                                                                                             <button
                                                                                                 type="button"
                                                                                                 onClick={() => {
@@ -1598,7 +1715,7 @@ export default function ChatIndex({
                                                                         {/* Timestamp and Read Receipts (4px below bubble) */}
                                                                         {isLastInGroup && (
                                                                             <div
-                                                                                className={`flex items-center gap-2 mt-1 text-[11px] text-[var(--muted)] px-1 ${
+                                                                                className={`flex items-center gap-2 mt-1 text-[11px] text-[color:var(--muted)] px-1 ${
                                                                                     isMine ? 'justify-end' : 'justify-start'
                                                                                 }`}
                                                                             >
@@ -1632,12 +1749,12 @@ export default function ChatIndex({
 
                                     {/* Typing Indicator */}
                                     {typingLabel && (
-                                        <div className="flex items-center gap-2 text-xs text-[var(--muted)] italic pt-1 animate-modal-in">
-                                            <div className="flex items-center gap-1 py-1 px-2.5 rounded-full bg-[var(--tint-neutral)] border border-[var(--border)]">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-[#EC7505] typing-dot-1" />
-                                                <span className="w-1.5 h-1.5 rounded-full bg-[#EC7505] typing-dot-2" />
-                                                <span className="w-1.5 h-1.5 rounded-full bg-[#EC7505] typing-dot-3" />
-                                                <span className="ml-1 text-[11px] font-medium text-[var(--ink)]">
+                                        <div className="flex items-center gap-2 text-xs text-[color:var(--muted)] italic pt-1 animate-modal-in">
+                                            <div className="flex items-center gap-1.5 py-1 px-3 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] shadow-xs">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--primary)] msg-typing-dot-1" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--primary)] msg-typing-dot-2" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--primary)] msg-typing-dot-3" />
+                                                <span className="ml-1 text-[11px] font-medium text-[color:var(--text)]">
                                                     {typingLabel}
                                                 </span>
                                             </div>
@@ -1652,7 +1769,7 @@ export default function ChatIndex({
                                     <button
                                         type="button"
                                         onClick={() => scrollToBottom('smooth')}
-                                        className="absolute bottom-24 right-8 z-20 px-3.5 py-1.5 rounded-full bg-[#FFBB00] text-[#2A2A2A] text-xs font-extrabold shadow-lg flex items-center gap-1.5 animate-modal-in cursor-pointer hover:scale-105 transition-transform"
+                                        className="msg-float-pill absolute bottom-24 right-8 z-20 px-3.5 py-1.5 rounded-full bg-[color:var(--primary)] text-white text-xs font-extrabold shadow-lg flex items-center gap-1.5 cursor-pointer hover:scale-105 transition-transform msg-interactive"
                                     >
                                         <span>New messages</span>
                                         <ArrowDown className="w-3.5 h-3.5" />
@@ -1660,14 +1777,44 @@ export default function ChatIndex({
                                 )}
 
                                 {/* ── Composer Area (Requirement 2 & 6) ── */}
-                                <div className="p-3 sm:p-4 border-t border-[var(--border)] bg-[var(--card)] shrink-0 space-y-2.5">
+                                <div className="p-3 sm:p-4 border-t border-[color:var(--border)] bg-[color:var(--card)] shrink-0 space-y-2.5">
+                                    {/* Send Error / Retry Banner */}
+                                    {sendError && (
+                                        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs animate-modal-in">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <AlertCircle className="w-4 h-4 shrink-0" />
+                                                <span className="truncate">{sendError}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const retryText = failedMessageText || messageText;
+                                                        handleSendMessage(retryText);
+                                                    }}
+                                                    className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] cursor-pointer msg-interactive"
+                                                >
+                                                    Retry
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSendError(null)}
+                                                    className="p-1 hover:opacity-70 cursor-pointer"
+                                                    aria-label="Dismiss error"
+                                                >
+                                                    <X className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Dashed pill quick actions */}
                                     {!activeChat.is_archived && (
                                         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
                                             <button
                                                 type="button"
                                                 onClick={() => setIsCreateTaskModalOpen(true)}
-                                                className="px-3 py-1 rounded-full border border-dashed border-[#EC7505] text-[#EC7505] bg-[#EC7505]/5 hover:bg-[#EC7505]/10 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                                                className="px-3 py-1 rounded-full border border-dashed border-[color:var(--primary)] text-[color:var(--primary)] bg-[color:var(--status-primary-bg)] hover:opacity-90 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 msg-interactive"
                                             >
                                                 <CheckSquare className="w-3.5 h-3.5" />
                                                 <span>Create task from message</span>
@@ -1676,7 +1823,7 @@ export default function ChatIndex({
                                             <button
                                                 type="button"
                                                 onClick={() => fileInputRef.current?.click()}
-                                                className="px-3 py-1 rounded-full border border-dashed border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--ink)] bg-[var(--tint-neutral)]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                                                className="px-3 py-1 rounded-full border border-dashed border-[color:var(--border)] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:border-[color:var(--text)] bg-[color:var(--soft-surface)]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 msg-interactive"
                                             >
                                                 <Paperclip className="w-3.5 h-3.5" />
                                                 <span>Share file</span>
@@ -1690,7 +1837,7 @@ export default function ChatIndex({
                                                     );
                                                     textareaRef.current?.focus();
                                                 }}
-                                                className="px-3 py-1 rounded-full border border-dashed border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--ink)] bg-[var(--tint-neutral)]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                                                className="px-3 py-1 rounded-full border border-dashed border-[color:var(--border)] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:border-[color:var(--text)] bg-[color:var(--soft-surface)]/40 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 msg-interactive"
                                             >
                                                 <Calendar className="w-3.5 h-3.5" />
                                                 <span>Schedule meeting</span>
@@ -1700,10 +1847,10 @@ export default function ChatIndex({
 
                                     {/* Selected file preview pill */}
                                     {selectedFile && (
-                                        <div className="flex items-center gap-2 p-2 rounded-xl bg-[var(--tint-neutral)] border border-[var(--border)] text-xs font-semibold text-[var(--ink)]">
-                                            <FileText className="w-4 h-4 text-[#EC7505]" />
+                                        <div className="flex items-center gap-2 p-2 rounded-xl bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-xs font-semibold text-[color:var(--text)]">
+                                            <FileText className="w-4 h-4 text-[color:var(--primary)]" />
                                             <span className="truncate flex-1">{selectedFile.name}</span>
-                                            <span className="text-[10px] text-[var(--muted)]">
+                                            <span className="text-[10px] text-[color:var(--muted)]">
                                                 {(selectedFile.size / 1024).toFixed(0)} KB
                                             </span>
                                             <button
@@ -1712,7 +1859,7 @@ export default function ChatIndex({
                                                     setSelectedFile(null);
                                                     if (fileInputRef.current) fileInputRef.current.value = '';
                                                 }}
-                                                className="p-1 text-[var(--muted)] hover:text-red-500 cursor-pointer"
+                                                className="p-1 text-[color:var(--muted)] hover:text-red-500 cursor-pointer msg-interactive"
                                                 aria-label="Remove attachment"
                                             >
                                                 <X className="w-3.5 h-3.5" />
@@ -1722,8 +1869,8 @@ export default function ChatIndex({
 
                                     {/* @ Mentions suggestions popover */}
                                     {mentionFilter !== null && mentionSuggestions.length > 0 && (
-                                        <div className="p-1 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-xl max-h-40 overflow-y-auto z-20 space-y-0.5">
-                                            <p className="px-2 py-1 text-[10px] font-bold uppercase text-[var(--muted)]">
+                                        <div className="p-1 rounded-xl bg-[color:var(--card)] border border-[color:var(--border)] shadow-xl max-h-40 overflow-y-auto z-20 space-y-0.5">
+                                            <p className="px-2 py-1 text-[10px] font-bold uppercase text-[color:var(--muted)]">
                                                 Mention project member
                                             </p>
                                             {mentionSuggestions.map((m, idx) => (
@@ -1731,10 +1878,10 @@ export default function ChatIndex({
                                                     key={m.id}
                                                     type="button"
                                                     onClick={() => handleSelectMention(m.name)}
-                                                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left cursor-pointer transition-colors ${
+                                                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left cursor-pointer transition-colors msg-interactive ${
                                                         idx === selectedMentionIndex
-                                                            ? 'bg-[#FFBB00] text-[#2A2A2A] font-bold'
-                                                            : 'hover:bg-[var(--tint-neutral)] text-[var(--ink)]'
+                                                            ? 'bg-[color:var(--primary)] text-white font-bold'
+                                                            : 'hover:bg-[color:var(--soft-surface)] text-[color:var(--text)]'
                                                     }`}
                                                 >
                                                     <Avatar className="w-5 h-5 text-[9px] font-black">
@@ -1743,6 +1890,20 @@ export default function ChatIndex({
                                                     <span className="truncate">{m.name}</span>
                                                 </button>
                                             ))}
+                                        </div>
+                                    )}
+
+                                    {/* Live Typing Status Pill above Input */}
+                                    {typingLabel && (
+                                        <div className="flex items-center gap-2 px-1 text-xs animate-modal-in select-none">
+                                            <div className="flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--primary)] msg-typing-dot-1" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--primary)] msg-typing-dot-2" />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[color:var(--primary)] msg-typing-dot-3" />
+                                            </div>
+                                            <span className="italic text-[11px] font-bold text-[color:var(--primary)]">
+                                                {typingLabel}
+                                            </span>
                                         </div>
                                     )}
 
@@ -1764,14 +1925,14 @@ export default function ChatIndex({
                                             type="button"
                                             onClick={() => fileInputRef.current?.click()}
                                             disabled={activeChat.is_archived}
-                                            className="p-2.5 rounded-xl border border-[var(--border)] bg-[var(--tint-neutral)] hover:bg-[var(--card)] text-[var(--muted)] hover:text-[var(--ink)] transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                                            className="msg-touch-target p-2.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:bg-[color:var(--card)] text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors cursor-pointer disabled:opacity-50 shrink-0 msg-interactive"
                                             aria-label="Attach file"
                                             title="Attach file"
                                         >
                                             <Paperclip className="w-4 h-4" />
                                         </button>
 
-                                        <div className="flex-1 relative rounded-xl border border-[var(--border)] bg-[var(--tint-neutral)]/40 focus-within:border-[#EC7505] focus-within:bg-[var(--card)] transition-colors">
+                                        <div className="flex-1 relative rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)]/50 focus-within:border-[color:var(--primary)] focus-within:bg-[color:var(--card)] transition-colors">
                                             <textarea
                                                 ref={textareaRef}
                                                 rows={1}
@@ -1789,7 +1950,7 @@ export default function ChatIndex({
                                                         ? 'This project is archived. Messages are read-only.'
                                                         : 'Write a message. Use @ to mention someone'
                                                 }
-                                                className="w-full px-3.5 py-2.5 text-xs bg-transparent text-[var(--ink)] outline-none resize-none leading-relaxed placeholder:text-[var(--muted)] disabled:opacity-50"
+                                                className="w-full px-3.5 py-2.5 text-xs bg-transparent text-[color:var(--text)] outline-none resize-none leading-relaxed placeholder:text-[color:var(--muted)] disabled:opacity-50"
                                                 style={{ maxHeight: '120px' }}
                                                 aria-label="Message input"
                                             />
@@ -1803,14 +1964,14 @@ export default function ChatIndex({
                                                 textareaRef.current?.focus();
                                             }}
                                             disabled={activeChat.is_archived}
-                                            className="p-2.5 rounded-xl border border-[var(--border)] bg-[var(--tint-neutral)] hover:bg-[var(--card)] text-[var(--muted)] hover:text-[var(--ink)] transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                                            className="msg-touch-target p-2.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:bg-[color:var(--card)] text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors cursor-pointer disabled:opacity-50 shrink-0 msg-interactive"
                                             aria-label="Insert thumbs up emoji"
                                             title="Quick emoji"
                                         >
                                             <Smile className="w-4 h-4" />
                                         </button>
 
-                                        {/* Orange Send Button */}
+                                        {/* Send Button */}
                                         <button
                                             type="button"
                                             onClick={() => handleSendMessage()}
@@ -1819,7 +1980,7 @@ export default function ChatIndex({
                                                 isSending ||
                                                 (!messageText.trim() && !selectedFile)
                                             }
-                                            className="p-2.5 rounded-xl bg-[#EC7505] hover:bg-[#D96904] active:bg-[#C25D03] text-[#2A2A2A] font-extrabold shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                                            className="msg-touch-target p-2.5 rounded-xl bg-[color:var(--primary)] hover:opacity-90 active:scale-95 text-white font-extrabold shadow-sm transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0 msg-interactive"
                                             aria-label="Send message"
                                             title="Send message (Enter)"
                                         >
@@ -1830,15 +1991,15 @@ export default function ChatIndex({
                             </>
                         ) : (
                             /* Empty Selection State */
-                            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-3 text-[var(--muted)]">
-                                <div className="w-14 h-14 rounded-2xl bg-[#FFBB00]/20 text-[#EC7505] flex items-center justify-center">
+                            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-3 text-[color:var(--muted)]">
+                                <div className="w-14 h-14 rounded-2xl bg-[color:var(--status-primary-bg)] text-[color:var(--primary)] flex items-center justify-center shadow-xs">
                                     <MessageSquare className="w-7 h-7" />
                                 </div>
                                 <div className="space-y-1 max-w-sm">
-                                    <h2 className="text-base font-bold text-[var(--ink)]">
+                                    <h2 className="text-base font-bold text-[color:var(--text)]">
                                         Select a project chat
                                     </h2>
-                                    <p className="text-xs text-[var(--muted)] leading-relaxed">
+                                    <p className="text-xs text-[color:var(--muted)] leading-relaxed">
                                         Choose an existing project chat from the left pane to collaborate with your team.
                                     </p>
                                 </div>
@@ -1847,19 +2008,19 @@ export default function ChatIndex({
                     </div>
 
                     {/* ─────────────────────────────────────────────────────────────
-                       PANE 3: DETAILS PANEL (290px fixed, hidden below 1250px)
+                       PANE 3: DETAILS PANEL (300px fixed, hidden below 1250px)
                        ───────────────────────────────────────────────────────────── */}
                     {activeChat && (
                         <div
-                            className="hidden min-[1250px]:flex w-[290px] shrink-0 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm flex-col overflow-hidden select-none"
+                            className="hidden min-[1250px]:flex w-[300px] shrink-0 border-l border-[color:var(--border)] flex-col h-full bg-[color:var(--card)] overflow-hidden select-none"
                             aria-label="Project details"
                         >
                             {/* Panel Header */}
-                            <div className="p-4 border-b border-[var(--border)] shrink-0 space-y-2">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                            <div className="p-4 border-b border-[color:var(--border)] shrink-0 space-y-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
                                     Project Details
                                 </span>
-                                <h3 className="text-sm font-extrabold text-[var(--ink)] truncate">
+                                <h3 className="text-sm font-extrabold text-[color:var(--text)] truncate">
                                     {activeChat.title}
                                 </h3>
 
@@ -1867,18 +2028,18 @@ export default function ChatIndex({
                                 {activeChat.project && (
                                     <div className="space-y-1.5 pt-1">
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="font-semibold text-[var(--muted)]">Progress</span>
-                                            <span className="font-black text-[#EC7505]">
+                                            <span className="font-semibold text-[color:var(--muted)]">Progress</span>
+                                            <span className="font-black text-[color:var(--primary)]">
                                                 {activeChat.project.progress}%
                                             </span>
                                         </div>
-                                        <div className="h-2 w-full rounded-full bg-[var(--tint-neutral)] overflow-hidden">
+                                        <div className="h-2 w-full rounded-full bg-[color:var(--soft-surface)] overflow-hidden">
                                             <div
-                                                className="h-full bg-[#EC7505] rounded-full transition-all duration-300"
+                                                className="h-full bg-[color:var(--primary)] rounded-full transition-all duration-300"
                                                 style={{ width: `${activeChat.project.progress}%` }}
                                             />
                                         </div>
-                                        <p className="text-[10px] text-[var(--muted)]">
+                                        <p className="text-[10px] text-[color:var(--muted)]">
                                             {activeChat.project.completed_tasks ?? 0} of {activeChat.project.total_tasks ?? 0} tasks completed
                                         </p>
                                     </div>
@@ -1886,11 +2047,11 @@ export default function ChatIndex({
                             </div>
 
                             {/* Panel Body: Members, Shared Files, Pinned Tasks */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-5 text-xs">
+                            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-5 text-xs">
                                 {/* Members Section */}
                                 <div className="space-y-2.5">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-bold text-[var(--ink)] uppercase tracking-wider">
+                                        <span className="text-[11px] font-bold text-[color:var(--text)] uppercase tracking-wider">
                                             Members ({participants.length})
                                         </span>
 
@@ -1898,7 +2059,7 @@ export default function ChatIndex({
                                         {activeChat.is_leader && (
                                             <Link
                                                 href={`/projects/${activeChat.project_id}?tab=personnel`}
-                                                className="text-[10px] font-bold text-[#EC7505] hover:underline"
+                                                className="text-[10px] font-bold text-[color:var(--primary)] hover:underline"
                                             >
                                                 Manage
                                             </Link>
@@ -1909,17 +2070,17 @@ export default function ChatIndex({
                                         {participants.map((member) => (
                                             <div
                                                 key={member.id}
-                                                className="flex items-center justify-between gap-2 p-1.5 rounded-xl hover:bg-[var(--tint-neutral)]/50 transition-colors"
+                                                className="flex items-center justify-between gap-2 p-1.5 rounded-xl hover:bg-[color:var(--soft-surface)]/50 transition-colors msg-interactive"
                                             >
                                                 <div className="flex items-center gap-2 min-w-0">
-                                                    <div className="w-7 h-7 rounded-lg bg-[#FFBB00] text-[#2A2A2A] font-bold flex items-center justify-center text-xs shrink-0">
+                                                    <div className="w-7 h-7 rounded-lg bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] font-bold flex items-center justify-center text-xs shrink-0">
                                                         {getInitials(member.name)}
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="font-bold text-[var(--ink)] truncate leading-snug">
+                                                        <p className="font-bold text-[color:var(--text)] truncate leading-snug">
                                                             {member.name}
                                                         </p>
-                                                        <p className="text-[10px] text-[var(--muted)] truncate">
+                                                        <p className="text-[10px] text-[color:var(--muted)] truncate">
                                                             {member.role || 'Member'}
                                                         </p>
                                                     </div>
@@ -1935,8 +2096,8 @@ export default function ChatIndex({
                                 </div>
 
                                 {/* Shared Files Section */}
-                                <div className="space-y-2.5 pt-3 border-t border-[var(--border)]">
-                                    <span className="text-[11px] font-bold text-[var(--ink)] uppercase tracking-wider">
+                                <div className="space-y-2.5 pt-3 border-t border-[color:var(--border)]">
+                                    <span className="text-[11px] font-bold text-[color:var(--text)] uppercase tracking-wider">
                                         Shared Files ({activeChat.shared_files?.length ?? 0})
                                     </span>
 
@@ -1948,28 +2109,28 @@ export default function ChatIndex({
                                                     href={file.download_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[var(--tint-neutral)]/50 hover:bg-[var(--tint-neutral)] text-[var(--ink)] transition-colors"
+                                                    className="flex items-center justify-between gap-2 p-2 rounded-xl bg-[color:var(--soft-surface)]/50 hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] transition-colors msg-interactive"
                                                 >
                                                     <div className="flex items-center gap-2 min-w-0">
-                                                        <FileText className="w-3.5 h-3.5 text-[#EC7505] shrink-0" />
+                                                        <FileText className="w-3.5 h-3.5 text-[color:var(--primary)] shrink-0" />
                                                         <span className="truncate font-medium text-xs">
                                                             {file.name}
                                                         </span>
                                                     </div>
-                                                    <Download className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" />
+                                                    <Download className="w-3.5 h-3.5 text-[color:var(--muted)] shrink-0" />
                                                 </a>
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-[11px] text-[var(--muted)] italic">
+                                        <p className="text-[11px] text-[color:var(--muted)] italic">
                                             No shared files yet.
                                         </p>
                                     )}
                                 </div>
 
                                 {/* Pinned Tasks Section */}
-                                <div className="space-y-2.5 pt-3 border-t border-[var(--border)]">
-                                    <span className="text-[11px] font-bold text-[var(--ink)] uppercase tracking-wider">
+                                <div className="space-y-2.5 pt-3 border-t border-[color:var(--border)]">
+                                    <span className="text-[11px] font-bold text-[color:var(--text)] uppercase tracking-wider">
                                         Pinned Tasks ({activeChat.pinned_tasks?.length ?? 0})
                                     </span>
 
@@ -1979,14 +2140,14 @@ export default function ChatIndex({
                                                 <Link
                                                     key={task.id}
                                                     href={task.action_url}
-                                                    className="block p-2.5 rounded-xl border border-[var(--border)] bg-[var(--tint-neutral)]/30 hover:bg-[var(--tint-neutral)]/60 transition-colors space-y-1"
+                                                    className="block p-2.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)]/30 hover:bg-[color:var(--soft-surface)]/60 transition-colors space-y-1 msg-interactive"
                                                 >
-                                                    <p className="font-bold text-[var(--ink)] truncate">
+                                                    <p className="font-bold text-[color:var(--text)] truncate">
                                                         {task.title}
                                                     </p>
-                                                    <div className="flex items-center justify-between text-[10px] text-[var(--muted)]">
+                                                    <div className="flex items-center justify-between text-[10px] text-[color:var(--muted)]">
                                                         <span>Due {task.due_date_formatted}</span>
-                                                        <span className="font-semibold text-[#EC7505]">
+                                                        <span className="font-semibold text-[color:var(--primary)]">
                                                             {task.status}
                                                         </span>
                                                     </div>
@@ -1994,7 +2155,7 @@ export default function ChatIndex({
                                             ))}
                                         </div>
                                     ) : (
-                                        <p className="text-[11px] text-[var(--muted)] italic">
+                                        <p className="text-[11px] text-[color:var(--muted)] italic">
                                             No pinned tasks.
                                         </p>
                                     )}
@@ -2003,7 +2164,6 @@ export default function ChatIndex({
                         </div>
                     )}
                 </div>
-            </div>
 
             {/* ══ Modals & Overlays ════════════════════════════════════════════ */}
 

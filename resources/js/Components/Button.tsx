@@ -1,26 +1,27 @@
-import React, { ButtonHTMLAttributes, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
+import { motion, HTMLMotionProps } from 'motion/react';
 import { ButtonVariant, ButtonSize } from '@/types';
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
     variant?: ButtonVariant;
     size?: ButtonSize;
     isLoading?: boolean;
     leftIcon?: React.ReactNode;
     rightIcon?: React.ReactNode;
+    children?: React.ReactNode;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-    // Primary: main action button using accessible --primary-btn with white text (WCAG AA > 4.5:1)
     primary:
-        'bg-[color:var(--primary-btn)] hover:opacity-90 active:scale-[0.99] text-white font-semibold border border-transparent',
+        'bg-[color:var(--primary-btn)] hover:opacity-90 text-white font-semibold border border-transparent',
     secondary:
-        'bg-[color:var(--soft-surface)] hover:bg-[color:color-mix(in_srgb,var(--text)_9%,var(--background))] active:scale-[0.99] text-[color:var(--text)] border border-[color:var(--border)] font-medium',
+        'bg-[color:var(--soft-surface)] hover:bg-[color:color-mix(in_srgb,var(--text)_9%,var(--background))] text-[color:var(--text)] border border-[color:var(--border)] font-medium',
     outline:
-        'bg-transparent hover:bg-[color:var(--soft-surface)] active:scale-[0.99] text-[color:var(--text)] border border-[color:var(--border)] font-medium',
+        'bg-transparent hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] font-medium',
     danger:
-        'bg-[color:var(--primary)] hover:opacity-90 active:scale-[0.99] text-white font-semibold border border-transparent',
+        'bg-[color:var(--primary)] hover:opacity-90 text-white font-semibold border border-transparent',
     ghost:
-        'bg-transparent hover:bg-[color:var(--soft-surface)] active:scale-[0.99] text-[color:var(--text)] border border-transparent font-medium',
+        'bg-transparent hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-transparent font-medium',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -40,17 +41,30 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             rightIcon,
             children,
             className = '',
+            whileHover,
+            whileTap,
             ...props
         },
         ref
     ) => {
         const isDisabled = disabled || isLoading;
 
+        const defaultHover = !isDisabled
+            ? variant === 'primary'
+                ? { scale: 1.02 }
+                : { scale: 1.01 }
+            : undefined;
+
+        const defaultTap = !isDisabled ? { scale: 0.98 } : undefined;
+
         return (
-            <button
+            <motion.button
                 ref={ref}
                 disabled={isDisabled}
-                className={`inline-flex items-center justify-center transition-all duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+                whileHover={whileHover !== undefined ? whileHover : defaultHover}
+                whileTap={whileTap !== undefined ? whileTap : defaultTap}
+                transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+                className={`inline-flex items-center justify-center transition-colors duration-150 select-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
                 {...props}
             >
                 {isLoading ? (
@@ -81,7 +95,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 {!isLoading && rightIcon && (
                     <span className="inline-flex shrink-0 items-center justify-center">{rightIcon}</span>
                 )}
-            </button>
+            </motion.button>
         );
     }
 );

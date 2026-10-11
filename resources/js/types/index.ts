@@ -3,6 +3,7 @@ export interface User {
     name: string;
     email: string;
     email_verified_at: string | null;
+    is_admin?: boolean;
     created_at?: string;
     updated_at?: string;
 }
@@ -22,6 +23,12 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         unread_count: number;
         recent: NotificationItem[];
     };
+    primaryRole?: 'Project Leader' | 'Project Staff' | 'Project Member' | string;
+    userRoles?: ('Project Leader' | 'Project Staff' | 'Project Member' | string)[];
+    active_projects_count?: number;
+    pending_reviews_count?: number;
+    my_tasks_count?: number;
+    unread_messages_count?: number;
 };
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
@@ -58,6 +65,56 @@ export interface NotificationItem {
     read_at: string | null;
     created_at: string;
     created_at_human?: string;
+    // Section 3 modular model compatibility fields
+    title?: string;
+    message?: string;
+    read?: boolean;
+    timestamp?: string;
+    projectId?: string | number;
+}
+
+// ─── Section 3 Canonical Data Models ──────────────────────────────────────────
+
+export interface Task {
+    id: string | number;
+    title: string;
+    description?: string | null;
+    projectId?: string | number;
+    projectName?: string;
+    committeeName?: string;
+    activityName?: string;
+    dueDate?: string | null;
+    status: string;
+    priority?: string;
+    isOverdue?: boolean;
+}
+
+export interface Project {
+    id: string | number;
+    title: string;
+    code?: string;
+    description?: string;
+    role?: string;
+    status: string;
+    progress: number;
+    committeesCount: number;
+    tasksCount: number;
+    deadline?: string | null;
+    leader?: { id: number; name: string; email?: string } | null;
+    members?: Array<{ id: number; name: string; email?: string; role?: string }>;
+    committees?: any[];
+    files?: any[];
+}
+
+export interface ChatMessage {
+    id: string | number;
+    projectId?: string | number;
+    senderId?: string | number | null;
+    senderName?: string;
+    senderInitials?: string;
+    text: string;
+    timestamp: string;
+    isSystem?: boolean;
 }
 
 export interface DashboardProject {

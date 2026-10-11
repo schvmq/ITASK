@@ -89,7 +89,7 @@ export function DeleteMessageModal({
                 aria-modal="true"
                 aria-labelledby="delete-dialog-title"
                 aria-describedby="delete-dialog-desc"
-                className="w-full max-w-md bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-5 space-y-4 animate-modal-in"
+                className="messaging-root w-full max-w-md bg-[color:var(--card)] border border-[color:var(--border)] rounded-2xl shadow-2xl p-5 space-y-4 animate-modal-in select-none"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-start gap-3">
@@ -97,22 +97,22 @@ export function DeleteMessageModal({
                         <Trash2 className="w-5 h-5" />
                     </div>
                     <div className="space-y-1 flex-1">
-                        <h3 id="delete-dialog-title" className="text-base font-bold text-[var(--ink)]">
+                        <h3 id="delete-dialog-title" className="text-base font-bold text-[color:var(--text)]">
                             Delete this message?
                         </h3>
-                        <p id="delete-dialog-desc" className="text-xs text-[var(--muted)] leading-relaxed">
-                            Everyone in this chat will no longer see it.
+                        <p id="delete-dialog-desc" className="text-xs text-[color:var(--muted)] leading-relaxed">
+                            Everyone in this group chat will no longer see it.
                         </p>
                     </div>
                 </div>
 
                 {/* Important notice if message contains a shared task card */}
                 {hasTaskCard && (
-                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[var(--tint-yellow)] border border-[#FFE9A8] dark:border-[#524410] text-[var(--ink)] text-xs">
-                        <CheckSquare className="w-4 h-4 text-[#8A5A00] dark:text-[#FFBB00] shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-[color:var(--text)] text-xs">
+                        <CheckSquare className="w-4 h-4 text-[color:var(--primary)] shrink-0 mt-0.5" />
                         <div className="space-y-0.5">
                             <span className="font-bold">Task preserved:</span>
-                            <p className="text-[11px] text-[var(--muted)]">
+                            <p className="text-[11px] text-[color:var(--muted)]">
                                 The task will stay in My Tasks and will not be deleted.
                             </p>
                         </div>
@@ -125,7 +125,7 @@ export function DeleteMessageModal({
                         type="button"
                         onClick={onClose}
                         disabled={isDeleting}
-                        className="px-4 py-2 rounded-xl text-xs font-bold border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--tint-neutral)] text-[var(--ink)] transition-colors cursor-pointer disabled:opacity-50 btn-press"
+                        className="px-4 py-2 rounded-xl text-xs font-bold border border-[color:var(--border)] bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] transition-colors cursor-pointer disabled:opacity-50 msg-interactive"
                     >
                         Cancel
                     </button>
@@ -134,7 +134,7 @@ export function DeleteMessageModal({
                         type="button"
                         onClick={onConfirm}
                         disabled={isDeleting}
-                        className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 btn-press"
+                        className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 msg-interactive"
                     >
                         {isDeleting ? (
                             <span>Deleting...</span>

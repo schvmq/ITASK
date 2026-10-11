@@ -16,6 +16,7 @@ use App\Notifications\TaskAssignedNotification;
 use App\Notifications\TaskReviewedNotification;
 use App\Notifications\TaskSubmittedForReviewNotification;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class TaskController extends Controller
@@ -148,29 +149,31 @@ class TaskController extends Controller
         // 2. Authorize
         Gate::authorize('submitReview', $task);
 
-        $task->update([
-            'status' => Task::STATUS_UNDER_REVIEW,
-        ]);
+        DB::transaction(function () use ($task, $committee, $activity, $project, $request) {
+            $task->update([
+                'status' => Task::STATUS_UNDER_REVIEW,
+            ]);
 
-        // Notify committee staff reviewer(s)
-        $staffUsers = $committee->roleAssignments()
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-            ->with('user')
-            ->get()
-            ->pluck('user')
-            ->filter();
+            // Notify committee staff reviewer(s)
+            $staffUsers = $committee->roleAssignments()
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+                ->with('user')
+                ->get()
+                ->pluck('user')
+                ->filter();
 
-        foreach ($staffUsers as $staff) {
-            if ($staff->id !== $request->user()->id) {
-                $staff->notify(new TaskSubmittedForReviewNotification(
-                    $task,
-                    $activity,
-                    $committee,
-                    $project,
-                    $request->user()
-                ));
+            foreach ($staffUsers as $staff) {
+                if ($staff->id !== $request->user()->id) {
+                    $staff->notify(new TaskSubmittedForReviewNotification(
+                        $task,
+                        $activity,
+                        $committee,
+                        $project,
+                        $request->user()
+                    ));
+                }
             }
-        }
+        });
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
@@ -200,22 +203,24 @@ class TaskController extends Controller
         // 2. Authorize
         Gate::authorize('review', $task);
 
-        $task->update([
-            'status' => Task::STATUS_COMPLETED,
-        ]);
+        DB::transaction(function () use ($task, $activity, $committee, $project, $request) {
+            $task->update([
+                'status' => Task::STATUS_COMPLETED,
+            ]);
 
-        // Notify assigned member
-        if ($task->assigned_to && $task->assignee && $task->assignee->id !== $request->user()->id) {
-            $task->assignee->notify(new TaskReviewedNotification(
-                $task,
-                $activity,
-                $committee,
-                $project,
-                $request->user(),
-                Task::STATUS_COMPLETED,
-                null
-            ));
-        }
+            // Notify assigned member
+            if ($task->assigned_to && $task->assignee && $task->assignee->id !== $request->user()->id) {
+                $task->assignee->notify(new TaskReviewedNotification(
+                    $task,
+                    $activity,
+                    $committee,
+                    $project,
+                    $request->user(),
+                    Task::STATUS_COMPLETED,
+                    null
+                ));
+            }
+        });
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
@@ -247,22 +252,24 @@ class TaskController extends Controller
 
         $feedback = $request->validated('review_feedback');
 
-        $task->update([
-            'status' => Task::STATUS_RETURNED,
-        ]);
+        DB::transaction(function () use ($task, $feedback, $activity, $committee, $project, $request) {
+            $task->update([
+                'status' => Task::STATUS_RETURNED,
+            ]);
 
-        // Notify assigned member with review feedback
-        if ($task->assigned_to && $task->assignee && $task->assignee->id !== $request->user()->id) {
-            $task->assignee->notify(new TaskReviewedNotification(
-                $task,
-                $activity,
-                $committee,
-                $project,
-                $request->user(),
-                Task::STATUS_RETURNED,
-                $feedback
-            ));
-        }
+            // Notify assigned member with review feedback
+            if ($task->assigned_to && $task->assignee && $task->assignee->id !== $request->user()->id) {
+                $task->assignee->notify(new TaskReviewedNotification(
+                    $task,
+                    $activity,
+                    $committee,
+                    $project,
+                    $request->user(),
+                    Task::STATUS_RETURNED,
+                    $feedback
+                ));
+            }
+        });
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,
@@ -292,9 +299,11 @@ class TaskController extends Controller
         // 2. Authorize
         Gate::authorize('resubmit', $task);
 
-        $task->update([
-            'status' => Task::STATUS_IN_PROGRESS,
-        ]);
+        DB::transaction(function () use ($task) {
+            $task->update([
+                'status' => Task::STATUS_IN_PROGRESS,
+            ]);
+        });
 
         return redirect()->route('projects.committees.activities.show', [
             'project' => $project->id,

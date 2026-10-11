@@ -97,6 +97,10 @@ class ProjectController extends Controller
      */
     public function store(StoreProjectRequest $request): RedirectResponse
     {
+        if ($request->user()->isAdmin()) {
+            abort(403, 'Administrators cannot create projects. Administrator accounts are restricted to system administration.');
+        }
+
         $file = $request->file('approval_document');
         $storedFilePath = null;
 

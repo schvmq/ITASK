@@ -76,4 +76,19 @@ class Activity extends Model
     {
         return $this->hasMany(Task::class);
     }
+
+    protected static function booted(): void
+    {
+        static::saved(function (Activity $activity) {
+            if ($activity->project_id) {
+                \App\Services\ProjectProgressService::clearProjectProgressCache($activity->project_id);
+            }
+        });
+
+        static::deleted(function (Activity $activity) {
+            if ($activity->project_id) {
+                \App\Services\ProjectProgressService::clearProjectProgressCache($activity->project_id);
+            }
+        });
+    }
 }

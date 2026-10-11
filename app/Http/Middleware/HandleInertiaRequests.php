@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $request->user()->name,
                     'email' => $request->user()->email,
                     'email_verified_at' => $request->user()->email_verified_at,
+                    'is_admin' => (bool) $request->user()->is_admin,
                 ] : null,
             ],
             'flash' => [
@@ -108,6 +109,57 @@ class HandleInertiaRequests extends Middleware
                 })
                 ->where('status', '!=', \App\Models\Task::STATUS_COMPLETED)
                 ->count() : 0,
+            'primaryRole' => $request->user() ? (function () use ($request) {
+                $user = $request->user();
+                $userId = $user->id;
+                $isLeader = \App\Models\Project::where('created_by', $userId)
+                    ->orWhereHas('roleAssignments', fn ($q) => $q->where('user_id', $userId)->where('role', \App\Models\ProjectRoleAssignment::ROLE_PROJECT_LEADER))
+                    ->exists();
+                if ($isLeader) {
+                    return \App\Models\ProjectRoleAssignment::ROLE_PROJECT_LEADER;
+                }
+                $isStaff = \App\Models\ProjectRoleAssignment::where('user_id', $userId)
+                    ->where('role', \App\Models\ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+                    ->exists();
+                if ($isStaff) {
+                    return \App\Models\ProjectRoleAssignment::ROLE_PROJECT_STAFF;
+                }
+                return \App\Models\ProjectRoleAssignment::ROLE_PROJECT_MEMBER;
+            })() : null,
+            'userRoles' => $request->user() ? (function () use ($request) {
+                $user = $request->user();
+                $roles = [];
+                if (\App\Models\Project::where('created_by', $user->id)->orWhereHas('roleAssignments', fn ($q) => $q->where('user_id', $user->id)->where('role', \App\Models\ProjectRoleAssignment::ROLE_PROJECT_LEADER))->exists()) {
+                    $roles[] = \App\Models\ProjectRoleAssignment::ROLE_PROJECT_LEADER;
+                }
+                if (\App\Models\ProjectRoleAssignment::where('user_id', $user->id)->where('role', \App\Models\ProjectRoleAssignment::ROLE_PROJECT_STAFF)->exists()) {
+                    $roles[] = \App\Models\ProjectRoleAssignment::ROLE_PROJECT_STAFF;
+                }
+                if (\App\Models\ProjectRoleAssignment::where('user_id', $user->id)->where('role', \App\Models\ProjectRoleAssignment::ROLE_PROJECT_MEMBER)->exists()) {
+                    $roles[] = \App\Models\ProjectRoleAssignment::ROLE_PROJECT_MEMBER;
+                }
+                if (empty($roles)) {
+                    $roles[] = \App\Models\ProjectRoleAssignment::ROLE_PROJECT_MEMBER;
+                }
+                return $roles;
+            })() : [],
+            'active_projects_count' => $request->user() ? \App\Models\Project::query()
+                ->where(function ($q) use ($request) {
+                    $q->where('created_by', $request->user()->id)
+                      ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $request->user()->id));
+                })
+                ->where('status', '!=', \App\Models\Project::STATUS_COMPLETED)
+                ->count() : 0,
+            'pending_reviews_count' => $request->user() ? (function () use ($request) {
+                $user = $request->user();
+                return \App\Models\Task::query()
+                    ->where('status', \App\Models\Task::STATUS_UNDER_REVIEW)
+                    ->whereHas('activity.committee', function ($q) use ($user) {
+                        $q->whereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $user->id)->where('role', \App\Models\ProjectRoleAssignment::ROLE_PROJECT_STAFF))
+                          ->orWhereHas('project', fn ($pq) => $pq->where('created_by', $user->id)->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $user->id)->where('role', \App\Models\ProjectRoleAssignment::ROLE_PROJECT_LEADER)));
+                    })
+                    ->count();
+            })() : 0,
             'available_users' => $request->user() ? \App\Models\User::query()
                 ->where('id', '!=', $request->user()->id)
                 ->whereNotNull('email_verified_at')

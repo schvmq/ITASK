@@ -12,7 +12,9 @@ use App\Policies\ChecklistItemPolicy;
 use App\Policies\CommitteePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
+use App\Models\Chat;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -35,5 +37,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Activity::class, ActivityPolicy::class);
         Gate::policy(Task::class, TaskPolicy::class);
         Gate::policy(ChecklistItem::class, ChecklistItemPolicy::class);
+
+        Route::bind('chat', function ($value) {
+            return Chat::where('id', $value)->first()
+                ?: Chat::where('project_id', $value)->first()
+                ?: abort(404, 'Chat not found.');
+        });
     }
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { PageProps } from '@/types';
 import {
     LayoutDashboard,
@@ -20,6 +21,16 @@ import {
     Star,
     Layers,
     ChevronDown,
+    Users,
+    Shield,
+    Crown,
+    Zap,
+    FileCheck,
+    ListTodo,
+    ArrowUpDown,
+    Check,
+    ShieldCheck,
+    Settings,
 } from 'lucide-react';
 
 import {
@@ -33,6 +44,7 @@ import { ThemeToggle } from '@/Components/ThemeToggle';
 import { CommandPalette } from '@/Components/CommandPalette';
 import { QuickNewTaskModal } from '@/Components/QuickNewTaskModal';
 import { CreateProjectModal } from '@/Components/CreateProjectModal';
+import { CreateCommitteeModal } from '@/Components/CreateCommitteeModal';
 import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import {
     DropdownMenu,
@@ -53,6 +65,12 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/Components/ui/tooltip';
+import {
+    getNavigationForRole,
+    ROLE_CONFIGS,
+    ProjectRole,
+    NavItem,
+} from '@/Config/navigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,26 +96,6 @@ export interface AppLayoutProps {
     children: React.ReactNode;
 }
 
-interface NavItemDef {
-    name: string;
-    href: string;
-    icon: React.ComponentType<{ className?: string }>;
-    exact?: boolean;
-    countKey?: 'projects' | 'tasks' | 'messages' | 'notifications';
-}
-
-// ─── Navigation Definitions in Strict Order per Section 4 ───────────────────
-// Order: Home, My Tasks with count, Projects, Calendar, Messages with unread count, Favorites, Notifications
-const NAV_ITEMS: NavItemDef[] = [
-    { name: 'Home', href: '/dashboard', icon: LayoutDashboard, exact: true },
-    { name: 'My Tasks', href: '/my-tasks', icon: CheckSquare, countKey: 'tasks' },
-    { name: 'Projects', href: '/projects', icon: FolderOpen, countKey: 'projects' },
-    { name: 'Calendar', href: '/calendar', icon: CalendarDays },
-    { name: 'Timeline', href: '/timeline', icon: GanttChartSquare },
-    { name: 'Messages', href: '/messages', icon: MessageSquare, countKey: 'messages' },
-    { name: 'Notifications', href: '/notifications', icon: Bell, countKey: 'notifications' },
-];
-
 function getInitials(name: string): string {
     return name
         .split(' ')
@@ -110,11 +108,12 @@ function getInitials(name: string): string {
 // ─── Sidebar Nav Item ────────────────────────────────────────────────────────
 
 interface SidebarNavItemProps {
-    item: NavItemDef;
+    item: NavItem;
     isActive: boolean;
     isCollapsed?: boolean;
     badgeCount?: number;
     isUrgent?: boolean;
+    isHighlighted?: boolean;
     onClick?: () => void;
 }
 
@@ -124,11 +123,12 @@ function SidebarNavItem({
     isCollapsed = false,
     badgeCount,
     isUrgent = false,
+    isHighlighted = false,
     onClick,
 }: SidebarNavItemProps) {
     const Icon = item.icon;
 
-    // Active item marked by soft background and a primary left marker (Section 4)
+    // Active item marked by soft background and a primary left marker
     const activeClass =
         'bg-[color:var(--soft-surface)] text-[color:var(--text)] font-semibold border-l-4 border-l-[color:var(--primary)]';
     const inactiveClass =
@@ -146,19 +146,33 @@ function SidebarNavItem({
             aria-label={item.name}
             aria-current={isActive ? 'page' : undefined}
         >
-            <Icon
-                className={`w-[18px] h-[18px] shrink-0 stroke-[2px] transition-colors ${
-                    isActive
-                        ? 'text-[color:var(--primary)]'
-                        : 'text-[color:var(--muted)] group-hover:text-[color:var(--text)]'
-                }`}
-            />
+            <div className="relative shrink-0 flex items-center justify-center">
+                <Icon
+                    className={`w-[18px] h-[18px] shrink-0 stroke-[2px] transition-colors ${
+                        isActive
+                            ? 'text-[color:var(--primary)]'
+                            : 'text-[color:var(--muted)] group-hover:text-[color:var(--text)]'
+                    }`}
+                />
+                {isHighlighted && !isActive && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[color:var(--primary)] ring-2 ring-[color:var(--card)]" />
+                )}
+            </div>
 
-            {!isCollapsed && <span className="flex-1 truncate">{item.name}</span>}
+            {!isCollapsed && (
+                <div className="flex-1 min-w-0 flex items-center justify-between gap-1.5">
+                    <span className="truncate">{item.name}</span>
+                    {isHighlighted && !badgeCount && (
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 rounded bg-[color:var(--primary)]/10 text-[color:var(--primary)] border border-[color:var(--primary)]/20 shrink-0">
+                            Key
+                        </span>
+                    )}
+                </div>
+            )}
 
             {!isCollapsed && badgeCount !== undefined && badgeCount > 0 && (
                 <span
-                    className={`px-1.5 py-0.5 text-[11px] font-semibold rounded-full tabular-nums ${
+                    className={`px-1.5 py-0.5 text-[11px] font-semibold rounded-full tabular-nums shrink-0 ${
                         isUrgent
                             ? 'bg-[color:var(--status-danger-bg)] text-[color:var(--primary)] border border-[color:var(--status-danger-border)]'
                             : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)]'
@@ -175,8 +189,13 @@ function SidebarNavItem({
             <Tooltip>
                 <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
                 <TooltipContent side="right" className="text-[12px] font-medium bg-[color:var(--card)] text-[color:var(--text)] border border-[color:var(--border)]">
-                    {item.name}
-                    {badgeCount !== undefined && badgeCount > 0 && ` (${badgeCount})`}
+                    <p className="font-semibold">{item.name}</p>
+                    {item.description && (
+                        <p className="text-[11px] text-[color:var(--muted)] font-normal">{item.description}</p>
+                    )}
+                    {badgeCount !== undefined && badgeCount > 0 && (
+                        <p className="text-[10px] text-[color:var(--primary)] font-semibold mt-0.5">{badgeCount} pending</p>
+                    )}
                 </TooltipContent>
             </Tooltip>
         );
@@ -195,10 +214,12 @@ interface SidebarContentProps {
     tasksNeedingAction?: boolean;
     unreadMessagesCount?: number;
     unreadNotificationsCount?: number;
+    pendingReviewsCount?: number;
+    userRole: ProjectRole;
+    isAdmin?: boolean;
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
     onNavClick?: () => void;
-    onOpenCreateProject?: () => void;
 }
 
 function SidebarContent({
@@ -209,10 +230,12 @@ function SidebarContent({
     tasksNeedingAction = false,
     unreadMessagesCount = 0,
     unreadNotificationsCount = 0,
+    pendingReviewsCount = 0,
+    userRole,
+    isAdmin = false,
     isCollapsed = false,
     onToggleCollapse,
     onNavClick,
-    onOpenCreateProject,
 }: SidebarContentProps) {
     const [pinnedProjects, setPinnedProjects] = useState<Array<{ id: string; title: string }>>(() => {
         if (typeof window === 'undefined') return [];
@@ -226,6 +249,8 @@ function SidebarContent({
 
     const [showFavorites, setShowFavorites] = useState(true);
 
+    const navItems = getNavigationForRole(userRole, isAdmin);
+
     return (
         <div className="flex flex-col h-full bg-[color:var(--card)] border-r border-[color:var(--border)] select-none">
             {/* ── Brand Header (Flat, no gradients) ── */}
@@ -237,11 +262,11 @@ function SidebarContent({
                 {!isCollapsed ? (
                     <>
                         <Link
-                            href="/dashboard"
+                            href={isAdmin ? '/admin/dashboard' : '/dashboard'}
                             onClick={onNavClick}
                             className="flex items-center gap-2.5 group min-w-0 focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 rounded-[6px]"
                         >
-                            <div className="w-8 h-8 rounded-[8px] bg-[color:var(--primary)] flex items-center justify-center shrink-0 text-white">
+                            <div className="w-8 h-8 rounded-[8px] bg-[color:var(--primary)] flex items-center justify-center shrink-0 text-white shadow-2xs">
                                 <CheckSquare className="w-4 h-4 stroke-[2px]" />
                             </div>
                             <div className="flex flex-col min-w-0">
@@ -249,35 +274,39 @@ function SidebarContent({
                                     ITASK
                                 </span>
                                 <span className="text-[11px] text-[color:var(--muted)] font-normal mt-0.5 truncate">
-                                    Student Workspace
+                                    {isAdmin ? 'System Admin' : userRole}
                                 </span>
                             </div>
                         </Link>
                         {onToggleCollapse && (
-                            <button
+                            <motion.button
                                 type="button"
                                 onClick={onToggleCollapse}
+                                whileHover={{ scale: 1.12 }}
+                                whileTap={{ scale: 0.95 }}
                                 className="p-1.5 rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                 title="Collapse sidebar"
                                 aria-label="Collapse sidebar"
                             >
                                 <ChevronLeft className="w-4 h-4 stroke-[2px]" />
-                            </button>
+                            </motion.button>
                         )}
                     </>
                 ) : (
                     onToggleCollapse ? (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <button
+                                <motion.button
                                     type="button"
                                     onClick={onToggleCollapse}
+                                    whileHover={{ scale: 1.12 }}
+                                    whileTap={{ scale: 0.95 }}
                                     className="w-9 h-9 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] flex items-center justify-center text-[color:var(--text)] hover:bg-[color:var(--border)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     title="Expand sidebar"
                                     aria-label="Expand sidebar"
                                 >
                                     <ChevronRight className="w-4 h-4 stroke-[2px]" />
-                                </button>
+                                </motion.button>
                             </TooltipTrigger>
                             <TooltipContent side="right" className="text-[12px] font-medium bg-[color:var(--card)] text-[color:var(--text)] border border-[color:var(--border)]">
                                 Expand sidebar
@@ -295,12 +324,15 @@ function SidebarContent({
             <div className={`flex-1 overflow-y-auto ${isCollapsed ? 'px-2 py-3 space-y-3' : 'px-2 py-3 space-y-4'}`}>
                 {/* Main Links */}
                 <nav className="space-y-0.5" aria-label="Main Navigation">
-                    {NAV_ITEMS.map((item) => {
-                        const isMessages = item.name === 'Messages';
+                    {navItems.map((item) => {
+                        const isMessages = item.name === 'Messages' || item.name.includes('Messages');
                         const isNotifications = item.name === 'Notifications';
+                        const isDashboard = item.name === 'Home' || item.name === 'Dashboard' || item.href === '/dashboard' || item.name === 'Dashboard Overview';
                         const isActive =
-                            item.exact || item.href === '/dashboard'
+                            item.href.includes('?')
                                 ? currentPage === item.href
+                                : item.exact || isDashboard
+                                ? currentPage === item.href || (isDashboard && (currentPage === '/' || currentPage === '/dashboard')) || (item.href === '/admin/dashboard' && currentPage.startsWith('/admin/dashboard') && !currentPage.includes('tab='))
                                 : isMessages
                                 ? currentPage.startsWith('/messages') || currentPage.startsWith('/chat')
                                 : isNotifications
@@ -321,7 +353,12 @@ function SidebarContent({
                         } else if (item.countKey === 'notifications') {
                             badgeCount = unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined;
                             isUrgent = unreadNotificationsCount > 0;
+                        } else if (item.countKey === 'reviews') {
+                            badgeCount = pendingReviewsCount > 0 ? pendingReviewsCount : undefined;
+                            isUrgent = pendingReviewsCount > 0;
                         }
+
+                        const isHighlighted = item.highlightForRole === userRole;
 
                         return (
                             <SidebarNavItem
@@ -331,6 +368,7 @@ function SidebarContent({
                                 isCollapsed={isCollapsed}
                                 badgeCount={badgeCount}
                                 isUrgent={isUrgent}
+                                isHighlighted={isHighlighted}
                                 onClick={onNavClick}
                             />
                         );
@@ -338,7 +376,7 @@ function SidebarContent({
                 </nav>
 
                 {/* ── Favorites Section (Section 4 requirement) ── */}
-                {!isCollapsed && (
+                {!isCollapsed && !isAdmin && (
                     <div className="pt-2 border-t border-[color:var(--border)]">
                         <div
                             onClick={() => setShowFavorites(!showFavorites)}
@@ -377,7 +415,7 @@ function SidebarContent({
             </div>
 
             {/* ── Active Project Indicator (if viewing a project) ── */}
-            {currentProject && !isCollapsed && (
+            {currentProject && !isCollapsed && !isAdmin && (
                 <div className="m-3 p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] shrink-0">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--muted)] mb-1">
                         Active project
@@ -427,6 +465,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
     const { auth, flash, primaryRole, stats, projects, assignedTasks, notifications } = pageProps;
 
+    // Role & identity
+    const userRole: ProjectRole = (primaryRole as ProjectRole) || 'Project Member';
+    const isAdmin = Boolean(auth?.user?.is_admin);
+    const user = auth?.user ? { name: auth.user.name, email: auth.user.email } : null;
+
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [dismissedFlash, setDismissedFlash] = useState<string | null>(null);
 
@@ -434,6 +477,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
     const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
     const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+    const [isCreateCommitteeOpen, setIsCreateCommitteeOpen] = useState(false);
     const [createProjectInitialValues, setCreateProjectInitialValues] = useState<{
         title?: string;
         description?: string;
@@ -441,21 +485,35 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         end_date?: string;
     } | undefined>(undefined);
 
-    // Shortcut detection (Mac vs Win)
-    const [shortcutLabel, setShortcutLabel] = useState('Ctrl K');
     useEffect(() => {
-        if (typeof window !== 'undefined' && navigator.platform?.toUpperCase().indexOf('MAC') >= 0) {
-            setShortcutLabel('⌘K');
-        }
 
         const handleOpenCreateProject = (e: Event) => {
+            if (isAdmin) return; // Admins cannot create projects
             const customEvent = e as CustomEvent;
             setCreateProjectInitialValues(customEvent.detail || undefined);
             setIsCreateProjectOpen(true);
         };
+        const handleOpenCreateCommittee = () => {
+            setIsCreateCommitteeOpen(true);
+        };
+        const handleOpenCreateTask = () => {
+            setIsNewTaskOpen(true);
+        };
+        const handleOpenCommandPalette = () => {
+            setIsCommandPaletteOpen(true);
+        };
+
         window.addEventListener('itask:open-create-project', handleOpenCreateProject);
-        return () => window.removeEventListener('itask:open-create-project', handleOpenCreateProject);
-    }, []);
+        window.addEventListener('itask:open-create-committee', handleOpenCreateCommittee);
+        window.addEventListener('itask:open-create-task', handleOpenCreateTask);
+        window.addEventListener('itask:open-command-palette', handleOpenCommandPalette);
+        return () => {
+            window.removeEventListener('itask:open-create-project', handleOpenCreateProject);
+            window.removeEventListener('itask:open-create-committee', handleOpenCreateCommittee);
+            window.removeEventListener('itask:open-create-task', handleOpenCreateTask);
+            window.removeEventListener('itask:open-command-palette', handleOpenCommandPalette);
+        };
+    }, [isAdmin]);
 
     // Collapsed sidebar state (Tablets & manual toggle)
     const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -483,12 +541,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         });
     };
 
-    const user = auth?.user ? { name: auth.user.name, email: auth.user.email } : null;
-    const userRole = primaryRole || 'Student';
-
     const { url } = usePage();
-    const currentPath = typeof window !== 'undefined' ? window.location.pathname : url || '/dashboard';
-    const isDashboard = currentPath === '/dashboard' || currentPath === '/' || url === '/dashboard' || url === '/';
+    const currentPath = typeof window !== 'undefined'
+        ? window.location.pathname + window.location.search
+        : url || '/dashboard';
 
     const handleLogout = () => {
         router.post('/logout');
@@ -500,13 +556,14 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     const tasksNeedingAction = (stats?.returnedTasksCount ?? 0) > 0 || (stats?.overdueTasksCount ?? 0) > 0;
     const unreadMessagesCount = (pageProps as any).unread_messages_count ?? 0;
     const unreadNotificationsCount = notifications?.unread_count ?? 0;
+    const pendingReviewsCount = (pageProps as any).pending_reviews_count ?? 0;
 
     return (
         <div className="min-h-screen flex bg-[color:var(--background)] text-[color:var(--text)] antialiased">
             {/* ══ Desktop / Tablet Sidebar (Hidden on mobile < 768px) ════════ */}
             <aside
                 className={`hidden md:flex md:flex-col shrink-0 fixed inset-y-0 left-0 z-30 transition-all duration-200 ease-in-out border-r border-[color:var(--border)] ${
-                    isCollapsed ? 'w-[64px]' : 'w-60'
+                    isCollapsed ? 'w-[72px]' : 'w-64'
                 }`}
             >
                 <SidebarContent
@@ -517,31 +574,35 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                     tasksNeedingAction={tasksNeedingAction}
                     unreadMessagesCount={unreadMessagesCount}
                     unreadNotificationsCount={unreadNotificationsCount}
+                    pendingReviewsCount={pendingReviewsCount}
+                    userRole={userRole}
+                    isAdmin={isAdmin}
                     isCollapsed={isCollapsed}
                     onToggleCollapse={toggleCollapse}
-                    onOpenCreateProject={() => setIsCreateProjectOpen(true)}
                 />
             </aside>
 
             {/* ══ Main Shell Area (Offset for sidebar on >= 768px) ═════════ */}
             <div
                 className={`flex flex-col min-w-0 w-full transition-all duration-200 ease-in-out ${
-                    isCollapsed ? 'md:pl-[64px]' : 'md:pl-60'
+                    isCollapsed ? 'md:pl-[72px]' : 'md:pl-64'
                 }`}
             >
-                {/* ── Sticky Top Bar (Section 4 requirement) ── */}
+                {/* ── Sticky Top Bar (Section 2 & Section 4 requirement) ── */}
                 <header className="h-14 px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
-                    {/* Left: Mobile Drawer Trigger & Search */}
+                    {/* Left: Mobile Drawer Trigger */}
                     <div className="flex items-center gap-2.5 min-w-0">
                         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                             <SheetTrigger asChild>
-                                <button
+                                <motion.button
                                     type="button"
-                                    className="md:hidden p-1.5 rounded-[6px] text-[color:var(--muted)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                    whileHover={{ scale: 1.12 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    className="md:hidden p-2 rounded-[6px] text-[color:var(--muted)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     aria-label="Open navigation drawer"
                                 >
                                     <Menu className="w-5 h-5 stroke-[2px] text-[color:var(--text)]" />
-                                </button>
+                                </motion.button>
                             </SheetTrigger>
                             <SheetContent
                                 side="left"
@@ -555,105 +616,67 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                     tasksNeedingAction={tasksNeedingAction}
                                     unreadMessagesCount={unreadMessagesCount}
                                     unreadNotificationsCount={unreadNotificationsCount}
+                                    pendingReviewsCount={pendingReviewsCount}
+                                    userRole={userRole}
+                                    isAdmin={isAdmin}
                                     isCollapsed={false}
                                     onNavClick={() => setIsMobileOpen(false)}
-                                    onOpenCreateProject={() => {
-                                        setIsMobileOpen(false);
-                                        setIsCreateProjectOpen(true);
-                                    }}
                                 />
                             </SheetContent>
                         </Sheet>
-
-                        {/* Search & Command Palette trigger (Ctrl/⌘ K) - only on Home dashboard */}
-                        {isDashboard && (
-                            <button
-                                type="button"
-                                onClick={() => setIsCommandPaletteOpen(true)}
-                                className="flex items-center justify-between h-9 w-44 sm:w-64 md:w-72 px-3 rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] text-[color:var(--muted)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-left group focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
-                            >
-                                <div className="flex items-center gap-2 truncate">
-                                    <Search className="w-4 h-4 text-[color:var(--muted)] group-hover:text-[color:var(--primary)] transition-colors shrink-0 stroke-[2px]" />
-                                    <span className="text-[13px] truncate">
-                                        Search...
-                                    </span>
-                                </div>
-                                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.2 text-[10px] font-mono text-[color:var(--muted)] bg-[color:var(--card)] border border-[color:var(--border)] rounded-[4px] shrink-0">
-                                    {shortcutLabel}
-                                </kbd>
-                            </button>
-                        )}
                     </div>
 
-                    {/* Right: Primary Create Button (only on Home dashboard), Theme Switch, Notifications, Avatar */}
+                    {/* Right: Current Role Label, Theme Toggle, Notifications, User Identity Badge */}
                     <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-                        {/* Primary "Create" Button - only on Home dashboard */}
-                        {isDashboard && (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button
-                                        type="button"
-                                        className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold cursor-pointer shrink-0 focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
-                                        title="Create item"
-                                    >
-                                        <Plus className="w-4 h-4 text-white stroke-[2.5]" />
-                                        <span>Create</span>
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    align="end"
-                                    className="w-44 p-1 bg-[color:var(--card)] border border-[color:var(--border)] rounded-[10px] text-[color:var(--text)]"
-                                    style={{ boxShadow: 'none' }}
-                                >
-                                    <DropdownMenuItem
-                                        onClick={() => setIsNewTaskOpen(true)}
-                                        className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
-                                    >
-                                        <CheckSquare className="w-4 h-4 mr-2 text-[color:var(--primary)] stroke-[2px]" />
-                                        New task
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        onClick={() => setIsCreateProjectOpen(true)}
-                                        className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
-                                    >
-                                        <FolderOpen className="w-4 h-4 mr-2 text-[color:var(--secondary)] stroke-[2px]" />
-                                        New project
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )}
+                        {/* Current Role Label (Visible on all pages for all 3 roles) */}
+                        <span
+                            data-testid="topbar-role-label"
+                            className="inline-flex items-center px-2.5 py-1 rounded-[6px] text-[12px] font-semibold bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] select-none shrink-0"
+                        >
+                            {isAdmin ? 'System Admin' : userRole}
+                        </span>
 
                         {/* Theme Switch */}
                         <ThemeToggle />
 
-                        {/* Notifications */}
+                        {/* Notifications (synced with unread count) */}
                         <NotificationDropdown />
 
                         <Separator orientation="vertical" className="h-5 mx-0.5 bg-[color:var(--border)]" />
 
-                        {/* Avatar & User Menu: User's name shown ONLY ONCE here per Section 4 */}
+                        {/* User Identity Badge */}
                         {user ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <button
+                                    <motion.button
                                         type="button"
-                                        className="rounded-full p-0.5 hover:ring-2 hover:ring-[color:var(--primary)] transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer select-none focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0 min-h-[36px]"
                                         aria-label="User account menu"
                                     >
-                                        <Avatar size="sm" className="shrink-0">
+                                        <Avatar size="sm" className="shrink-0 w-7 h-7">
                                             <AvatarImage src={undefined} />
-                                            <AvatarFallback className="text-[11px] font-bold">
-                                                {getInitials(user.name)}
+                                            <AvatarFallback className="text-[11px] font-bold bg-[color:var(--primary)] text-white">
+                                                {getInitials(user.name) || 'BJ'}
                                             </AvatarFallback>
                                         </Avatar>
-                                    </button>
+                                        <div className="hidden sm:flex items-center gap-1.5 text-left text-[12px] leading-tight">
+                                            <span className="font-semibold text-[color:var(--text)] truncate max-w-[130px]">
+                                                {user.name}
+                                            </span>
+                                            <span className="text-[color:var(--muted)]">·</span>
+                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[color:var(--card)] text-[color:var(--primary)] border border-[color:var(--border)]">
+                                                CCIS
+                                            </span>
+                                        </div>
+                                    </motion.button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent
                                     align="end"
-                                    className="w-56 mt-1 p-1 bg-[color:var(--card)] border border-[color:var(--border)] rounded-[10px] text-[color:var(--text)]"
-                                    style={{ boxShadow: 'none' }}
+                                    className="w-56 mt-1 p-1 bg-[color:var(--card)] border border-[color:var(--border)] rounded-[10px] text-[color:var(--text)] shadow-xs"
+                                    style={{ boxShadow: 'var(--shadow-xs)' }}
                                 >
-                                    {/* The ONLY location displaying the user's name */}
                                     <DropdownMenuLabel className="font-normal px-3 py-2">
                                         <p className="text-[13px] font-semibold text-[color:var(--text)] truncate">
                                             {user.name}
@@ -661,25 +684,64 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                         <p className="text-[11px] text-[color:var(--muted)] truncate">
                                             {user.email}
                                         </p>
-                                        <span className="inline-block mt-1 text-[10px] font-medium text-[color:var(--status-neutral-text)] bg-[color:var(--status-neutral-bg)] px-2 py-0.5 rounded-full border border-[color:var(--status-neutral-border)]">
-                                            {userRole}
-                                        </span>
+                                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                            {isAdmin && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400">
+                                                    <ShieldCheck className="w-3 h-3 stroke-[2.5]" />
+                                                    <span>Admin</span>
+                                                </span>
+                                            )}
+                                            <span
+                                                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border"
+                                                style={{
+                                                    backgroundColor: ROLE_CONFIGS[userRole]?.badgeBg || 'rgba(79, 70, 229, 0.12)',
+                                                    borderColor: ROLE_CONFIGS[userRole]?.badgeBorder || 'rgba(79, 70, 229, 0.35)',
+                                                    color: ROLE_CONFIGS[userRole]?.accentColor || '#4F46E5',
+                                                }}
+                                            >
+                                                <span>{userRole}</span>
+                                            </span>
+                                            <span className="text-[10px] font-bold text-[color:var(--primary)] bg-[color:var(--soft-surface)] px-1.5 py-0.5 rounded border border-[color:var(--border)]">
+                                                CCIS
+                                            </span>
+                                        </div>
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator className="bg-[color:var(--border)]" />
-                                    <DropdownMenuItem
-                                        onClick={() => router.visit('/my-tasks')}
-                                        className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
-                                    >
-                                        <CheckSquare className="w-3.5 h-3.5 mr-2 stroke-[2px]" />
-                                        My Tasks
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                        onClick={() => router.visit('/projects')}
-                                        className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
-                                    >
-                                        <FolderOpen className="w-3.5 h-3.5 mr-2 stroke-[2px]" />
-                                        Projects
-                                    </DropdownMenuItem>
+                                    {isAdmin ? (
+                                        <>
+                                            <DropdownMenuItem
+                                                onClick={() => router.visit('/admin/dashboard')}
+                                                className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
+                                            >
+                                                <Users className="w-3.5 h-3.5 mr-2 stroke-[2px] text-purple-500" />
+                                                User Management Directory
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => router.visit('/admin/dashboard?tab=pending')}
+                                                className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
+                                            >
+                                                <ShieldCheck className="w-3.5 h-3.5 mr-2 stroke-[2px] text-amber-500" />
+                                                Pending Registrations
+                                            </DropdownMenuItem>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <DropdownMenuItem
+                                                onClick={() => router.visit('/my-tasks')}
+                                                className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
+                                            >
+                                                <CheckSquare className="w-3.5 h-3.5 mr-2 stroke-[2px]" />
+                                                My Tasks
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => router.visit('/projects')}
+                                                className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
+                                            >
+                                                <FolderOpen className="w-3.5 h-3.5 mr-2 stroke-[2px]" />
+                                                Projects
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
                                     <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                                     <DropdownMenuItem
                                         onClick={handleLogout}
@@ -741,31 +803,58 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
                 {/* ── Main Content Container Wrapped in ErrorBoundary ── */}
                 <main className="flex-1 p-4 sm:p-6 w-full max-w-7xl mx-auto">
-                    {/* Global Flash Alerts */}
-                    {(flash?.success || flash?.status) && dismissedFlash !== (flash.success || flash.status) && (
-                        <div className="mb-4">
-                            <Alert
-                                variant="success"
-                                onClose={() => setDismissedFlash(flash.success || flash.status || null)}
+                    {/* Global Flash Alerts with Spring Motion */}
+                    <AnimatePresence>
+                        {(flash?.success || flash?.status) && dismissedFlash !== (flash.success || flash.status) && (
+                            <motion.div
+                                key="flash-success"
+                                initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                                className="mb-4"
                             >
-                                {flash.success || flash.status}
-                            </Alert>
-                        </div>
-                    )}
-                    {flash?.error && dismissedFlash !== flash.error && (
-                        <div className="mb-4">
-                            <Alert
-                                variant="danger"
-                                onClose={() => setDismissedFlash(flash.error || null)}
+                                <Alert
+                                    variant="success"
+                                    onClose={() => setDismissedFlash(flash.success || flash.status || null)}
+                                >
+                                    {flash.success || flash.status}
+                                </Alert>
+                            </motion.div>
+                        )}
+                        {flash?.error && dismissedFlash !== flash.error && (
+                            <motion.div
+                                key="flash-error"
+                                initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                                className="mb-4"
                             >
-                                {flash.error}
-                            </Alert>
-                        </div>
-                    )}
+                                <Alert
+                                    variant="danger"
+                                    onClose={() => setDismissedFlash(flash.error || null)}
+                                >
+                                    {flash.error}
+                                </Alert>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                    <ErrorBoundary>
-                        {children}
-                    </ErrorBoundary>
+                    {/* Top-Level Page Transition */}
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={currentPath}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ type: 'spring', damping: 24, stiffness: 360 }}
+                        >
+                            <ErrorBoundary>
+                                {children}
+                            </ErrorBoundary>
+                        </motion.div>
+                    </AnimatePresence>
                 </main>
             </div>
 
@@ -792,6 +881,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 availableUsers={(pageProps as any).available_users}
                 initialValues={createProjectInitialValues}
             />
+
+            <CreateCommitteeModal
+                isOpen={isCreateCommitteeOpen}
+                onClose={() => setIsCreateCommitteeOpen(false)}
+                projectId={currentProject?.id}
+                projects={projects?.map((p: any) => ({ id: String(p.id), title: p.title || p.name }))}
+            />
         </div>
     );
 };
@@ -804,5 +900,17 @@ export function openCreateProjectModal(initialValues?: {
 }) {
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('itask:open-create-project', { detail: initialValues }));
+    }
+}
+
+export function openCreateCommitteeModal() {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('itask:open-create-committee'));
+    }
+}
+
+export function openCommandPalette() {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('itask:open-command-palette'));
     }
 }

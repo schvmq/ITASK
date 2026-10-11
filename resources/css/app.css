@@ -9,54 +9,58 @@
 @source '../**/*.ts';
 
 /* ==========================================================================
-   DESIGN TOKENS (Strictly 5 base tokens + color-mix derivations)
+   DESIGN TOKENS (Brutalist-Refined Architecture Blueprint)
    ========================================================================== */
 
 :root,
 :root[data-theme="light"] {
-    --text: #191410;
-    --background: #fdfcfb;
-    --primary: #fa8c38;
-    --secondary: #f4c28d;
-    --accent: #fbd361;
+    --text: #111827;
+    --background: #F8F9FA;
+    --primary: #EA580C;
+    --secondary: #F97316;
+    --accent: #10B981;
 
-    /* Primary button (vibrant light orange with high-contrast text) */
-    --primary-btn: #f97316;
-    --primary-btn-hover: #ea580c;
-    --primary-btn-active: #c2410c;
+    /* Primary button (Warm ITASK Ember/Orange) */
+    --primary-btn: #EA580C;
+    --primary-btn-hover: #F97316;
+    --primary-btn-active: #C2410C;
     --primary-btn-text: #ffffff;
 
-    /* Derived surfaces & boundaries */
-    --card: color-mix(in srgb, var(--background) 96%, var(--text) 4%);
-    --card-surface: color-mix(in srgb, var(--background) 98%, var(--text) 2%);
-    --border: color-mix(in srgb, var(--text) 14%, var(--background));
-    --muted: color-mix(in srgb, var(--text) 68%, var(--background));
-    --soft-surface: color-mix(in srgb, var(--text) 5%, var(--background));
+    /* Derived surfaces & hairline structural boundaries */
+    --card: #FFFFFF;
+    --card-surface: #FAFAFA;
+    --border: #E5E7EB; /* border-neutral-200 */
+    --muted: #6B7280;
+    --soft-surface: #F3F4F6;
 
-    /* Semantic Status Mixes (using strictly accent, secondary, danger red) */
-    /* Success / On Track (accent) */
-    --status-success: var(--accent);
-    --status-success-bg: color-mix(in srgb, var(--accent) 22%, var(--background));
-    --status-success-border: color-mix(in srgb, var(--accent) 45%, var(--background));
-    --status-success-text: color-mix(in srgb, var(--accent) 20%, var(--text));
+    /* Semantic Status Mixes (Emerald, Amber, Crimson) */
+    /* Nominal / Completed (Emerald) */
+    --status-success: #10B981;
+    --status-success-bg: rgba(16, 185, 129, 0.1);
+    --status-success-border: rgba(16, 185, 129, 0.28);
+    --status-success-text: #059669;
 
-    /* In Review / Neutral (secondary) */
-    --status-neutral: var(--secondary);
-    --status-neutral-bg: color-mix(in srgb, var(--secondary) 22%, var(--background));
-    --status-neutral-border: color-mix(in srgb, var(--secondary) 45%, var(--background));
-    --status-neutral-text: color-mix(in srgb, var(--secondary) 25%, var(--text));
+    /* In-Review / Planning (Amber) */
+    --status-neutral: #F59E0B;
+    --status-neutral-bg: rgba(245, 158, 11, 0.1);
+    --status-neutral-border: rgba(245, 158, 11, 0.28);
+    --status-neutral-text: #D97706;
 
-    /* At Risk / Overdue / Critical (danger red) */
-    --status-danger: #ef4444;
-    --status-danger-bg: color-mix(in srgb, var(--status-danger) 12%, var(--background));
-    --status-danger-border: color-mix(in srgb, var(--status-danger) 32%, var(--background));
-    --status-danger-text: color-mix(in srgb, var(--status-danger) 85%, var(--text));
+    /* Overdue / At-Risk / Critical (Crimson) */
+    --status-danger: #EF4444;
+    --status-danger-bg: rgba(239, 68, 68, 0.1);
+    --status-danger-border: rgba(239, 68, 68, 0.28);
+    --status-danger-text: #DC2626;
 
-    /* Primary Accent / Active States (light orange) */
-    --status-primary: var(--primary);
-    --status-primary-bg: color-mix(in srgb, var(--primary) 14%, var(--background));
-    --status-primary-border: color-mix(in srgb, var(--primary) 36%, var(--background));
-    --status-primary-text: color-mix(in srgb, var(--primary) 85%, var(--text));
+    /* Primary Signature / Active States (Warm Ember/Orange) */
+    --status-primary: #EA580C;
+    --status-primary-bg: rgba(234, 88, 12, 0.1);
+    --status-primary-border: rgba(234, 88, 12, 0.28);
+    --status-primary-text: #EA580C;
+
+    /* Subtle depth shadows */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-2xs: 0 1px 1px 0 rgb(0 0 0 / 0.03);
 
     /* Compatibility aliases */
     --color-bg-page: var(--background);
@@ -68,49 +72,53 @@
 
 :root[data-theme="dark"],
 html.dark {
-    --text: #fceede;
-    --background: #0d0906;
-    --primary: #fb923c;
-    --secondary: #8c571c;
-    --accent: #b59520;
+    --text: #F3F4F6;
+    --background: #14181F; /* Neutral dark slate canvas */
+    --primary: #F97316;
+    --secondary: #FB923C;
+    --accent: #34D399;
 
     /* Primary button for dark mode */
-    --primary-btn: #ea580c;
-    --primary-btn-hover: #f97316;
-    --primary-btn-active: #c2410c;
+    --primary-btn: #EA580C;
+    --primary-btn-hover: #F97316;
+    --primary-btn-active: #C2410C;
     --primary-btn-text: #ffffff;
 
-    /* Derived surfaces & boundaries */
-    --card: color-mix(in srgb, var(--background) 90%, var(--text) 10%);
-    --card-surface: color-mix(in srgb, var(--background) 94%, var(--text) 6%);
-    --border: color-mix(in srgb, var(--text) 14%, var(--background));
-    --muted: color-mix(in srgb, var(--text) 68%, var(--background));
-    --soft-surface: color-mix(in srgb, var(--text) 5%, var(--background));
+    /* Derived surfaces & hairline structural boundaries */
+    --card: #0F1216; /* Neutral dark canvas card */
+    --card-surface: #181D24;
+    --border: #262626; /* dark:border-neutral-800 */
+    --muted: #9CA3AF;
+    --soft-surface: #1E232B;
 
-    /* Semantic Status Mixes */
-    /* Success / On Track (accent) */
-    --status-success: var(--accent);
-    --status-success-bg: color-mix(in srgb, var(--accent) 26%, var(--background));
-    --status-success-border: color-mix(in srgb, var(--accent) 50%, var(--background));
-    --status-success-text: color-mix(in srgb, var(--accent) 45%, var(--text));
+    /* Semantic Status Mixes (Emerald, Amber, Crimson) */
+    /* Nominal / Completed (Emerald) */
+    --status-success: #34D399;
+    --status-success-bg: rgba(16, 185, 129, 0.16);
+    --status-success-border: rgba(52, 211, 153, 0.32);
+    --status-success-text: #34D399;
 
-    /* In Review / Neutral (secondary) */
-    --status-neutral: var(--secondary);
-    --status-neutral-bg: color-mix(in srgb, var(--secondary) 26%, var(--background));
-    --status-neutral-border: color-mix(in srgb, var(--secondary) 50%, var(--background));
-    --status-neutral-text: color-mix(in srgb, var(--secondary) 45%, var(--text));
+    /* In-Review / Planning (Amber) */
+    --status-neutral: #FBBF24;
+    --status-neutral-bg: rgba(245, 158, 11, 0.16);
+    --status-neutral-border: rgba(251, 191, 36, 0.32);
+    --status-neutral-text: #FBBF24;
 
-    /* At Risk / Overdue / Critical */
-    --status-danger: #f87171;
-    --status-danger-bg: color-mix(in srgb, var(--status-danger) 18%, var(--background));
-    --status-danger-border: color-mix(in srgb, var(--status-danger) 40%, var(--background));
-    --status-danger-text: color-mix(in srgb, var(--status-danger) 70%, var(--text));
+    /* Overdue / At-Risk / Critical (Crimson) */
+    --status-danger: #F87171;
+    --status-danger-bg: rgba(239, 68, 68, 0.16);
+    --status-danger-border: rgba(248, 113, 113, 0.32);
+    --status-danger-text: #F87171;
 
-    /* Primary Accent */
-    --status-primary: var(--primary);
-    --status-primary-bg: color-mix(in srgb, var(--primary) 18%, var(--background));
-    --status-primary-border: color-mix(in srgb, var(--primary) 40%, var(--background));
-    --status-primary-text: color-mix(in srgb, var(--primary) 70%, var(--text));
+    /* Primary Signature / Active States (Warm Ember/Orange) */
+    --status-primary: #FB923C;
+    --status-primary-bg: rgba(234, 88, 12, 0.16);
+    --status-primary-border: rgba(251, 146, 60, 0.32);
+    --status-primary-text: #FB923C;
+
+    /* Subtle depth shadows */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-2xs: 0 1px 1px 0 rgb(0 0 0 / 0.3);
 
     /* Compatibility aliases */
     --color-bg-page: var(--background);
@@ -129,7 +137,7 @@ html.dark {
 }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Montserrat', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 15px;
     line-height: 1.5;
     color: var(--text);
@@ -140,12 +148,25 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Tabular numerals for numbers, dates, stats, and tables */
+/* Tabular numerals & figures for dates, deadlines, timestamps, and percentages */
 .tabular-nums,
 table,
 .stats-number,
-time {
+time,
+code,
+pre,
+.font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-variant-numeric: tabular-nums;
+}
+
+/* Subtle depth shadows */
+.shadow-xs {
+    box-shadow: var(--shadow-xs);
+}
+
+.shadow-2xs {
+    box-shadow: var(--shadow-2xs);
 }
 
 /* Typography Scale */

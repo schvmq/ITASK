@@ -149,6 +149,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence', [\App\Http\Controllers\TaskEvidenceController::class, 'store'])->name('projects.committees.activities.tasks.evidence.store');
     Route::get('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence/{evidence}/download', [\App\Http\Controllers\TaskEvidenceController::class, 'download'])->name('projects.committees.activities.tasks.evidence.download');
     Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}/evidence/{evidence}', [\App\Http\Controllers\TaskEvidenceController::class, 'destroy'])->name('projects.committees.activities.tasks.evidence.destroy');
+
+    // Administration Routes (Admin Only)
+    Route::middleware('admin')->prefix('admin')->name('admin.')->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'index'])->name('dashboard');
+        Route::get('/', fn () => redirect()->route('admin.dashboard'));
+        Route::post('/users/{user}/verify', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'verifyUser'])->name('users.verify');
+        Route::post('/users/{user}/deny', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'denyUser'])->name('users.deny');
+        Route::post('/users/{user}/role', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'updateRole'])->name('users.role');
+        Route::post('/users/{user}/toggle-admin', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'toggleAdmin'])->name('users.toggle-admin');
+        Route::delete('/users/{user}', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'destroy'])->name('users.destroy');
+        Route::post('/projects/{project}/toggle-archive', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'toggleProjectArchive'])->name('projects.toggle-archive');
+        Route::post('/settings', [\App\Http\Controllers\Admin\AdminDashboardController::class, 'updateSettings'])->name('settings.update');
+    });
 });
 
 // Logout

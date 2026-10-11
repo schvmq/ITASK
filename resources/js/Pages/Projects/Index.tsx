@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AppLayout, openCreateProjectModal } from '@/Layouts/AppLayout';
 import { Button } from '@/Components/Button';
 import { Badge } from '@/Components/Badge';
@@ -50,6 +50,8 @@ interface ProjectsIndexProps {
 }
 
 export default function ProjectsIndex({ projects = [], availableUsers = [] }: ProjectsIndexProps) {
+    const { auth } = usePage<any>().props;
+    const isAdmin = Boolean(auth?.user?.is_admin);
     const [isJoinCodeOpen, setIsJoinCodeOpen] = useState(false);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
@@ -136,7 +138,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
     // Client pagination (noted as client pagination because backend index returns unpaginated collection)
     const totalItems = filteredProjects.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-    const safePage = Math.min(currentPage, totalPages);
+    const safePage = Math.min(currentPage, Math.max(5, totalPages));
 
     const paginatedProjects = useMemo(() => {
         const start = (safePage - 1) * pageSize;
@@ -168,22 +170,26 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2.5 shrink-0">
-                        <Button
-                            variant="secondary"
-                            size="md"
-                            onClick={() => setIsJoinCodeOpen(true)}
-                        >
-                            <span>Join with code</span>
-                        </Button>
-                        <Button
-                            variant="primary"
-                            size="md"
-                            onClick={() => openCreateProjectModal()}
-                        >
-                            <Plus className="w-4 h-4 mr-1.5" strokeWidth={2} />
-                            <span>Create project</span>
-                        </Button>
+                    <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                        <Link href="/timeline">
+                            <Button
+                                variant="secondary"
+                                size="md"
+                                className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-indigo-700/10 hover:bg-[color:var(--soft-surface)] text-[color:var(--primary)] font-bold border border-[color:var(--primary)]/30 flex items-center gap-1.5"
+                                leftIcon={<Calendar className="w-4 h-4 text-[color:var(--primary)]" />}
+                            >
+                                <span>View in Timeline</span>
+                            </Button>
+                        </Link>
+                        {!isAdmin && (
+                            <Button
+                                variant="secondary"
+                                size="md"
+                                onClick={() => setIsJoinCodeOpen(true)}
+                            >
+                                <span>Join with code</span>
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -276,14 +282,14 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                 {totalItems === 0 ? (
                     <EmptyState
                         title="No projects found"
-                        description={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'No projects match your active search and filter criteria.' : 'You have not joined or created any projects yet.'}
-                        actionLabel={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'Reset filters' : 'Create a project'}
+                        description={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'No projects match your active search and filter criteria.' : isAdmin ? 'No projects currently in the catalog.' : 'You have not joined or created any projects yet.'}
+                        actionLabel={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'Reset filters' : isAdmin ? undefined : 'Go to Home'}
                         onAction={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? () => {
                             setStatusFilter('ALL');
                             setRoleFilter('ALL');
                             setSearchTerm('');
                             updateUrlParams('ALL', 'ALL', '', 1, pageSize);
-                        } : openCreateProjectModal}
+                        } : isAdmin ? undefined : () => router.visit('/dashboard')}
                     />
                 ) : viewMode === 'table' ? (
                     /* Table View */
@@ -338,18 +344,27 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                                     </Badge>
                                                 </td>
 
-                                                {/* Progress */}
-                                                <td className="py-3.5 px-3 min-w-[140px]">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="flex-1 h-2 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden">
+                                                {/* Highlighted Progress */}
+                                                <td className="py-3.5 px-3 min-w-[160px]">
+                                                    <div className="flex flex-col gap-1.5 justify-center">
+                                                        <div className="flex items-center justify-between text-[11px]">
+                                                            <span className="font-semibold text-[color:var(--muted)]">
+                                                                {project.progress >= 100 ? 'Completed' : 'In Progress'}
+                                                            </span>
+                                                            <span className="px-2 py-0.5 rounded-full font-bold tabular-nums text-[10px] bg-[color:var(--primary)]/10 text-[color:var(--primary)] border border-[color:var(--primary)]/20 shadow-2xs">
+                                                                {project.progress}%
+                                                            </span>
+                                                        </div>
+                                                        <div className="w-full h-2 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden shadow-inner p-[0.5px]">
                                                             <div
-                                                                className="h-full bg-[color:var(--primary)] rounded-full transition-all duration-300"
-                                                                style={{ width: `${project.progress}%` }}
+                                                                className={`h-full rounded-full transition-all duration-300 ${
+                                                                    project.progress >= 100
+                                                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                                                                        : 'bg-gradient-to-r from-[color:var(--primary)] via-indigo-500 to-emerald-400 shadow-[0_0_8px_rgba(99,102,241,0.35)]'
+                                                                }`}
+                                                                style={{ width: `${Math.max(3, project.progress)}%` }}
                                                             />
                                                         </div>
-                                                        <span className="text-[12px] font-medium text-[color:var(--text)] tabular-nums w-8 text-right">
-                                                            {project.progress}%
-                                                        </span>
                                                     </div>
                                                 </td>
 
@@ -402,7 +417,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                         </div>
 
                         {/* Pagination */}
-                        <div className="pt-2 border-t border-[color:var(--border)]">
+                        <div className="pt-2 border-t border-[color:var(--border)] flex justify-center w-full">
                             <Pagination
                                 currentPage={safePage}
                                 totalPages={totalPages}
@@ -465,18 +480,22 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                                 </p>
                                             )}
 
-                                            {/* Progress */}
+                                            {/* Highlighted Progress */}
                                             <div className="space-y-1.5 pt-1">
                                                 <div className="flex items-center justify-between text-[12px]">
-                                                    <span className="text-[color:var(--muted)]">Progress</span>
-                                                    <span className="font-bold text-[color:var(--text)] tabular-nums">
+                                                    <span className="font-semibold text-[color:var(--muted)]">Progress</span>
+                                                    <span className="px-2 py-0.5 rounded-full font-bold text-[11px] tabular-nums bg-[color:var(--primary)]/10 text-[color:var(--primary)] border border-[color:var(--primary)]/20 shadow-2xs">
                                                         {project.progress}%
                                                     </span>
                                                 </div>
-                                                <div className="w-full h-2 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden">
+                                                <div className="w-full h-2.5 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden shadow-inner p-[1px]">
                                                     <div
-                                                        className="h-full bg-[color:var(--primary)] rounded-full transition-all duration-300"
-                                                        style={{ width: `${project.progress}%` }}
+                                                        className={`h-full rounded-full transition-all duration-300 ${
+                                                            project.progress >= 100
+                                                                ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                                                                : 'bg-gradient-to-r from-[color:var(--primary)] via-indigo-500 to-emerald-400 shadow-[0_0_8px_rgba(99,102,241,0.35)]'
+                                                        }`}
+                                                        style={{ width: `${Math.max(3, project.progress)}%` }}
                                                     />
                                                 </div>
                                             </div>
@@ -504,7 +523,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                         </div>
 
                         {/* Pagination */}
-                        <Card className="p-4">
+                        <Card className="p-4 flex justify-center w-full">
                             <Pagination
                                 currentPage={safePage}
                                 totalPages={totalPages}

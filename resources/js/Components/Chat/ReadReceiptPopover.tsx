@@ -77,8 +77,8 @@ export function ReadReceiptPopover({
             const fullTooltip = formatFullTooltipDateTime(readAt);
 
             return (
-                <div className="flex items-center gap-1 text-[11px] text-[var(--muted)] font-medium select-none">
-                    <CheckCheck className="w-3.5 h-3.5 text-[#EC7505]" strokeWidth={2.2} />
+                <div className="flex items-center gap-1 text-[11px] text-[color:var(--muted)] font-medium select-none">
+                    <CheckCheck className="w-3.5 h-3.5 text-[color:var(--primary)]" strokeWidth={2.2} />
                     <span title={fullTooltip} className="hover:underline cursor-help">
                         Read on {formatted}
                     </span>
@@ -87,8 +87,8 @@ export function ReadReceiptPopover({
         }
 
         return (
-            <div className="flex items-center gap-1 text-[11px] text-[var(--muted)] font-medium select-none">
-                <Check className="w-3.5 h-3.5 text-[var(--muted)]" strokeWidth={2} />
+            <div className="flex items-center gap-1 text-[11px] text-[color:var(--muted)] font-medium select-none">
+                <Check className="w-3.5 h-3.5 text-[color:var(--muted)]" strokeWidth={2} />
                 <span>Delivered</span>
             </div>
         );
@@ -97,8 +97,8 @@ export function ReadReceiptPopover({
     // ── Multi-Member Chat Receipt: Show "Delivered" until read by at least 1 person ──
     if (readCount === 0) {
         return (
-            <div className="flex items-center gap-1 text-[11px] text-[var(--muted)] font-medium select-none">
-                <Check className="w-3.5 h-3.5 text-[var(--muted)]" strokeWidth={2} />
+            <div className="flex items-center gap-1 text-[11px] text-[color:var(--muted)] font-medium select-none">
+                <Check className="w-3.5 h-3.5 text-[color:var(--muted)]" strokeWidth={2} />
                 <span>Delivered</span>
             </div>
         );
@@ -111,15 +111,15 @@ export function ReadReceiptPopover({
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 onMouseEnter={() => setIsOpen(true)}
-                className="flex items-center gap-1 text-[11px] text-[var(--muted)] hover:text-[var(--ink)] font-medium cursor-pointer transition-colors"
+                className="flex items-center gap-1 text-[11px] text-[color:var(--muted)] hover:text-[color:var(--text)] font-medium cursor-pointer transition-colors"
                 aria-expanded={isOpen}
                 aria-haspopup="dialog"
                 aria-label={`Read receipt: Read by ${readCount} of ${totalOthers}`}
             >
                 {isFullyRead ? (
-                    <CheckCheck className="w-3.5 h-3.5 text-[#EC7505]" strokeWidth={2.2} />
+                    <CheckCheck className="w-3.5 h-3.5 text-[color:var(--primary)]" strokeWidth={2.2} />
                 ) : (
-                    <Check className="w-3.5 h-3.5 text-[var(--muted)]" strokeWidth={2} />
+                    <Check className="w-3.5 h-3.5 text-[color:var(--muted)]" strokeWidth={2} />
                 )}
                 <span>
                     Read by {readCount} of {totalOthers}
@@ -131,14 +131,14 @@ export function ReadReceiptPopover({
                 <div
                     role="dialog"
                     aria-label="Member read status details"
-                    className="absolute right-0 bottom-full mb-2 w-64 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-xl p-3 z-30 animate-modal-in select-none text-left"
+                    className="messaging-root absolute right-0 bottom-full mb-2 w-64 bg-[color:var(--card)] border border-[color:var(--border)] rounded-2xl shadow-xl p-3 z-30 animate-modal-in select-none text-left"
                     onMouseLeave={() => setIsOpen(false)}
                 >
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-[var(--border)]">
-                        <span className="text-xs font-bold text-[var(--ink)]">
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-[color:var(--border)]">
+                        <span className="text-xs font-bold text-[color:var(--text)]">
                             Read Receipts ({readCount}/{totalOthers})
                         </span>
-                        <span className="text-[10px] text-[var(--muted)] font-medium">
+                        <span className="text-[10px] text-[color:var(--muted)] font-medium">
                             {isFullyRead ? 'Everyone read' : 'Group members'}
                         </span>
                     </div>
@@ -148,17 +148,17 @@ export function ReadReceiptPopover({
                         {readMembers.map(({ member, readAt }) => (
                             <div key={member.id} className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                    <p className="font-semibold text-[var(--ink)] truncate">
+                                    <p className="font-semibold text-[color:var(--text)] truncate">
                                         {member.name}
                                     </p>
                                     <p
-                                        className="text-[10px] text-[var(--muted)] truncate"
+                                        className="text-[10px] text-[color:var(--muted)] truncate"
                                         title={formatFullTooltipDateTime(readAt)}
                                     >
                                         Read on {formatReadReceiptTime(readAt)}
                                     </p>
                                 </div>
-                                <span className="w-2 h-2 rounded-full bg-[#EC7505] shrink-0 mt-1" title="Read" />
+                                <span className="w-2 h-2 rounded-full bg-[color:var(--primary)] shrink-0 mt-1" title="Read" />
                             </div>
                         ))}
 
@@ -166,12 +166,12 @@ export function ReadReceiptPopover({
                         {unreadMembers.map((member) => (
                             <div key={member.id} className="flex items-start justify-between gap-2 opacity-70">
                                 <div className="min-w-0">
-                                    <p className="font-medium text-[var(--ink)] truncate">
+                                    <p className="font-medium text-[color:var(--text)] truncate">
                                         {member.name}
                                     </p>
-                                    <p className="text-[10px] text-[var(--muted)]">Not read yet</p>
+                                    <p className="text-[10px] text-[color:var(--muted)]">Not read yet</p>
                                 </div>
-                                <span className="w-2 h-2 rounded-full bg-[var(--border)] shrink-0 mt-1" title="Not read yet" />
+                                <span className="w-2 h-2 rounded-full bg-[color:var(--border)] shrink-0 mt-1" title="Not read yet" />
                             </div>
                         ))}
                     </div>

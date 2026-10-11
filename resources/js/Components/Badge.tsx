@@ -1,5 +1,7 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { BadgeVariant } from '@/types';
+import { badgePopVariant } from '@/animations';
 
 export interface BadgeProps {
     variant?: BadgeVariant;
@@ -56,11 +58,14 @@ export const Badge: React.FC<BadgeProps> = ({
     const style = variantStyles[variant] || variantStyles.neutral;
 
     return (
-        <span
+        <motion.span
+            variants={badgePopVariant}
+            initial="hidden"
+            animate="visible"
             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-medium border ${style.badge} ${className}`}
         >
             {dot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot}`} aria-hidden="true" />}
             <span>{children}</span>
-        </span>
+        </motion.span>
     );
 };

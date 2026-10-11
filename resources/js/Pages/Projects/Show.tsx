@@ -1,5 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { staggerContainer, cardVariant, rowVariant } from '@/animations';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { type ProjectRole } from '@/Config/navigation';
 import type { ProjectTimelineData } from '@/types';
@@ -40,6 +42,7 @@ import {
     Lock,
     Upload,
     CheckCircle2,
+    Bell,
 } from 'lucide-react';
 
 // ─── Types & Definitions ──────────────────────────────────────────────────────
@@ -303,16 +306,21 @@ export default function ProjectShow({
     }
 
     const isLeader = (initialProject.role || '').toLowerCase().includes('leader');
+    const isStaff = (initialProject.role || '').toLowerCase().includes('staff');
     const canCreateCommittee = Boolean(initialProject.can?.createCommittee || isLeader);
     const allTasks = initialProject.tasks || [];
     const allDocuments = initialProject.documents || [];
     const allCommittees = initialProject.committees || [];
     const timelineData = propTimeline || initialProject.timeline || null;
+    const firstTask = allTasks[0];
+    const reminderTargetUrl = firstTask?.committee && firstTask?.activity
+        ? `/projects/${initialProject.id}/committees/${firstTask.committee.id}/activities/${firstTask.activity.id}?remind=1`
+        : null;
 
     // Paginated tasks
     const totalTasks = allTasks.length;
     const totalTaskPages = Math.max(1, Math.ceil(totalTasks / taskPageSize));
-    const safeTaskPage = Math.min(taskPage, totalTaskPages);
+    const safeTaskPage = Math.min(taskPage, Math.max(5, totalTaskPages));
     const paginatedTasks = useMemo(() => {
         const start = (safeTaskPage - 1) * taskPageSize;
         return allTasks.slice(start, start + taskPageSize);
@@ -321,7 +329,7 @@ export default function ProjectShow({
     // Paginated documents
     const totalFiles = allDocuments.length;
     const totalFilesPages = Math.max(1, Math.ceil(totalFiles / filesPageSize));
-    const safeFilesPage = Math.min(filesPage, totalFilesPages);
+    const safeFilesPage = Math.min(filesPage, Math.max(5, totalFilesPages));
     const paginatedDocuments = useMemo(() => {
         const start = (safeFilesPage - 1) * filesPageSize;
         return allDocuments.slice(start, start + filesPageSize);
@@ -412,7 +420,8 @@ export default function ProjectShow({
 
             <div className="space-y-6">
                 {/* ══ Project Header (with progress and members) ══ */}
-                <Card className="p-5 sm:p-6 space-y-5">
+                <motion.div variants={cardVariant} whileHover={{ y: -2 }}>
+                    <Card className="p-5 sm:p-6 space-y-5">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <div className="space-y-2 min-w-0 flex-1">
                             <div className="flex items-center gap-2.5 flex-wrap">
@@ -457,7 +466,33 @@ export default function ProjectShow({
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
+                        <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-center flex-wrap">
+                            {/* Highlighted View in Timeline Button */}
+                            <Link href={`/projects/${initialProject.id}/timeline`}>
+                                <Button
+                                    variant="primary"
+                                    size="md"
+                                    className="bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 text-white font-bold shadow-xs flex items-center gap-1.5"
+                                >
+                                    <Calendar className="w-4 h-4 text-white" />
+                                    <span>View in Timeline</span>
+                                </Button>
+                            </Link>
+
+                            {/* Highlighted Send Reminders Button (For Leader & Staff) */}
+                            {(isLeader || isStaff) && reminderTargetUrl && (
+                                <Link href={reminderTargetUrl}>
+                                    <Button
+                                        variant="secondary"
+                                        size="md"
+                                        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold border-none shadow-xs flex items-center gap-1.5"
+                                    >
+                                        <Bell className="w-4 h-4 text-white animate-pulse" />
+                                        <span>Send Reminders</span>
+                                    </Button>
+                                </Link>
+                            )}
+
                             <Link href={`/chat/${initialProject.id}`}>
                                 <Button variant="secondary" size="md">
                                     <MessageSquare className="w-4 h-4 mr-1.5" strokeWidth={2} />
@@ -467,7 +502,7 @@ export default function ProjectShow({
 
                             {canCreateCommittee && (
                                 <Button
-                                    variant="primary"
+                                    variant="outline"
                                     size="md"
                                     onClick={() => {
                                         resetCommitteeForm();
@@ -517,22 +552,44 @@ export default function ProjectShow({
                         </div>
                     </div>
 
-                    {/* Overall Progress Bar */}
-                    <div className="pt-2 border-t border-[color:var(--border)] space-y-1.5">
+                    {/* Highlighted Overall Progress Bar */}
+                    <div className="pt-2 border-t border-[color:var(--border)] space-y-2">
                         <div className="flex items-center justify-between text-[13px]">
-                            <span className="text-[color:var(--muted)]">Overall progress</span>
-                            <span className="font-bold text-[color:var(--text)] tabular-nums">
+                            <div className="flex items-center gap-2">
+                                <span
+                                    className={`w-2 h-2 rounded-full ${
+                                        (initialProject.progress ?? 0) >= 100
+                                            ? 'bg-emerald-500 ring-2 ring-emerald-500/20'
+                                            : 'bg-[color:var(--primary)] animate-pulse ring-2 ring-[color:var(--primary)]/20'
+                                    }`}
+                                />
+                                <span className="font-semibold text-[color:var(--muted)]">Overall progress</span>
+                            </div>
+                            <motion.span
+                                key={Math.round(initialProject.progress ?? 0)}
+                                initial={{ scale: 1.15 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', damping: 15 }}
+                                className="px-2.5 py-0.5 rounded-full font-bold text-[12px] text-[color:var(--primary)] bg-[color:var(--primary)]/10 border border-[color:var(--primary)]/20 tabular-nums shadow-2xs inline-block"
+                            >
                                 {Math.round(initialProject.progress ?? 0)}%
-                            </span>
+                            </motion.span>
                         </div>
-                        <div className="w-full h-2 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden">
-                            <div
-                                className="h-full bg-[color:var(--primary)] rounded-full transition-all duration-300"
-                                style={{ width: `${initialProject.progress ?? 0}%` }}
+                        <div className="w-full h-3 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden shadow-inner p-[1px]">
+                            <motion.div
+                                className={`h-full rounded-full transition-all ${
+                                    (initialProject.progress ?? 0) >= 100
+                                        ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                                        : 'bg-gradient-to-r from-[color:var(--primary)] via-indigo-500 to-emerald-400 shadow-[0_0_8px_rgba(99,102,241,0.35)]'
+                                }`}
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.max(2, initialProject.progress ?? 0)}%` }}
+                                transition={{ type: 'spring', stiffness: 220, damping: 26 }}
                             />
                         </div>
                     </div>
                 </Card>
+            </motion.div>
 
                 {/* ══ Navigation Tabs (Tasks, Chat, Files, Timeline, Overview, Committees) ══ */}
                 <div className="border-b border-[color:var(--border)] flex space-x-2 overflow-x-auto">
@@ -561,9 +618,16 @@ export default function ProjectShow({
                 </div>
 
                 {/* ══ TAB CONTENTS ══ */}
-
-                {/* ── TAB: TASKS ── */}
-                {activeTab === 'tasks' && (
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={activeTab}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ type: 'spring', damping: 24, stiffness: 360 }}
+                    >
+                        {/* ── TAB: TASKS ── */}
+                        {activeTab === 'tasks' && (
                     <Card className="p-5 space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border)]">
                             <div>
@@ -635,7 +699,7 @@ export default function ProjectShow({
 
                         {/* Tasks Client Pagination */}
                         {totalTasks > 0 && (
-                            <div className="pt-2 border-t border-[color:var(--border)]">
+                            <div className="pt-2 border-t border-[color:var(--border)] flex justify-center w-full">
                                 <Pagination
                                     currentPage={safeTaskPage}
                                     totalPages={totalTaskPages}
@@ -743,7 +807,7 @@ export default function ProjectShow({
 
                         {/* Files Client Pagination */}
                         {totalFiles > 0 && (
-                            <div className="pt-2 border-t border-[color:var(--border)]">
+                            <div className="pt-2 border-t border-[color:var(--border)] flex justify-center w-full">
                                 <Pagination
                                     currentPage={safeFilesPage}
                                     totalPages={totalFilesPages}
@@ -855,6 +919,8 @@ export default function ProjectShow({
                         )}
                     </div>
                 )}
+                    </motion.div>
+                </AnimatePresence>
             </div>
 
             {/* ══ MODALS (Edit Project, Archive, Create Committee, Upload Document) ══ */}

@@ -14,10 +14,15 @@ import {
     Send,
     Sparkles,
     MessageSquare,
+    Shield,
+    Crown,
+    Zap,
+    PlusCircle,
+    FileCheck,
+    ShieldCheck,
 } from 'lucide-react';
 
 // ─── Project-Scoped Roles ────────────────────────────────────────────────────
-// Exactly three project-scoped roles defined for ITASK:
 export type ProjectRole = 'Project Leader' | 'Project Staff' | 'Project Member';
 
 // ─── Navigation Item Interface ───────────────────────────────────────────────
@@ -25,152 +30,225 @@ export interface NavItem {
     name: string;
     href: string;
     icon: React.ComponentType<{ className?: string }>;
-    /** Optional: mark as coming soon (renders as disabled with tooltip) */
+    /** Optional: mark as coming soon */
     comingSoon?: boolean;
     /** Optional exact match for active route detection */
     exact?: boolean;
-    /** Optional badge count or indicator */
+    /** Optional badge count key */
+    countKey?: 'projects' | 'tasks' | 'messages' | 'notifications' | 'reviews';
+    /** Optional badge text or count override */
     badge?: string;
-    /**
-     * Architectural metadata for future role-scoped navigation.
-     * When a project context is active in future development steps, items can declare
-     * which project-scoped roles have access to them.
-     * Backend remains the source of truth for all authorization.
-     */
+    /** Roles that prioritize or see this item */
     allowedRoles?: ProjectRole[];
-    /** Supporting description for tooltips or expanded menus */
+    /** Supporting description */
     description?: string;
+    /** Role-specific badge indicator */
+    roleTag?: string;
+    /** If this item is specially highlighted for a role */
+    highlightForRole?: ProjectRole;
 }
 
-// ─── Centralized Main Navigation ─────────────────────────────────────────────
-// Usable by all authenticated users. Projects is now an active page.
-export const MAIN_NAV_ITEMS: NavItem[] = [
+export interface RoleQuickAction {
+    name: string;
+    description: string;
+    icon: React.ComponentType<{ className?: string }>;
+    href?: string;
+    actionEvent?: string;
+}
+
+export interface RoleConfig {
+    role: ProjectRole;
+    shortTitle: string;
+    tagline: string;
+    icon: React.ComponentType<{ className?: string }>;
+    accentColor: string;
+    badgeBg: string;
+    badgeBorder: string;
+    badgeText: string;
+    quickActions: RoleQuickAction[];
+}
+
+export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
+    'Project Leader': {
+        role: 'Project Leader',
+        shortTitle: 'Leader',
+        tagline: 'Project Governance, Scope & Timeline',
+        icon: Crown,
+        accentColor: '#4F46E5', // Indigo
+        badgeBg: 'rgba(79, 70, 229, 0.12)',
+        badgeBorder: 'rgba(79, 70, 229, 0.35)',
+        badgeText: '#4338CA',
+        quickActions: [
+            {
+                name: 'New Project',
+                description: 'Initiate a new CCIS project workspace',
+                icon: PlusCircle,
+                actionEvent: 'itask:open-create-project',
+            },
+            {
+                name: 'Manage Committees',
+                description: 'Organize project committees & assign staff',
+                icon: Users,
+                href: '/projects',
+            },
+            {
+                name: 'Timeline & Gantt',
+                description: 'Track overall project schedule & milestones',
+                icon: GanttChartSquare,
+                href: '/timeline',
+            },
+        ],
+    },
+    'Project Staff': {
+        role: 'Project Staff',
+        shortTitle: 'Staff',
+        tagline: 'Committee Operations, Tasks & Review',
+        icon: Shield,
+        accentColor: '#059669', // Emerald
+        badgeBg: 'rgba(5, 150, 105, 0.12)',
+        badgeBorder: 'rgba(5, 150, 105, 0.35)',
+        badgeText: '#047857',
+        quickActions: [
+            {
+                name: 'Review Submissions',
+                description: 'Inspect tasks & deliverables awaiting approval',
+                icon: FileCheck,
+                href: '/my-tasks?status=Under+Review',
+            },
+            {
+                name: 'New Committee Task',
+                description: 'Assign a task with checklist to members',
+                icon: ListTodo,
+                actionEvent: 'itask:open-create-task',
+            },
+            {
+                name: 'Committee Hub',
+                description: 'Monitor committee activities and deliverables',
+                icon: FolderOpen,
+                href: '/projects',
+            },
+        ],
+    },
+    'Project Member': {
+        role: 'Project Member',
+        shortTitle: 'Member',
+        tagline: 'Tasks, Interactive Checklists & Deliverables',
+        icon: Zap,
+        accentColor: '#EA580C', // Orange
+        badgeBg: 'rgba(234, 88, 12, 0.12)',
+        badgeBorder: 'rgba(234, 88, 12, 0.35)',
+        badgeText: '#C2410C',
+        quickActions: [
+            {
+                name: 'My Assigned Tasks',
+                description: 'Focus on your pending deliverables & checklists',
+                icon: CheckSquare,
+                href: '/my-tasks',
+            },
+            {
+                name: 'Deadlines Calendar',
+                description: 'Check dates, approaching milestones & urgency',
+                icon: CalendarDays,
+                href: '/calendar',
+            },
+            {
+                name: 'Project Messages',
+                description: 'Collaborate with staff & team members',
+                icon: MessageSquare,
+                href: '/messages',
+            },
+        ],
+    },
+};
+
+// ─── Centralized Global Navigation (identical for all three roles) ─────────
+export const GLOBAL_NAV_ITEMS: NavItem[] = [
     {
-        name: 'Dashboard',
+        name: 'Home',
         href: '/dashboard',
         icon: LayoutDashboard,
         exact: true,
-        description: 'Your ITASK workspace overview',
-    },
-    {
-        name: 'Projects',
-        href: '/projects',
-        icon: FolderOpen,
-        description: 'CCIS projects where you hold an active role',
+        description: 'Workspace overview and recent activity',
     },
     {
         name: 'My Tasks',
         href: '/my-tasks',
         icon: CheckSquare,
-        description: 'Tasks assigned to you across all projects',
+        countKey: 'tasks',
+        description: 'Personal task assignments and checklists',
     },
     {
-        name: 'Calendar',
-        href: '/calendar',
-        icon: CalendarDays,
-        description: 'Upcoming project deadlines and milestones',
+        name: 'Projects',
+        href: '/projects',
+        icon: FolderOpen,
+        countKey: 'projects',
+        description: 'Projects and committees directory',
     },
     {
         name: 'Timeline',
         href: '/timeline',
         icon: GanttChartSquare,
-        description: 'CCIS project schedules and Gantt timelines',
+        description: 'Gantt schedule and milestone roadmap',
+    },
+    {
+        name: 'Calendar',
+        href: '/calendar',
+        icon: CalendarDays,
+        description: 'Project deadlines and events schedule',
     },
     {
         name: 'Messages',
         href: '/messages',
         icon: MessageSquare,
-        description: 'Project collaboration and group chat',
+        countKey: 'messages',
+        description: 'Team messaging and group chats',
     },
-];
-
-// ─── Centralized Utility Navigation ──────────────────────────────────────────
-export const UTILITY_NAV_ITEMS: NavItem[] = [
     {
         name: 'Notifications',
         href: '/notifications',
         icon: Bell,
-        description: 'Activity alerts and role updates',
+        countKey: 'notifications',
+        description: 'Alerts, reviews, and activity updates',
     },
 ];
 
-// ─── Architectural Placeholders for Future Project-Scoped Actions ─────────────
-// DO NOT enforce or display these yet — these exist as extension points for future steps
-// when a specific project context is active.
-export const FUTURE_PROJECT_SCOPED_NAV: Record<ProjectRole, NavItem[]> = {
-    'Project Leader': [
-        {
-            name: 'Manage Project',
-            href: '#manage-project',
-            icon: Settings,
-            description: 'Project settings, charter, and scope management',
-        },
-        {
-            name: 'Manage Committees',
-            href: '#manage-committees',
-            icon: Users,
-            description: 'Committee formation and staff assignments',
-        },
-        {
-            name: 'Project Assignments',
-            href: '#project-assignments',
-            icon: UserCheck,
-            description: 'Overall project member assignment overview',
-        },
-    ],
-    'Project Staff': [
-        {
-            name: 'Manage Assigned Committee',
-            href: '#manage-assigned-committee',
-            icon: Users,
-            description: 'Committee members and operational deliverables',
-        },
-        {
-            name: 'Review Activities',
-            href: '#review-activities',
-            icon: ClipboardCheck,
-            description: 'Review and approve submitted member activity reports',
-        },
-        {
-            name: 'Manage Committee Tasks',
-            href: '#manage-committee-tasks',
-            icon: ListTodo,
-            description: 'Task assignment and progress monitoring',
-        },
-    ],
-    'Project Member': [
-        {
-            name: 'My Assigned Work',
-            href: '#assigned-work',
-            icon: CheckSquare,
-            description: 'Deliverables and tasks assigned to you',
-        },
-        {
-            name: 'Submit Activities',
-            href: '#submit-activities',
-            icon: Send,
-            description: 'Submit proof of completion and activity reports',
-        },
-        {
-            name: 'Update Task Progress',
-            href: '#update-task-progress',
-            icon: Sparkles,
-            description: 'Log progress percentage and task milestones',
-        },
-    ],
+// Deprecated aliases pointing to GLOBAL_NAV_ITEMS to prevent broken imports
+export const LEADER_NAV_ITEMS: NavItem[] = GLOBAL_NAV_ITEMS;
+export const STAFF_NAV_ITEMS: NavItem[] = GLOBAL_NAV_ITEMS;
+export const MEMBER_NAV_ITEMS: NavItem[] = GLOBAL_NAV_ITEMS;
+export const DEFAULT_NAV_ITEMS: NavItem[] = GLOBAL_NAV_ITEMS;
+
+export const ADMIN_NAV_ITEMS: NavItem[] = [
+    {
+        name: 'User Management',
+        href: '/admin/dashboard',
+        icon: Users,
+        exact: true,
+        description: 'Account directory, approval decisions, and privileges',
+    },
+    {
+        name: 'Pending Registrations',
+        href: '/admin/dashboard?tab=pending',
+        icon: UserCheck,
+        description: 'Review, verify, or deny new student & staff accounts',
+    },
+];
+
+export const ADMIN_NAV_ITEM: NavItem = {
+    name: 'User Management',
+    href: '/admin/dashboard',
+    icon: ShieldCheck,
+    exact: true,
+    description: 'User accounts, verification & role directory',
 };
 
-// ─── Navigation Resolver Helper ──────────────────────────────────────────────
-export interface GetNavigationOptions {
-    /** Future role from backend when inside a project context; currently optional / unused */
-    currentRole?: ProjectRole | null;
+/**
+ * Returns role-tailored navigation items (admin has dedicated dashboard, all three roles share identical 7 tabs)
+ */
+export function getNavigationForRole(role?: string | null, isAdmin?: boolean): NavItem[] {
+    if (isAdmin) {
+        return [...ADMIN_NAV_ITEMS];
+    }
+    return [...GLOBAL_NAV_ITEMS];
 }
 
-/**
- * Returns navigation items for the current session.
- * NOTE: The backend remains the source of truth for authorization.
- * Currently returns universal main navigation for all authenticated users.
- */
-export function getNavigationItems(_options?: GetNavigationOptions): NavItem[] {
-    return MAIN_NAV_ITEMS;
-}

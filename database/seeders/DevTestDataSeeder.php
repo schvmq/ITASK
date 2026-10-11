@@ -22,8 +22,25 @@ class DevTestDataSeeder extends Seeder
     public function run(): void
     {
         // ---------------------------------------------------------------------
-        // 1. TEST ACCOUNTS
+        // 1. TEST ACCOUNTS (Admin, Leader, Staff, Members)
         // ---------------------------------------------------------------------
+        $admin = User::updateOrCreate(
+            ['email' => 'admin.itask@carsu.edu.ph'],
+            [
+                'name' => 'ITASK Administrator',
+                'password' => Hash::make('password'),
+                'is_admin' => true,
+            ]
+        );
+        $admin->forceFill(['email_verified_at' => now(), 'is_admin' => true])->save();
+
+        // Ensure bryanjay.oja@carsu.edu.ph is non-admin and can log in with 'password'
+        User::where('email', 'bryanjay.oja@carsu.edu.ph')->update([
+            'is_admin' => false,
+            'password' => Hash::make('password'),
+            'email_verified_at' => now(),
+        ]);
+
         $leader = User::updateOrCreate(
             ['email' => 'leader.itask@carsu.edu.ph'],
             [

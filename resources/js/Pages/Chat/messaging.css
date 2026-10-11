@@ -1,0 +1,205 @@
+/* ==========================================================================
+   GROUP MESSAGING FEATURE STYLES (Strictly Scoped under .messaging-root)
+   Visual polish for group chats: typography, bubbles, scrollbars & transitions.
+   ========================================================================== */
+
+.messaging-root {
+    --msg-transition-fast: 180ms ease;
+    --msg-transition-normal: 240ms ease;
+    color: var(--text);
+}
+
+/* ── Full-Bleed Unified Chat Layout (Static UI, Zero Page Scrolling) ── */
+html:has(.messaging-root),
+body:has(.messaging-root) {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+}
+
+body:has(.messaging-root) .min-h-screen {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    min-height: 100vh !important;
+    overflow: hidden !important;
+}
+
+body:has(.messaging-root) .min-h-screen > div.flex-col {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
+
+main:has(.messaging-root) {
+    max-width: 100% !important;
+    padding: 0 !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: calc(100vh - 3.5rem) !important;
+    max-height: calc(100vh - 3.5rem) !important;
+    overflow: hidden !important;
+}
+
+main:has(.messaging-root) > div,
+main:has(.messaging-root) > div > div {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+main:has(.messaging-root) .messaging-root {
+    margin: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: row !important;
+    overflow: hidden !important;
+}
+
+/* ── Scoped Custom Scrollbars ── */
+.messaging-root *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.messaging-root *::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.messaging-root *::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+    transition: background-color var(--msg-transition-fast);
+}
+
+.messaging-root *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--muted);
+}
+
+/* Firefox scrollbar styling */
+.messaging-root * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+/* ── Interactive Focus States ── */
+.messaging-root button:focus-visible,
+.messaging-root a:focus-visible,
+.messaging-root input:focus-visible,
+.messaging-root textarea:focus-visible {
+    outline: 2px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* ── Accessible Touch Targets (Minimum 40px) ── */
+.messaging-root .msg-touch-target {
+    min-width: 40px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Micro-Interactions & Transitions (150-240ms) ── */
+.messaging-root .msg-interactive {
+    transition: background-color var(--msg-transition-fast),
+                border-color var(--msg-transition-fast),
+                color var(--msg-transition-fast),
+                box-shadow var(--msg-transition-fast),
+                transform 120ms ease;
+}
+
+.messaging-root .msg-interactive:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+/* ── Message Bubble Entering Animation ── */
+@keyframes msgBubbleEnter {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.messaging-root .msg-bubble-anim {
+    animation: msgBubbleEnter var(--msg-transition-fast);
+}
+
+/* ── Typing Indicator Dots ── */
+@keyframes msgTypingBounce {
+    0%, 80%, 100% {
+        transform: scale(0.65);
+        opacity: 0.35;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.messaging-root .msg-typing-dot-1 {
+    animation: msgTypingBounce 1.4s infinite ease-in-out both;
+    animation-delay: -0.32s;
+}
+
+.messaging-root .msg-typing-dot-2 {
+    animation: msgTypingBounce 1.4s infinite ease-in-out both;
+    animation-delay: -0.16s;
+}
+
+.messaging-root .msg-typing-dot-3 {
+    animation: msgTypingBounce 1.4s infinite ease-in-out both;
+}
+
+/* ── Smooth Pulse for Unread Badges ── */
+@keyframes msgBadgePulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+.messaging-root .msg-badge-pulse {
+    animation: msgBadgePulse 2.4s ease-in-out infinite;
+}
+
+/* ── Floating New Messages Pill ── */
+@keyframes msgFloatUp {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.messaging-root .msg-float-pill {
+    animation: msgFloatUp var(--msg-transition-fast);
+}
+
+/* ── Reduced Motion Support ── */
+@media (prefers-reduced-motion: reduce) {
+    .messaging-root *,
+    .messaging-root *::before,
+    .messaging-root *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

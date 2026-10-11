@@ -179,12 +179,37 @@ class ChatController extends Controller
         $selectedChat = null;
 
         if ($targetProjectId) {
-            // Find chat by project_id or chat_id
+            // Find chat by project_id first, then chat_id
             $candidateChat = Chat::query()
                 ->where('project_id', $targetProjectId)
-                ->orWhere('id', $targetProjectId)
                 ->with(['project.creator', 'project.roleAssignments.user'])
                 ->first();
+
+            if (! $candidateChat) {
+                $candidateChat = Chat::query()
+                    ->where('id', $targetProjectId)
+                    ->with(['project.creator', 'project.roleAssignments.user'])
+                    ->first();
+            }
+
+            if (! $candidateChat) {
+                $proj = Project::where('id', $targetProjectId)
+                    ->whereNull('deleted_at')
+                    ->where(function ($q) use ($user) {
+                        $q->where('created_by', $user->id)
+                            ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $user->id));
+                    })
+                    ->first();
+
+                if ($proj) {
+                    $candidateChat = Chat::firstOrCreate([
+                        'project_id' => $proj->id,
+                    ], [
+                        'archived_at' => $proj->status === Project::STATUS_ARCHIVED ? now() : null,
+                    ]);
+                    $candidateChat->load(['project.creator', 'project.roleAssignments.user']);
+                }
+            }
 
             // If not found or soft-deleted or user is not a member, abort 404 with no info leaked
             if (! $candidateChat || ! $candidateChat->hasActiveMember($user->id)) {
@@ -397,11 +422,42 @@ class ChatController extends Controller
     }
 
     /**
+     * Resolves a Chat instance from either a Chat model, a chat ID, or a project ID.
+     */
+    protected function resolveChat($chat): Chat
+    {
+        if ($chat instanceof Chat) {
+            return $chat;
+        }
+
+        $resolved = Chat::where('id', $chat)->first()
+            ?: Chat::where('project_id', $chat)->first();
+
+        if (! $resolved) {
+            $project = Project::find($chat);
+            if ($project) {
+                $resolved = Chat::firstOrCreate([
+                    'project_id' => $project->id,
+                ], [
+                    'archived_at' => $project->status === Project::STATUS_ARCHIVED ? now() : null,
+                ]);
+            }
+        }
+
+        if (! $resolved) {
+            abort(404, 'Chat not found.');
+        }
+
+        return $resolved;
+    }
+
+    /**
      * Send a message in the project group chat.
      */
-    public function store(Request $request, Chat $chat)
+    public function store(Request $request, $chat)
     {
         $user = $request->user();
+        $chat = $this->resolveChat($chat);
 
         // 1. Enforce active project membership
         if (! $chat->hasActiveMember($user->id)) {
@@ -419,8 +475,11 @@ class ChatController extends Controller
             'file' => ['nullable', 'file', 'max:10240'], // 10MB limit
         ]);
 
-        if (empty($validated['body']) && ! $request->hasFile('file')) {
-            if ($request->wantsJson()) {
+        $body = isset($validated['body']) ? trim($validated['body']) : '';
+        $hasFile = $request->hasFile('file') && $request->file('file') !== null;
+
+        if ($body === '' && ! $hasFile) {
+            if ($request->wantsJson() || $request->expectsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
                 return response()->json(['message' => 'Message or attachment is required.'], 422);
             }
             return back()->withErrors(['body' => 'Message or attachment is required.']);
@@ -431,8 +490,11 @@ class ChatController extends Controller
         $attachmentType = null;
         $attachmentSize = null;
 
-        if ($request->hasFile('file')) {
+        if ($hasFile) {
             $file = $request->file('file');
+            if (! $file->isValid()) {
+                return response()->json(['message' => 'The uploaded file is invalid or exceeded upload limits.'], 422);
+            }
             $attachmentPath = Storage::disk('local')->putFile('chat_attachments', $file);
             $attachmentName = $file->getClientOriginalName();
             $attachmentType = $file->getClientMimeType() ?: 'application/octet-stream';
@@ -440,13 +502,13 @@ class ChatController extends Controller
         }
 
         // 4. Create message & update sender read receipt in transaction
-        $message = DB::transaction(function () use ($chat, $user, $validated, $attachmentPath, $attachmentName, $attachmentType, $attachmentSize) {
+        $message = DB::transaction(function () use ($chat, $user, $body, $attachmentPath, $attachmentName, $attachmentType, $attachmentSize) {
             $msgType = $attachmentPath ? Message::TYPE_FILE : Message::TYPE_TEXT;
 
             $msg = $chat->messages()->create([
                 'sender_id' => $user->id,
                 'type' => $msgType,
-                'body' => $validated['body'] ?? '',
+                'body' => $body,
                 'attachment_path' => $attachmentPath,
                 'attachment_name' => $attachmentName,
                 'attachment_type' => $attachmentType,
@@ -471,17 +533,28 @@ class ChatController extends Controller
             report($e);
         }
 
-        if ($request->wantsJson()) {
-            return response()->json([
-                'id' => $message->id,
-                'chat_id' => $message->chat_id,
-                'conversation_id' => $message->chat_id,
-                'sender_id' => $message->sender_id,
-                'type' => $message->type,
-                'body' => $message->body,
-                'is_deleted' => false,
-                'created_at' => $message->created_at->toISOString(),
-            ]);
+        $responseData = [
+            'id' => $message->id,
+            'chat_id' => $message->chat_id,
+            'conversation_id' => $message->chat_id,
+            'sender_id' => $message->sender_id,
+            'type' => $message->type,
+            'body' => $message->body,
+            'attachment_path' => $message->attachment_path,
+            'attachment_name' => $message->attachment_name,
+            'attachment_type' => $message->attachment_type,
+            'attachment_size' => $message->attachment_size,
+            'is_deleted' => false,
+            'created_at' => $message->created_at->toISOString(),
+            'sender' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ],
+        ];
+
+        if ($request->wantsJson() || $request->expectsJson() || $request->ajax() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json($responseData);
         }
 
         return redirect()->route('messages.index', ['projectId' => $chat->project_id]);
@@ -491,9 +564,10 @@ class ChatController extends Controller
      * Mark messages in a chat as read.
      * Enforces server time and strictly advances forward (never moves backward).
      */
-    public function markAsRead(Request $request, Chat $chat): JsonResponse
+    public function markAsRead(Request $request, $chat): JsonResponse
     {
         $user = $request->user();
+        $chat = $this->resolveChat($chat);
 
         if (! $chat->hasActiveMember($user->id)) {
             abort(403, 'You are not a member of this project.');
@@ -545,9 +619,10 @@ class ChatController extends Controller
      * Soft delete a message.
      * Enforces server-side permissions: Sender OR Project Leader only.
      */
-    public function destroyMessage(Request $request, Chat $chat, Message $message): JsonResponse
+    public function destroyMessage(Request $request, $chat, Message $message): JsonResponse
     {
         $user = $request->user();
+        $chat = $this->resolveChat($chat);
 
         if (! $chat->hasActiveMember($user->id)) {
             abort(403, 'You are not a member of this project.');
@@ -584,9 +659,10 @@ class ChatController extends Controller
     /**
      * Restore a soft-deleted message within the 5-second Undo flow.
      */
-    public function restoreMessage(Request $request, Chat $chat, int $messageId): JsonResponse
+    public function restoreMessage(Request $request, $chat, int $messageId): JsonResponse
     {
         $user = $request->user();
+        $chat = $this->resolveChat($chat);
 
         if (! $chat->hasActiveMember($user->id)) {
             abort(403, 'You are not a member of this project.');
@@ -619,9 +695,10 @@ class ChatController extends Controller
      * Create a task from message popup within an atomic database transaction.
      * Modal opens first -> fills fields -> "Create task and send" -> atomic commit.
      */
-    public function createTask(Request $request, Chat $chat): JsonResponse
+    public function createTask(Request $request, $chat): JsonResponse
     {
         $user = $request->user();
+        $chat = $this->resolveChat($chat);
 
         // 1. Authorize member
         if (! $chat->hasActiveMember($user->id)) {
@@ -803,9 +880,10 @@ class ChatController extends Controller
     /**
      * Toggle pin status for the chat for current user.
      */
-    public function togglePin(Request $request, Chat $chat): JsonResponse
+    public function togglePin(Request $request, $chat): JsonResponse
     {
         $user = $request->user();
+        $chat = $this->resolveChat($chat);
 
         if (! $chat->hasActiveMember($user->id)) {
             abort(403, 'You are not a member of this project.');
@@ -827,9 +905,10 @@ class ChatController extends Controller
     /**
      * Toggle mute status for the chat for current user.
      */
-    public function toggleMute(Request $request, Chat $chat): JsonResponse
+    public function toggleMute(Request $request, $chat): JsonResponse
     {
         $user = $request->user();
+        $chat = $this->resolveChat($chat);
 
         if (! $chat->hasActiveMember($user->id)) {
             abort(403, 'You are not a member of this project.');

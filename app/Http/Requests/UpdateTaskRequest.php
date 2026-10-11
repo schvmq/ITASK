@@ -73,7 +73,7 @@ class UpdateTaskRequest extends FormRequest
         }
 
         // 2. Task Configuration Modification: ONLY Project Leader or Committee Staff can change config!
-        if ($this->hasAny(['title', 'description', 'due_date', 'assigned_to', 'requires_review'])) {
+        if ($this->hasAny(['title', 'description', 'due_date', 'priority', 'assigned_to', 'requires_review'])) {
             if (! $isLeader && ! $isStaff) {
                 return false;
             }
@@ -131,6 +131,7 @@ class UpdateTaskRequest extends FormRequest
             $rules['title'] = ['sometimes', 'required', 'string', 'max:255'];
             $rules['description'] = ['nullable', 'string'];
             $rules['due_date'] = ['nullable', 'date'];
+            $rules['priority'] = ['nullable', 'string', 'max:50'];
             $rules['requires_review'] = ['sometimes', 'boolean'];
             $rules['assigned_to'] = [
                 'nullable',
@@ -144,6 +145,7 @@ class UpdateTaskRequest extends FormRequest
                     $user = User::find($value);
                     if (! $user || ! $user->hasVerifiedEmail()) {
                         $fail('The assigned user must have a verified institutional email address.');
+
                         return;
                     }
 
@@ -185,18 +187,21 @@ class UpdateTaskRequest extends FormRequest
                 // 1. Cannot set status to Returned directly (only reviewers can return via /return)
                 if ($newStatus === Task::STATUS_RETURNED) {
                     $validator->errors()->add('status', 'Tasks cannot be set to Returned directly.');
+
                     return;
                 }
 
                 // 2. Completed tasks cannot change status
                 if ($task->status === Task::STATUS_COMPLETED && $newStatus !== Task::STATUS_COMPLETED) {
                     $validator->errors()->add('status', 'Completed tasks cannot be reopened or changed.');
+
                     return;
                 }
 
                 // 3. Tasks under review cannot change status directly via PATCH
                 if ($task->status === Task::STATUS_UNDER_REVIEW && $newStatus !== Task::STATUS_UNDER_REVIEW) {
                     $validator->errors()->add('status', 'Tasks under review cannot change status directly.');
+
                     return;
                 }
 
@@ -205,12 +210,14 @@ class UpdateTaskRequest extends FormRequest
                     // Cannot be marked Completed directly (must be approved via /approve)
                     if ($newStatus === Task::STATUS_COMPLETED) {
                         $validator->errors()->add('status', 'This task requires review and cannot be marked completed directly.');
+
                         return;
                     }
 
                     // Cannot be set to Under Review directly via PATCH (must use /submit endpoint)
                     if ($newStatus === Task::STATUS_UNDER_REVIEW) {
                         $validator->errors()->add('status', 'Tasks requiring review must be submitted via the submit endpoint.');
+
                         return;
                     }
                 }

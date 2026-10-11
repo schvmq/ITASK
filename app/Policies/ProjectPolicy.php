@@ -9,6 +9,32 @@ use App\Models\User;
 class ProjectPolicy
 {
     /**
+     * Determine whether the user can create projects.
+     * Allowed for Project Leaders; administrators are restricted to system administration only.
+     * Project Members and Project Staff without leadership roles are blocked.
+     */
+    public function create(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return false;
+        }
+
+        $isMemberOrStaff = $user->projectRoleAssignments()
+            ->whereIn('role', [ProjectRoleAssignment::ROLE_PROJECT_MEMBER, ProjectRoleAssignment::ROLE_PROJECT_STAFF])
+            ->exists();
+
+        $isLeader = $user->createdProjects()->exists() || $user->projectRoleAssignments()
+            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->exists();
+
+        if ($isMemberOrStaff && ! $isLeader) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Determine whether the user can view the project.
      * Allowed for: Project Creator, Project Leader, Project Staff, Project Member assigned to the project.
      */

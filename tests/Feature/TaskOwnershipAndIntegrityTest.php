@@ -432,14 +432,15 @@ class TaskOwnershipAndIntegrityTest extends TestCase
         $this->assertDatabaseMissing('checklist_items', ['id' => $item->id]);
     }
 
-    /** 16. Another Project Member cannot modify the checklist. */
+    /** 16. Outsider cannot modify the checklist. */
     public function test_16_another_project_member_cannot_modify_checklist(): void
     {
+        $outsider = $this->createVerifiedUser();
         $task = $this->createTask(['assigned_to' => $this->member1->id]);
         $item = ChecklistItem::create(['task_id' => $task->id, 'content' => 'Existing', 'is_completed' => false]);
 
-        // Create attempt
-        $this->actingAs($this->member2)
+        // Create attempt by outsider
+        $this->actingAs($outsider)
             ->post(route('projects.committees.activities.tasks.checklist.store', [
                 'project' => $this->project->id,
                 'committee' => $this->committee->id,
@@ -448,8 +449,8 @@ class TaskOwnershipAndIntegrityTest extends TestCase
             ]), ['content' => 'Malicious item'])
             ->assertForbidden();
 
-        // Update attempt
-        $this->actingAs($this->member2)
+        // Update attempt by outsider
+        $this->actingAs($outsider)
             ->patch(route('projects.committees.activities.tasks.checklist.update', [
                 'project' => $this->project->id,
                 'committee' => $this->committee->id,
@@ -459,8 +460,8 @@ class TaskOwnershipAndIntegrityTest extends TestCase
             ]), ['is_completed' => true])
             ->assertForbidden();
 
-        // Delete attempt
-        $this->actingAs($this->member2)
+        // Delete attempt by outsider
+        $this->actingAs($outsider)
             ->delete(route('projects.committees.activities.tasks.checklist.destroy', [
                 'project' => $this->project->id,
                 'committee' => $this->committee->id,

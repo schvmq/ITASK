@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import axios from 'axios';
 import {
     X,
     Calendar as CalendarIcon,
@@ -230,33 +231,29 @@ export function CreateTaskModal({
         const idempotencyKey = `task_${conversationId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
         try {
-            const csrfToken =
-                (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+            const metaToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
+            const match = typeof document !== 'undefined' ? document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/) : null;
+            const xsrfCookie = match ? decodeURIComponent(match[1]) : '';
 
-            const response = await fetch(`/chat/${conversationId}/tasks`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify({
-                    title: title.trim(),
-                    description: description.trim() || null,
-                    assignee_ids: selectedAssigneeIds,
-                    due_date: dueDate,
-                    priority,
-                    project_id: targetProjectId,
-                    idempotency_key: idempotencyKey,
-                }),
+            const headers: Record<string, string> = {
+                Accept: 'application/json',
+            };
+            if (metaToken) headers['X-CSRF-TOKEN'] = metaToken;
+            if (xsrfCookie) headers['X-XSRF-TOKEN'] = xsrfCookie;
+
+            const response = await axios.post(`/chat/${conversationId}/tasks`, {
+                title: title.trim(),
+                description: description.trim() || null,
+                assignee_ids: selectedAssigneeIds,
+                due_date: dueDate,
+                priority,
+                project_id: targetProjectId,
+                idempotency_key: idempotencyKey,
+            }, {
+                headers,
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Couldn't create the task. Nothing was sent. Try again.");
-            }
+            const data = response.data;
 
             // Success
             setIsSubmitting(false);
@@ -267,7 +264,12 @@ export function CreateTaskModal({
             onClose();
         } catch (err: any) {
             setIsSubmitting(false);
-            setErrorSummary(err.message || "Couldn't create the task. Nothing was sent. Try again.");
+            const msg =
+                err.response?.data?.message ||
+                (err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(' ') : null) ||
+                err.message ||
+                "Couldn't create the task. Nothing was sent. Try again.";
+            setErrorSummary(msg);
         }
     };
 
@@ -283,20 +285,20 @@ export function CreateTaskModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="create-task-title"
-                className="w-full max-w-[520px] max-[640px]:max-w-none bg-[var(--card)] border border-[var(--border)] rounded-[18px] max-[640px]:rounded-b-none shadow-2xl overflow-hidden animate-modal-in flex flex-col max-h-[90vh]"
+                className="messaging-root w-full max-w-[520px] max-[640px]:max-w-none bg-[color:var(--card)] border border-[color:var(--border)] rounded-[18px] max-[640px]:rounded-b-none shadow-2xl overflow-hidden animate-modal-in flex flex-col max-h-[90vh]"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ── Modal Header ── */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] shrink-0">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[color:var(--border)] shrink-0">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-[#EC7505]/15 text-[#EC7505] flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-xl bg-[color:var(--status-primary-bg)] text-[color:var(--primary)] flex items-center justify-center">
                             <CheckSquare className="w-4 h-4 stroke-[2.5]" />
                         </div>
                         <div>
-                            <h3 id="create-task-title" className="text-base font-extrabold text-[var(--ink)]">
+                            <h3 id="create-task-title" className="text-base font-extrabold text-[color:var(--text)]">
                                 Create a task
                             </h3>
-                            <p className="text-xs text-[var(--muted)]">
+                            <p className="text-xs text-[color:var(--muted)]">
                                 Creates task and shares an interactive card in chat
                             </p>
                         </div>
@@ -304,7 +306,7 @@ export function CreateTaskModal({
                     <button
                         type="button"
                         onClick={handleRequestClose}
-                        className="p-1.5 rounded-lg text-[var(--muted)] hover:text-[var(--ink)] hover:bg-[var(--tint-neutral)] transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer msg-interactive"
                         aria-label="Close modal"
                     >
                         <X className="w-4 h-4" />
@@ -330,10 +332,10 @@ export function CreateTaskModal({
                     {/* 1. Task Title (Required, max 120) */}
                     <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                            <label htmlFor="task-title-input" className="font-bold text-[var(--ink)]">
-                                Task Title <span className="text-[#EC7505]">*</span>
+                            <label htmlFor="task-title-input" className="font-bold text-[color:var(--text)]">
+                                Task Title <span className="text-[color:var(--primary)]">*</span>
                             </label>
-                            <span className="text-[10px] text-[var(--muted)]">{title.length}/120</span>
+                            <span className="text-[10px] text-[color:var(--muted)]">{title.length}/120</span>
                         </div>
                         <input
                             ref={titleInputRef}
@@ -347,10 +349,10 @@ export function CreateTaskModal({
                                 if (errors.title) setErrors((prev) => ({ ...prev, title: undefined }));
                             }}
                             placeholder="e.g. Design wireframes for sprint review"
-                            className={`w-full px-3.5 py-2 rounded-xl border bg-[var(--card)] text-[var(--ink)] outline-none transition-colors ${
+                            className={`w-full px-3.5 py-2 rounded-xl border bg-[color:var(--card)] text-[color:var(--text)] outline-none transition-colors ${
                                 errors.title
                                     ? 'border-red-500 focus:ring-1 focus:ring-red-500'
-                                    : 'border-[var(--border)] focus:border-[#EC7505]'
+                                    : 'border-[color:var(--border)] focus:border-[color:var(--primary)]'
                             }`}
                         />
                         {errors.title && (
@@ -362,8 +364,8 @@ export function CreateTaskModal({
 
                     {/* 2. Description (Optional, multi-line) */}
                     <div className="space-y-1">
-                        <label htmlFor="task-desc-input" className="font-bold text-[var(--ink)]">
-                            Description <span className="font-normal text-[var(--muted)]">(optional)</span>
+                        <label htmlFor="task-desc-input" className="font-bold text-[color:var(--text)]">
+                            Description <span className="font-normal text-[color:var(--muted)]">(optional)</span>
                         </label>
                         <textarea
                             id="task-desc-input"
@@ -374,34 +376,34 @@ export function CreateTaskModal({
                                 handleFieldChange();
                             }}
                             placeholder="Add deliverables, criteria, or context..."
-                            className="w-full px-3.5 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--ink)] outline-none focus:border-[#EC7505] resize-none leading-relaxed"
+                            className="w-full px-3.5 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] outline-none focus:border-[color:var(--primary)] resize-none leading-relaxed"
                         />
                     </div>
 
                     {/* 3. Project Selection (Always prefilled and read-only in project chats) */}
                     <div className="space-y-1">
-                        <label className="font-bold text-[var(--ink)]">
+                        <label className="font-bold text-[color:var(--text)]">
                             Project
                         </label>
-                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[var(--tint-neutral)]/50 border border-[var(--border)] text-[var(--ink)] font-semibold">
-                            <FolderOpen className="w-4 h-4 text-[#EC7505]" />
+                        <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[color:var(--soft-surface)]/50 border border-[color:var(--border)] text-[color:var(--text)] font-semibold">
+                            <FolderOpen className="w-4 h-4 text-[color:var(--primary)]" />
                             <span className="truncate">
                                 {conversationProjectTitle || 'Current Project'}
                             </span>
-                            <span className="ml-auto text-[10px] text-[var(--muted)] font-medium">Locked to project</span>
+                            <span className="ml-auto text-[10px] text-[color:var(--muted)] font-medium">Locked to project</span>
                         </div>
                     </div>
 
                     {/* 4. Assign To (Searchable multi-select + "Assign to me") */}
                     <div className="space-y-1.5" ref={assigneeContainerRef} tabIndex={-1}>
                         <div className="flex items-center justify-between">
-                            <label className="font-bold text-[var(--ink)]">
-                                Assign to <span className="text-[#EC7505]">*</span>
+                            <label className="font-bold text-[color:var(--text)]">
+                                Assign to <span className="text-[color:var(--primary)]">*</span>
                             </label>
                             <button
                                 type="button"
                                 onClick={handleAssignToMe}
-                                className="text-[11px] font-bold text-[#B35400] dark:text-[#FFBB00] hover:underline cursor-pointer flex items-center gap-1"
+                                className="text-[11px] font-bold text-[color:var(--primary)] hover:underline cursor-pointer flex items-center gap-1"
                             >
                                 <UserCheck className="w-3 h-3" />
                                 <span>Assign to me</span>
@@ -410,13 +412,13 @@ export function CreateTaskModal({
 
                         {/* Search field */}
                         <div className="relative">
-                            <Search className="w-3.5 h-3.5 text-[var(--muted)] absolute left-3 top-1/2 -translate-y-1/2" />
+                            <Search className="w-3.5 h-3.5 text-[color:var(--muted)] absolute left-3 top-1/2 -translate-y-1/2" />
                             <input
                                 type="text"
                                 value={memberSearchTerm}
                                 onChange={(e) => setMemberSearchTerm(e.target.value)}
                                 placeholder="Search project members..."
-                                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--ink)] outline-none focus:border-[#EC7505]"
+                                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] outline-none focus:border-[color:var(--primary)]"
                             />
                         </div>
 
@@ -425,11 +427,11 @@ export function CreateTaskModal({
                             className={`max-h-36 overflow-y-auto space-y-1 p-1 rounded-xl border ${
                                 errors.assignees
                                     ? 'border-red-500'
-                                    : 'border-[var(--border)] bg-[var(--tint-neutral)]/20'
+                                    : 'border-[color:var(--border)] bg-[color:var(--soft-surface)]/20'
                             }`}
                         >
                             {filteredMembers.length === 0 ? (
-                                <p className="p-3 text-center text-[11px] text-[var(--muted)] italic">
+                                <p className="p-3 text-center text-[11px] text-[color:var(--muted)] italic">
                                     No members found in this project
                                 </p>
                             ) : (
@@ -440,21 +442,21 @@ export function CreateTaskModal({
                                             key={member.id}
                                             type="button"
                                             onClick={() => toggleAssignee(member.id)}
-                                            className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer ${
+                                            className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-colors cursor-pointer msg-interactive ${
                                                 isSelected
-                                                    ? 'bg-[var(--tint-yellow)] text-[#2A2A2A]'
-                                                    : 'hover:bg-[var(--tint-neutral)]/40 text-[var(--ink)]'
+                                                    ? 'bg-[color:var(--status-primary-bg)] text-[color:var(--primary)] font-bold'
+                                                    : 'hover:bg-[color:var(--soft-surface)]/40 text-[color:var(--text)]'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <Avatar size="sm">
-                                                    <AvatarFallback className="text-[9px] font-bold bg-[#FFBB00] text-[#2A2A2A]">
+                                                    <AvatarFallback className="text-[9px] font-bold bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)]">
                                                         {getInitials(member.name)}
                                                     </AvatarFallback>
                                                 </Avatar>
                                                 <div className="min-w-0">
                                                     <p className="font-bold truncate">{member.name}</p>
-                                                    <p className="text-[10px] text-[var(--muted)] truncate">
+                                                    <p className="text-[10px] text-[color:var(--muted)] truncate">
                                                         {member.email}
                                                     </p>
                                                 </div>
@@ -462,8 +464,8 @@ export function CreateTaskModal({
                                             <div
                                                 className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                                                     isSelected
-                                                        ? 'bg-[#EC7505] border-[#EC7505] text-white'
-                                                        : 'border-[var(--border)] bg-[var(--card)]'
+                                                        ? 'bg-[color:var(--primary)] border-[color:var(--primary)] text-white'
+                                                        : 'border-[color:var(--border)] bg-[color:var(--card)]'
                                                 }`}
                                             >
                                                 {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
@@ -484,8 +486,8 @@ export function CreateTaskModal({
                     <div className="grid grid-cols-2 gap-3 pt-1">
                         {/* Due Date (No past dates) */}
                         <div className="space-y-1">
-                            <label htmlFor="task-due-date" className="font-bold text-[var(--ink)]">
-                                Due date <span className="text-[#EC7505]">*</span>
+                            <label htmlFor="task-due-date" className="font-bold text-[color:var(--text)]">
+                                Due date <span className="text-[color:var(--primary)]">*</span>
                             </label>
                             <input
                                 ref={dateInputRef}
@@ -498,10 +500,10 @@ export function CreateTaskModal({
                                     handleFieldChange();
                                     if (errors.dueDate) setErrors((prev) => ({ ...prev, dueDate: undefined }));
                                 }}
-                                className={`w-full px-3 py-2 rounded-xl border bg-[var(--card)] text-[var(--ink)] outline-none ${
+                                className={`w-full px-3 py-2 rounded-xl border bg-[color:var(--card)] text-[color:var(--text)] outline-none ${
                                     errors.dueDate
                                         ? 'border-red-500'
-                                        : 'border-[var(--border)] focus:border-[#EC7505]'
+                                        : 'border-[color:var(--border)] focus:border-[color:var(--primary)]'
                                 }`}
                             />
                             {errors.dueDate && (
@@ -513,7 +515,7 @@ export function CreateTaskModal({
 
                         {/* Priority: Low, Medium, High */}
                         <div className="space-y-1">
-                            <label className="font-bold text-[var(--ink)]">Priority</label>
+                            <label className="font-bold text-[color:var(--text)]">Priority</label>
                             <div className="flex items-center gap-1.5 pt-0.5">
                                 {(['Low', 'Medium', 'High'] as const).map((p) => {
                                     const isSelected = priority === p;
@@ -525,14 +527,14 @@ export function CreateTaskModal({
                                                 setPriority(p);
                                                 handleFieldChange();
                                             }}
-                                            className={`flex-1 py-2 text-center rounded-xl font-bold transition-all cursor-pointer ${
+                                            className={`flex-1 py-2 text-center rounded-xl font-bold transition-all cursor-pointer msg-interactive ${
                                                 isSelected
                                                     ? p === 'High'
                                                         ? 'bg-red-500 text-white shadow-xs'
                                                         : p === 'Low'
                                                         ? 'bg-emerald-600 text-white shadow-xs'
-                                                        : 'bg-[#FFBB00] text-[#2A2A2A] shadow-xs'
-                                                    : 'border border-[var(--border)] bg-[var(--card)] text-[var(--muted)] hover:text-[var(--ink)]'
+                                                        : 'bg-[color:var(--primary)] text-white shadow-xs'
+                                                    : 'border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--muted)] hover:text-[color:var(--text)]'
                                             }`}
                                         >
                                             {p}
@@ -544,19 +546,19 @@ export function CreateTaskModal({
                     </div>
 
                     {/* ── Modal Footer ── */}
-                    <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[var(--border)] shrink-0">
+                    <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[color:var(--border)] shrink-0">
                         <button
                             type="button"
                             onClick={handleRequestClose}
                             disabled={isSubmitting}
-                            className="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--tint-neutral)] text-[var(--ink)] font-bold transition-colors cursor-pointer disabled:opacity-50 btn-press"
+                            className="px-4 py-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] font-bold transition-colors cursor-pointer disabled:opacity-50 msg-interactive"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="btn-primary-orange px-4 py-2 rounded-xl font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2 btn-press"
+                            className="px-4 py-2 rounded-xl font-bold bg-[color:var(--primary-btn)] hover:bg-[color:var(--primary-btn-hover)] text-white shadow-xs transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2 msg-interactive"
                         >
                             {isSubmitting ? (
                                 <>
@@ -581,14 +583,14 @@ export function CreateTaskModal({
                     onClick={() => setShowDiscardConfirm(false)}
                 >
                     <div
-                        className="w-full max-w-sm bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-5 space-y-4 animate-modal-in"
+                        className="messaging-root w-full max-w-sm bg-[color:var(--card)] border border-[color:var(--border)] rounded-2xl shadow-2xl p-5 space-y-4 animate-modal-in"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="space-y-1">
-                            <h4 id="discard-title" className="text-sm font-bold text-[var(--ink)]">
+                            <h4 id="discard-title" className="text-sm font-bold text-[color:var(--text)]">
                                 Discard this task?
                             </h4>
-                            <p className="text-xs text-[var(--muted)]">
+                            <p className="text-xs text-[color:var(--muted)]">
                                 The information you entered will not be saved. Your message text in the composer will remain intact.
                             </p>
                         </div>
@@ -596,7 +598,7 @@ export function CreateTaskModal({
                             <button
                                 type="button"
                                 onClick={() => setShowDiscardConfirm(false)}
-                                className="px-3.5 py-1.5 rounded-xl border border-[var(--border)] text-xs font-bold text-[var(--ink)] hover:bg-[var(--tint-neutral)]"
+                                className="px-3.5 py-1.5 rounded-xl border border-[color:var(--border)] text-xs font-bold text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] msg-interactive"
                             >
                                 Continue editing
                             </button>
@@ -606,7 +608,7 @@ export function CreateTaskModal({
                                     setShowDiscardConfirm(false);
                                     onClose();
                                 }}
-                                className="px-3.5 py-1.5 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700"
+                                className="px-3.5 py-1.5 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 msg-interactive"
                             >
                                 Discard
                             </button>

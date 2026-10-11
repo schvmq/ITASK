@@ -74,4 +74,21 @@ class Task extends Model
     {
         return $this->hasMany(TaskEvidence::class);
     }
+
+    protected static function booted(): void
+    {
+        static::saved(function (Task $task) {
+            $projectId = $task->activity?->project_id;
+            if ($projectId) {
+                \App\Services\ProjectProgressService::clearProjectProgressCache($projectId);
+            }
+        });
+
+        static::deleted(function (Task $task) {
+            $projectId = $task->activity?->project_id;
+            if ($projectId) {
+                \App\Services\ProjectProgressService::clearProjectProgressCache($projectId);
+            }
+        });
+    }
 }

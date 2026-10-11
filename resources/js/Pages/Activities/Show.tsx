@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { staggerContainer, cardVariant, rowVariant } from '@/animations';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { Modal } from '@/Components/Modal';
 import { FormField } from '@/Components/FormField';
@@ -313,6 +315,16 @@ export default function ActivityShow({
         setIsReminderModalOpen(true);
     };
 
+    // Auto-open reminder modal if requested via URL query (?remind=1)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('remind') === '1' && activity.can?.sendReminder) {
+                handleOpenReminderModal();
+            }
+        }
+    }, [activity.can?.sendReminder]);
+
     const handleSendReminderSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setReminderServerError(null);
@@ -586,7 +598,10 @@ export default function ActivityShow({
 
     // Checklist handlers
     const handleToggleChecklist = (task: TaskItem, item: ChecklistItemData) => {
-        if (!task.can.manageChecklist) return;
+        if (!task.can.manageChecklist) {
+            setChecklistError('You do not have authorization to manage this checklist.');
+            return;
+        }
 
         // Optimistically update viewingTask checklist items so the progress bar updates immediately
         if (viewingTask && viewingTask.id === task.id) {
@@ -599,11 +614,24 @@ export default function ActivityShow({
         }
 
         setChecklistProcessing(true);
+        setChecklistError(null);
         router.patch(
             `/projects/${project.id}/committees/${committee.id}/activities/${activity.id}/tasks/${task.id}/checklist/${item.id}`,
             { is_completed: !item.is_completed },
             {
                 preserveScroll: true,
+                onError: (err) => {
+                    // Revert optimistic toggle
+                    if (viewingTask && viewingTask.id === task.id) {
+                        setViewingTask({
+                            ...viewingTask,
+                            checklist_items: (viewingTask.checklist_items || []).map((ci) =>
+                                ci.id === item.id ? { ...ci, is_completed: item.is_completed } : ci
+                            ),
+                        });
+                    }
+                    setChecklistError(err?.message || 'Unable to update checklist item. Please check permissions.');
+                },
                 onFinish: () => setChecklistProcessing(false),
             }
         );
@@ -1014,14 +1042,22 @@ export default function ActivityShow({
                 <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                         <div className="space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 flex-wrap">
                                 <Link
-                                    href={`/projects/${project.id}/committees/${committee.id}`}
-                                    className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors mr-1"
+                                    href={`/projects/${project.id}`}
+                                    className="font-medium text-slate-600 hover:text-[color:var(--primary)] transition-colors inline-flex items-center gap-1"
                                 >
                                     <ArrowLeft className="w-3.5 h-3.5" />
-                                    <span>Back to Committee</span>
+                                    <span>{project.title}</span>
                                 </Link>
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                                <Link
+                                    href={`/projects/${project.id}/committees/${committee.id}`}
+                                    className="font-medium text-slate-600 hover:text-[color:var(--primary)] transition-colors"
+                                >
+                                    {committee.name}
+                                </Link>
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                                     Activity
                                 </span>
@@ -1064,13 +1100,13 @@ export default function ActivityShow({
                             </div>
                         </div>
 
-                        {/* Action Controls */}
-                        <div className="flex items-center gap-2 self-start shrink-0 flex-wrap">
+                        {/* Action Controls - Highlighted Send Reminders and View in Timeline */}
+                        <div className="flex items-center gap-2.5 self-start shrink-0 flex-wrap">
                             <Link
                                 href={`/projects/${project.id}/timeline`}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
+                                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 shadow-sm hover:shadow transition-all active:scale-95 ring-1 ring-white/20"
                             >
-                                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                <Calendar className="w-4 h-4 text-white" />
                                 <span>View in Timeline</span>
                             </Link>
 
@@ -1078,12 +1114,12 @@ export default function ActivityShow({
                             {activity.can.sendReminder && (
                                 <Button
                                     type="button"
-                                    variant="outline"
                                     size="sm"
                                     onClick={handleOpenReminderModal}
-                                    leftIcon={<Bell className="w-3.5 h-3.5 text-slate-500" />}
+                                    leftIcon={<Bell className="w-4 h-4 text-white animate-pulse" />}
+                                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold border-none shadow-sm hover:shadow transition-all active:scale-95 flex items-center gap-1.5"
                                 >
-                                    Send Reminder
+                                    <span>Send Reminders</span>
                                 </Button>
                             )}
 
@@ -1137,29 +1173,50 @@ export default function ActivityShow({
                 </div>
 
                 {/* ── Progress & Quick Metrics ── */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5">
+                <motion.div
+                    variants={staggerContainer}
+                    initial="hidden"
+                    animate="visible"
+                    className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+                >
+                    <motion.div
+                        variants={cardVariant}
+                        whileHover={{ y: -2 }}
+                        className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5"
+                    >
                         <span className="text-[11px] font-semibold text-slate-500">Tasks Completed</span>
                         <div className="flex items-center justify-between">
                             <span className="text-lg font-bold text-slate-900">
                                 {completedTasksCount} / {activity.tasks.length}
                             </span>
-                            <span className="text-xs font-bold text-[color:var(--color-brand-dark-green)]">
+                            <motion.span
+                                key={taskProgressPercent}
+                                initial={{ scale: 1.15 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', damping: 15 }}
+                                className="text-xs font-bold text-[color:var(--color-brand-dark-green)]"
+                            >
                                 {taskProgressPercent}%
-                            </span>
+                            </motion.span>
                         </div>
                         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                                className="h-full rounded-full transition-all duration-300"
+                            <motion.div
+                                className="h-full rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${taskProgressPercent}%` }}
+                                transition={{ type: 'spring', stiffness: 220, damping: 26 }}
                                 style={{
-                                    width: `${taskProgressPercent}%`,
                                     backgroundColor: 'var(--color-brand-dark-green)',
                                 }}
                             />
                         </div>
-                    </div>
+                    </motion.div>
 
-                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5">
+                    <motion.div
+                        variants={cardVariant}
+                        whileHover={{ y: -2 }}
+                        className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5"
+                    >
                         <span className="text-[11px] font-semibold text-slate-500">Committee Supervision</span>
                         <div className="flex items-center gap-1.5">
                             <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -1168,14 +1225,18 @@ export default function ActivityShow({
                             </span>
                         </div>
                         <p className="text-[11px] text-slate-400 truncate">Project Staff Head</p>
-                    </div>
+                    </motion.div>
 
-                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5">
+                    <motion.div
+                        variants={cardVariant}
+                        whileHover={{ y: -2 }}
+                        className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5"
+                    >
                         <span className="text-[11px] font-semibold text-slate-500">Parent Project</span>
                         <p className="text-sm font-bold text-slate-800 truncate">{project.title}</p>
                         <p className="text-[11px] text-slate-400">Status: {project.status}</p>
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
 
                 {/* ── Ready for Review Submission Callout (for Members) ── */}
                 {allTasksCompleted && activity.status === 'In Progress' && activity.can.submit && (
@@ -1431,18 +1492,27 @@ export default function ActivityShow({
 
                     {activity.tasks.length > 0 ? (
                         filteredTasks.length > 0 ? (
-                            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                                {filteredTasks.map((task) => {
-                                const checklistCount = task.checklist_items ? task.checklist_items.length : 0;
-                                const checklistCompleted = task.checklist_items
-                                    ? task.checklist_items.filter((i) => i.is_completed).length
-                                    : 0;
+                            <motion.div
+                                variants={staggerContainer}
+                                initial="hidden"
+                                animate="visible"
+                                className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden"
+                            >
+                                <AnimatePresence mode="popLayout">
+                                    {filteredTasks.map((task) => {
+                                        const checklistCount = task.checklist_items ? task.checklist_items.length : 0;
+                                        const checklistCompleted = task.checklist_items
+                                            ? task.checklist_items.filter((i) => i.is_completed).length
+                                            : 0;
 
-                                return (
-                                    <div
-                                        key={task.id}
-                                        className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/70 transition-colors"
-                                    >
+                                        return (
+                                            <motion.div
+                                                key={task.id}
+                                                variants={rowVariant}
+                                                layout
+                                                whileHover={{ x: 2 }}
+                                                className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/70 transition-colors"
+                                            >
                                         <div className="space-y-1.5 max-w-xl">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 {/* Status Badge or Member Status Dropdown */}
@@ -1643,10 +1713,11 @@ export default function ActivityShow({
                                                 </button>
                                             )}
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 );
                             })}
-                        </div>
+                                </AnimatePresence>
+                            </motion.div>
                         ) : (
                             <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
                                 <p className="text-xs text-slate-500">
@@ -1905,14 +1976,21 @@ export default function ActivityShow({
                                     </div>
                                     {/* Progress indicator */}
                                     <div className="text-left sm:text-right">
-                                        <span className="text-xs font-bold text-slate-800">
+                                        <motion.span
+                                            key={viewingTask.checklist_items?.filter((i) => i.is_completed).length ?? 0}
+                                            initial={{ scale: 1.15 }}
+                                            animate={{ scale: 1 }}
+                                            transition={{ type: 'spring', damping: 15 }}
+                                            className="text-xs font-bold text-slate-800"
+                                        >
                                             {viewingTask.checklist_items?.filter((i) => i.is_completed).length ?? 0} /{' '}
                                             {viewingTask.checklist_items?.length ?? 0} completed
-                                        </span>
+                                        </motion.span>
                                         <div className="w-32 h-1.5 bg-slate-200 rounded-full mt-1 overflow-hidden">
-                                            <div
-                                                className="h-full bg-[color:var(--color-brand-dark-green)] transition-all duration-300 rounded-full"
-                                                style={{
+                                            <motion.div
+                                                className="h-full bg-[color:var(--color-brand-dark-green)] rounded-full"
+                                                initial={{ width: 0 }}
+                                                animate={{
                                                     width: `${
                                                         viewingTask.checklist_items &&
                                                         viewingTask.checklist_items.length > 0
@@ -1926,6 +2004,7 @@ export default function ActivityShow({
                                                             : 0
                                                     }%`,
                                                 }}
+                                                transition={{ type: 'spring', stiffness: 220, damping: 26 }}
                                             />
                                         </div>
                                     </div>
@@ -1934,118 +2013,134 @@ export default function ActivityShow({
                                 {/* Items List */}
                                 <div className="space-y-2">
                                     {viewingTask.checklist_items && viewingTask.checklist_items.length > 0 ? (
-                                        <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white">
-                                            {viewingTask.checklist_items.map((item) => (
-                                                <div
-                                                    key={item.id}
-                                                    className={`p-3 flex items-start justify-between gap-3 transition-colors ${
-                                                        item.is_completed ? 'bg-slate-50/70' : 'hover:bg-slate-50/40'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                                                        <button
-                                                            type="button"
-                                                            disabled={
-                                                                !viewingTask.can.manageChecklist || checklistProcessing
-                                                            }
-                                                            onClick={() => handleToggleChecklist(viewingTask, item)}
-                                                            className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                                                                item.is_completed
-                                                                    ? 'bg-[color:var(--color-brand-action-orange)] border-[color:var(--color-brand-action-orange)] text-white'
-                                                                    : 'border-slate-300 hover:border-slate-400 bg-white'
-                                                            } ${
-                                                                viewingTask.can.manageChecklist
-                                                                    ? 'cursor-pointer'
-                                                                    : 'cursor-not-allowed opacity-75'
-                                                            }`}
-                                                            title={
-                                                                viewingTask.can.manageChecklist
-                                                                    ? item.is_completed
-                                                                        ? 'Mark incomplete'
-                                                                        : 'Mark complete'
-                                                                    : 'Only assigned personnel, Project Staff, or Leader can toggle checklist items'
-                                                            }
-                                                        >
-                                                            {item.is_completed && (
-                                                                <Check className="w-3 h-3 stroke-[3]" />
-                                                            )}
-                                                        </button>
+                                        <motion.div
+                                            variants={staggerContainer}
+                                            initial="hidden"
+                                            animate="visible"
+                                            className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white"
+                                        >
+                                            <AnimatePresence mode="popLayout">
+                                                {viewingTask.checklist_items.map((item) => (
+                                                    <motion.div
+                                                        key={item.id}
+                                                        variants={rowVariant}
+                                                        layout
+                                                        whileHover={{ x: 2 }}
+                                                        className={`p-3 flex items-start justify-between gap-3 transition-colors ${
+                                                            item.is_completed ? 'bg-slate-50/70' : 'hover:bg-slate-50/40'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                                            <button
+                                                                type="button"
+                                                                disabled={
+                                                                    !viewingTask.can.manageChecklist || checklistProcessing
+                                                                }
+                                                                onClick={() => handleToggleChecklist(viewingTask, item)}
+                                                                className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                                                                    item.is_completed
+                                                                        ? 'bg-[color:var(--color-brand-action-orange)] border-[color:var(--color-brand-action-orange)] text-white'
+                                                                        : 'border-slate-300 hover:border-slate-400 bg-white'
+                                                                } ${
+                                                                    viewingTask.can.manageChecklist
+                                                                        ? 'cursor-pointer'
+                                                                        : 'cursor-not-allowed opacity-75'
+                                                                }`}
+                                                                title={
+                                                                    viewingTask.can.manageChecklist
+                                                                        ? item.is_completed
+                                                                            ? 'Mark incomplete'
+                                                                            : 'Mark complete'
+                                                                        : 'Only assigned personnel, Project Staff, or Leader can toggle checklist items'
+                                                                }
+                                                            >
+                                                                {item.is_completed && (
+                                                                    <motion.div
+                                                                        initial={{ scale: 0 }}
+                                                                        animate={{ scale: 1 }}
+                                                                        transition={{ type: 'spring', damping: 15 }}
+                                                                    >
+                                                                        <Check className="w-3 h-3 stroke-[3]" />
+                                                                    </motion.div>
+                                                                )}
+                                                            </button>
 
-                                                        {editingChecklistId === item.id ? (
-                                                            <div className="flex-1 space-y-2">
-                                                                <input
-                                                                    type="text"
-                                                                    value={editingChecklistContent}
-                                                                    onChange={(e) =>
-                                                                        setEditingChecklistContent(e.target.value)
-                                                                    }
-                                                                    className="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
-                                                                    autoFocus
-                                                                    maxLength={500}
-                                                                />
-                                                                <div className="flex items-center gap-1.5">
+                                                            {editingChecklistId === item.id ? (
+                                                                <div className="flex-1 space-y-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editingChecklistContent}
+                                                                        onChange={(e) =>
+                                                                            setEditingChecklistContent(e.target.value)
+                                                                        }
+                                                                        className="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                                        autoFocus
+                                                                        maxLength={500}
+                                                                    />
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                handleSaveEditChecklist(viewingTask, item)
+                                                                            }
+                                                                            disabled={checklistProcessing}
+                                                                            className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 transition-opacity"
+                                                                        >
+                                                                            Save
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setEditingChecklistId(null)}
+                                                                            className="px-2 py-0.5 rounded text-[11px] text-slate-600 hover:bg-slate-100 transition-colors"
+                                                                        >
+                                                                            Cancel
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <span
+                                                                    className={`text-xs leading-relaxed break-words flex-1 ${
+                                                                        item.is_completed
+                                                                            ? 'line-through text-slate-400'
+                                                                            : 'text-slate-700'
+                                                                    }`}
+                                                                >
+                                                                    {item.content}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {viewingTask.can.manageChecklist &&
+                                                            editingChecklistId !== item.id && (
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setEditingChecklistId(item.id);
+                                                                            setEditingChecklistContent(item.content);
+                                                                        }}
+                                                                        className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                                                        title="Edit item"
+                                                                    >
+                                                                        <Edit3 className="w-3.5 h-3.5" />
+                                                                    </button>
                                                                     <button
                                                                         type="button"
                                                                         onClick={() =>
-                                                                            handleSaveEditChecklist(viewingTask, item)
+                                                                            handleDeleteChecklist(viewingTask, item)
                                                                         }
                                                                         disabled={checklistProcessing}
-                                                                        className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 transition-opacity"
+                                                                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                                                        title="Delete item"
                                                                     >
-                                                                        Save
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setEditingChecklistId(null)}
-                                                                        className="px-2 py-0.5 rounded text-[11px] text-slate-600 hover:bg-slate-100 transition-colors"
-                                                                    >
-                                                                        Cancel
+                                                                        <Trash2 className="w-3.5 h-3.5" />
                                                                     </button>
                                                                 </div>
-                                                            </div>
-                                                        ) : (
-                                                            <span
-                                                                className={`text-xs leading-relaxed break-words flex-1 ${
-                                                                    item.is_completed
-                                                                        ? 'line-through text-slate-400'
-                                                                        : 'text-slate-700'
-                                                                }`}
-                                                            >
-                                                                {item.content}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {viewingTask.can.manageChecklist &&
-                                                        editingChecklistId !== item.id && (
-                                                            <div className="flex items-center gap-1 shrink-0">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setEditingChecklistId(item.id);
-                                                                        setEditingChecklistContent(item.content);
-                                                                    }}
-                                                                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                                                                    title="Edit item"
-                                                                >
-                                                                    <Edit3 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        handleDeleteChecklist(viewingTask, item)
-                                                                    }
-                                                                    disabled={checklistProcessing}
-                                                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                                                                    title="Delete item"
-                                                                >
-                                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                </div>
-                                            ))}
-                                        </div>
+                                                            )}
+                                                    </motion.div>
+                                                ))}
+                                            </AnimatePresence>
+                                        </motion.div>
                                     ) : (
                                         <div className="p-4 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50 text-xs text-slate-500">
                                             No checklist items created for this task yet.
@@ -2053,38 +2148,44 @@ export default function ActivityShow({
                                     )}
 
                                     {/* Add Checklist Item Form */}
-                                    {viewingTask.can.manageChecklist && (
-                                        <form
-                                            onSubmit={(e) => handleAddChecklistItem(e, viewingTask)}
-                                            className="pt-2"
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={newChecklistContent}
-                                                    onChange={(e) => setNewChecklistContent(e.target.value)}
-                                                    placeholder="Add a new checklist item..."
-                                                    maxLength={500}
-                                                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
-                                                />
-                                                <Button
-                                                    type="submit"
-                                                    variant="primary"
-                                                    size="sm"
-                                                    disabled={checklistProcessing || !newChecklistContent.trim()}
-                                                    isLoading={checklistProcessing}
-                                                >
-                                                    <Plus className="w-3.5 h-3.5 mr-1" />
-                                                    <span>Add Item</span>
-                                                </Button>
-                                            </div>
-                                            {checklistError && (
-                                                <p className="text-[11px] text-rose-600 mt-1 font-medium">
-                                                    {checklistError}
-                                                </p>
-                                            )}
-                                        </form>
-                                    )}
+                                    <AnimatePresence>
+                                        {viewingTask.can.manageChecklist && (
+                                            <motion.form
+                                                initial={{ opacity: 0, height: 0, y: -4 }}
+                                                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                                                exit={{ opacity: 0, height: 0, y: -4 }}
+                                                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                                                onSubmit={(e) => handleAddChecklistItem(e, viewingTask)}
+                                                className="pt-2 overflow-hidden"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={newChecklistContent}
+                                                        onChange={(e) => setNewChecklistContent(e.target.value)}
+                                                        placeholder="Add a new checklist item..."
+                                                        maxLength={500}
+                                                        className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
+                                                    />
+                                                    <Button
+                                                        type="submit"
+                                                        variant="primary"
+                                                        size="sm"
+                                                        disabled={checklistProcessing || !newChecklistContent.trim()}
+                                                        isLoading={checklistProcessing}
+                                                    >
+                                                        <Plus className="w-3.5 h-3.5 mr-1" />
+                                                        <span>Add Item</span>
+                                                    </Button>
+                                                </div>
+                                                {checklistError && (
+                                                    <p className="text-[11px] text-rose-600 mt-1 font-medium">
+                                                        {checklistError}
+                                                    </p>
+                                                )}
+                                            </motion.form>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                             </div>
 

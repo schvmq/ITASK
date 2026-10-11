@@ -130,6 +130,67 @@ export default function Login() {
                 </div>
             </form>
 
+            {/* Quick Demo Fill Accounts */}
+            <div className="mt-5 p-3 rounded-[10px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-left">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
+                        Quick Demo Accounts (Password: password)
+                    </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setData((prev) => ({ ...prev, email: 'admin.itask@carsu.edu.ph', password: 'password' }));
+                            clearErrors();
+                        }}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded-[6px] bg-[color:var(--card)] hover:bg-[color:var(--primary)] hover:text-white border border-[color:var(--border)] transition-colors cursor-pointer"
+                    >
+                        🛡️ Admin
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setData((prev) => ({ ...prev, email: 'bryanjay.oja@carsu.edu.ph', password: 'password' }));
+                            clearErrors();
+                        }}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded-[6px] bg-[color:var(--card)] hover:bg-[color:var(--primary)] hover:text-white border border-[color:var(--border)] transition-colors cursor-pointer"
+                    >
+                        👤 Bryan Jay
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setData((prev) => ({ ...prev, email: 'leader.itask@carsu.edu.ph', password: 'password' }));
+                            clearErrors();
+                        }}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded-[6px] bg-[color:var(--card)] hover:bg-[color:var(--primary)] hover:text-white border border-[color:var(--border)] transition-colors cursor-pointer"
+                    >
+                        👑 Leader
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setData((prev) => ({ ...prev, email: 'staff.itask@carsu.edu.ph', password: 'password' }));
+                            clearErrors();
+                        }}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded-[6px] bg-[color:var(--card)] hover:bg-[color:var(--primary)] hover:text-white border border-[color:var(--border)] transition-colors cursor-pointer"
+                    >
+                        ⚡ Staff
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setData((prev) => ({ ...prev, email: 'member01.itask@carsu.edu.ph', password: 'password' }));
+                            clearErrors();
+                        }}
+                        className="text-[11px] font-medium px-2.5 py-1 rounded-[6px] bg-[color:var(--card)] hover:bg-[color:var(--primary)] hover:text-white border border-[color:var(--border)] transition-colors cursor-pointer"
+                    >
+                        📋 Member
+                    </button>
+                </div>
+            </div>
+
             <div className="mt-6 pt-5 border-t border-[color:var(--border)] text-center space-y-2">
                 <p className="text-[13px] text-[color:var(--muted)]">
                     Don't have an account?{' '}

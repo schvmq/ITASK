@@ -4,12 +4,17 @@ import { createInertiaApp } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { TooltipProvider } from '@/Components/ui/tooltip';
+import { ErrorBoundary } from '@/Components/ErrorBoundary';
 import React from 'react';
 import { configureEcho } from '@laravel/echo-react';
 
-configureEcho({
-    broadcaster: 'reverb',
-});
+try {
+    configureEcho({
+        broadcaster: 'reverb',
+    });
+} catch (e) {
+    console.warn('Echo initialization warning:', e);
+}
 
 const appName = import.meta.env.VITE_APP_NAME || 'ITASK';
 
@@ -23,9 +28,11 @@ createInertiaApp({
     setup({ el, App, props }) {
         if (el) {
             createRoot(el).render(
-                <TooltipProvider>
-                    <App {...props} />
-                </TooltipProvider>,
+                <ErrorBoundary>
+                    <TooltipProvider>
+                        <App {...props} />
+                    </TooltipProvider>
+                </ErrorBoundary>,
             );
         }
     },
