@@ -1,0 +1,360 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views';
+@source '../js';
+@source '../**/*.blade.php';
+@source '../**/*.tsx';
+@source '../**/*.ts';
+
+/* ==========================================================================
+   DESIGN TOKENS (Brutalist-Refined Architecture Blueprint)
+   ========================================================================== */
+
+:root,
+:root[data-theme="light"] {
+    --text: #111827;
+    --background: #F8F9FA;
+    --primary: #EA580C;
+    --secondary: #F97316;
+    --accent: #10B981;
+
+    /* Primary button (Warm ITASK Ember/Orange) */
+    --primary-btn: #EA580C;
+    --primary-btn-hover: #F97316;
+    --primary-btn-active: #C2410C;
+    --primary-btn-text: #ffffff;
+
+    /* Derived surfaces & hairline structural boundaries */
+    --card: #FFFFFF;
+    --card-surface: #FAFAFA;
+    --border: #E5E7EB; /* border-neutral-200 */
+    --muted: #6B7280;
+    --soft-surface: #F3F4F6;
+
+    /* Semantic Status Mixes (Emerald, Amber, Crimson) */
+    /* Nominal / Completed (Emerald) */
+    --status-success: #10B981;
+    --status-success-bg: rgba(16, 185, 129, 0.1);
+    --status-success-border: rgba(16, 185, 129, 0.28);
+    --status-success-text: #059669;
+
+    /* In-Review / Planning (Amber) */
+    --status-neutral: #F59E0B;
+    --status-neutral-bg: rgba(245, 158, 11, 0.1);
+    --status-neutral-border: rgba(245, 158, 11, 0.28);
+    --status-neutral-text: #D97706;
+
+    /* Overdue / At-Risk / Critical (Crimson) */
+    --status-danger: #EF4444;
+    --status-danger-bg: rgba(239, 68, 68, 0.1);
+    --status-danger-border: rgba(239, 68, 68, 0.28);
+    --status-danger-text: #DC2626;
+
+    /* Primary Signature / Active States (Warm Ember/Orange) */
+    --status-primary: #EA580C;
+    --status-primary-bg: rgba(234, 88, 12, 0.1);
+    --status-primary-border: rgba(234, 88, 12, 0.28);
+    --status-primary-text: #EA580C;
+
+    /* Subtle depth shadows */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-2xs: 0 1px 1px 0 rgb(0 0 0 / 0.03);
+
+    /* Compatibility aliases */
+    --color-bg-page: var(--background);
+    --color-bg-card: var(--card);
+    --color-ink: var(--text);
+    --color-ink-muted: var(--muted);
+    --color-border-token: var(--border);
+}
+
+:root[data-theme="dark"],
+html.dark {
+    --text: #F3F4F6;
+    --background: #14181F; /* Neutral dark slate canvas */
+    --primary: #F97316;
+    --secondary: #FB923C;
+    --accent: #34D399;
+
+    /* Primary button for dark mode */
+    --primary-btn: #EA580C;
+    --primary-btn-hover: #F97316;
+    --primary-btn-active: #C2410C;
+    --primary-btn-text: #ffffff;
+
+    /* Derived surfaces & hairline structural boundaries */
+    --card: #0F1216; /* Neutral dark canvas card */
+    --card-surface: #181D24;
+    --border: #262626; /* dark:border-neutral-800 */
+    --muted: #9CA3AF;
+    --soft-surface: #1E232B;
+
+    /* Semantic Status Mixes (Emerald, Amber, Crimson) */
+    /* Nominal / Completed (Emerald) */
+    --status-success: #34D399;
+    --status-success-bg: rgba(16, 185, 129, 0.16);
+    --status-success-border: rgba(52, 211, 153, 0.32);
+    --status-success-text: #34D399;
+
+    /* In-Review / Planning (Amber) */
+    --status-neutral: #FBBF24;
+    --status-neutral-bg: rgba(245, 158, 11, 0.16);
+    --status-neutral-border: rgba(251, 191, 36, 0.32);
+    --status-neutral-text: #FBBF24;
+
+    /* Overdue / At-Risk / Critical (Crimson) */
+    --status-danger: #F87171;
+    --status-danger-bg: rgba(239, 68, 68, 0.16);
+    --status-danger-border: rgba(248, 113, 113, 0.32);
+    --status-danger-text: #F87171;
+
+    /* Primary Signature / Active States (Warm Ember/Orange) */
+    --status-primary: #FB923C;
+    --status-primary-bg: rgba(234, 88, 12, 0.16);
+    --status-primary-border: rgba(251, 146, 60, 0.32);
+    --status-primary-text: #FB923C;
+
+    /* Subtle depth shadows */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-2xs: 0 1px 1px 0 rgb(0 0 0 / 0.3);
+
+    /* Compatibility aliases */
+    --color-bg-page: var(--background);
+    --color-bg-card: var(--card);
+    --color-ink: var(--text);
+    --color-ink-muted: var(--muted);
+    --color-border-token: var(--border);
+}
+
+/* ==========================================================================
+   GLOBAL TYPOGRAPHY & RESETS
+   ========================================================================== */
+
+* {
+    border-color: var(--border);
+}
+
+body {
+    font-family: 'Montserrat', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text);
+    background-color: var(--background);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular numerals & figures for dates, deadlines, timestamps, and percentages */
+.tabular-nums,
+table,
+.stats-number,
+time,
+code,
+pre,
+.font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Subtle depth shadows */
+.shadow-xs {
+    box-shadow: var(--shadow-xs);
+}
+
+.shadow-2xs {
+    box-shadow: var(--shadow-2xs);
+}
+
+/* Typography Scale */
+h1, .page-title {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+    color: var(--text);
+}
+
+h2, .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
+}
+
+h3, .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--text);
+}
+
+p, span, div {
+    /* Sentence case guidance maintained */
+}
+
+/* ==========================================================================
+   FLAT CARDS (No gradients, glows, or decorative shadows; 1px border, 12px radius)
+   ========================================================================== */
+
+.itask-card {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+/* Attention Card: The only card with a primary left edge */
+.itask-card-attention {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+/* ==========================================================================
+   KEYBOARD FOCUS RING (3px primary, 2px offset on all interactive elements)
+   ========================================================================== */
+
+:focus-visible {
+    outline: 3px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid var(--primary) !important;
+    outline-offset: 2px !important;
+}
+
+/* ==========================================================================
+   BUTTONS & CONTROLS
+   ========================================================================== */
+
+.btn-primary {
+    background-color: var(--primary-btn);
+    color: #ffffff;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+    box-shadow: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: var(--primary-btn-hover);
+}
+
+.btn-primary:active:not(:disabled) {
+    background-color: var(--primary-btn-active);
+    transform: scale(0.99);
+}
+
+.btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background-color: var(--soft-surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--text) 9%, var(--background));
+}
+
+.btn-secondary:active:not(:disabled) {
+    transform: scale(0.99);
+}
+
+/* ==========================================================================
+   SUBTLE MOTION & REDUCED MOTION SUPPORT
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.18s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+    0% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.85;
+    }
+    100% {
+        opacity: 0.5;
+    }
+}
+
+.skeleton-shimmer {
+    background-color: var(--soft-surface);
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 6px;
+}
+
+/* Clean scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
