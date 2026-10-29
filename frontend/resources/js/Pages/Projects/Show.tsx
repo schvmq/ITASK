@@ -282,6 +282,8 @@ export default function ProjectShow({
         status: initialProject?.status ?? 'Active',
     });
 
+    const [showRespondentGuide, setShowRespondentGuide] = useState(true);
+
     const {
         data: committeeData,
         setData: setCommitteeData,
@@ -290,10 +292,16 @@ export default function ProjectShow({
         errors: committeeErrors,
         reset: resetCommitteeForm,
         clearErrors: clearCommitteeErrors,
-    } = useForm({
+    } = useForm<{
+        name: string;
+        description: string;
+        user_id: string;
+        member_ids: number[];
+    }>({
         name: '',
         description: '',
         user_id: '',
+        member_ids: [],
     });
 
     const {
@@ -403,6 +411,51 @@ export default function ProjectShow({
 
         return list;
     }, [initialProject]);
+
+    // Available project personnel that the Project Leader can assign as committee staff or members
+    const assignablePersonnelList = useMemo(() => {
+        const list: Array<{
+            id: number;
+            name: string;
+            email: string;
+            role: string;
+            committee_id?: string | null;
+            committee_name?: string | null;
+        }> = [];
+        const seen = new Set<number>();
+
+        (initialProject?.projectStaff || []).forEach((u) => {
+            if (!seen.has(u.id)) {
+                seen.add(u.id);
+                const comm = (initialProject?.committees || []).find((c) => String(c.id) === String(u.committee_id));
+                list.push({
+                    id: u.id,
+                    name: u.name,
+                    email: u.email,
+                    role: 'Project Staff',
+                    committee_id: u.committee_id,
+                    committee_name: comm?.name,
+                });
+            }
+        });
+
+        (initialProject?.projectMembers || []).forEach((u) => {
+            if (!seen.has(u.id)) {
+                seen.add(u.id);
+                const comm = (initialProject?.committees || []).find((c) => String(c.id) === String(u.committee_id));
+                list.push({
+                    id: u.id,
+                    name: u.name,
+                    email: u.email,
+                    role: 'Project Member',
+                    committee_id: u.committee_id,
+                    committee_name: comm?.name,
+                });
+            }
+        });
+
+        return list;
+    }, [initialProject?.projectStaff, initialProject?.projectMembers, initialProject?.committees]);
 
     // Keep viewingTask up to date when tasks are refreshed
     useEffect(() => {
@@ -526,6 +579,55 @@ export default function ProjectShow({
             <Head title={initialProject.title} />
 
             <div className="space-y-6">
+                {/* ══ Workflow & Survey Navigation Guide Banner ══ */}
+                {showRespondentGuide && (
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-slate-50 border border-indigo-100 shadow-2xs text-slate-800 transition-all">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-2 font-bold text-xs text-indigo-950 uppercase tracking-wider">
+                                <span className="flex h-2 w-2 rounded-full bg-indigo-600 animate-pulse" />
+                                <span>Project Usability & Workflow Guide (Survey Testing)</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowRespondentGuide(false)}
+                                className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                                title="Dismiss guide"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
+                            Follow these simple 4 steps to complete project management tasks or respondent survey instructions:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-3">
+                            <div className="p-2.5 rounded-lg bg-white/90 border border-indigo-100 text-xs space-y-1">
+                                <span className="font-bold text-indigo-700 block">1. Committees & Staff</span>
+                                <span className="text-[11px] text-slate-600 block leading-normal">
+                                    Leader creates committees and assigns staff/members. Committee members can also delegate staff!
+                                </span>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-white/90 border border-indigo-100 text-xs space-y-1">
+                                <span className="font-bold text-indigo-700 block">2. Create Tasks</span>
+                                <span className="text-[11px] text-slate-600 block leading-normal">
+                                    Add tasks with interactive checklists and deliverable MOV requirements under committees.
+                                </span>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-white/90 border border-indigo-100 text-xs space-y-1">
+                                <span className="font-bold text-indigo-700 block">3. Submit Deliverables</span>
+                                <span className="text-[11px] text-slate-600 block leading-normal">
+                                    Assigned members complete checklist items, upload files, and click &quot;Submit for Review&quot;.
+                                </span>
+                            </div>
+                            <div className="p-2.5 rounded-lg bg-white/90 border border-indigo-100 text-xs space-y-1">
+                                <span className="font-bold text-indigo-700 block">4. Leader & Staff Review</span>
+                                <span className="text-[11px] text-slate-600 block leading-normal">
+                                    Project Leader & Staff inspect deliverables, then &quot;Approve&quot; or &quot;Return for Revision&quot;.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* ══ Project Header (with progress and members) ══ */}
                 <motion.div variants={cardVariant} whileHover={{ y: -2 }}>
                     <Card className="p-5 sm:p-6 space-y-5">
@@ -1086,8 +1188,8 @@ export default function ProjectShow({
                                             )}
 
                                             <div className="text-[12px] text-[color:var(--muted)] space-y-1 pt-1">
-                                                <p>Staff: <span className="font-medium text-[color:var(--text)]">{comm.leadName || 'Unassigned'}</span></p>
-                                                <p>{comm.membersCount} members · {comm.activitiesCount} activities</p>
+                                                <p>Staff: <span className="font-medium text-[color:var(--text)]">{comm.leadName || comm.head?.name || 'Unassigned'}</span></p>
+                                                <p>{comm.membersCount} members · {comm.activitiesCount ?? comm.activities?.length ?? 0} activities</p>
                                             </div>
                                         </div>
 
@@ -1190,8 +1292,8 @@ export default function ProjectShow({
             <Modal
                 isOpen={isCreateCommitteeModalOpen}
                 onClose={() => !committeeProcessing && setIsCreateCommitteeModalOpen(false)}
-                title="Create committee"
-                maxWidth="md"
+                title="Create Committee & Assign Members"
+                maxWidth="lg"
             >
                 <form onSubmit={handleCreateCommitteeSubmit} className="space-y-4">
                     <FormField
@@ -1199,6 +1301,7 @@ export default function ProjectShow({
                         name="name"
                         value={committeeData.name}
                         onChange={(e) => setCommitteeData('name', e.target.value)}
+                        placeholder="e.g. Documentation Committee, Logistics Committee"
                         error={committeeErrors.name}
                         required
                     />
@@ -1206,13 +1309,102 @@ export default function ProjectShow({
                     <div>
                         <Label>Description</Label>
                         <textarea
-                            rows={3}
+                            rows={2}
                             value={committeeData.description}
                             onChange={(e) => setCommitteeData('description', e.target.value)}
-                            className="w-full mt-1 p-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px]"
+                            placeholder="Briefly state this committee's mandate and scope of work..."
+                            className="w-full mt-1 p-2.5 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)] leading-relaxed"
                         />
                         <InputError message={committeeErrors.description} />
                     </div>
+
+                    {/* Committee Head / Staff Assignment */}
+                    <div className="space-y-1.5 p-3.5 rounded-[10px] bg-[color:var(--soft-surface)]/60 border border-[color:var(--border)]">
+                        <Label htmlFor="committee-head-select" className="flex items-center justify-between">
+                            <span className="font-semibold text-[13px] text-[color:var(--text)]">Designate Committee Head (Project Staff)</span>
+                            <span className="text-[11px] text-[color:var(--muted)]">Optional</span>
+                        </Label>
+                        <p className="text-[11px] text-[color:var(--muted)] leading-relaxed">
+                            Select who will lead this committee. Assigned staff can review deliverables, add activities, and assign tasks.
+                        </p>
+                        <select
+                            id="committee-head-select"
+                            value={committeeData.user_id}
+                            onChange={(e) => setCommitteeData('user_id', e.target.value)}
+                            className="w-full mt-1 px-3 py-2 text-[13px] bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]"
+                        >
+                            <option value="">-- Choose who you want to assign as Head (or Leave Unassigned) --</option>
+                            {assignablePersonnelList.map((person) => {
+                                const currentComm = person.committee_name ? ` (Currently in ${person.committee_name})` : ' (Available)';
+                                return (
+                                    <option key={person.id} value={person.id}>
+                                        {person.name} — {person.role} - {person.email}{currentComm}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                        <InputError message={committeeErrors.user_id} />
+                    </div>
+
+                    {/* Initial Committee Members Multi-Select */}
+                    {assignablePersonnelList.length > 0 && (
+                        <div className="space-y-2 p-3.5 rounded-[10px] bg-[color:var(--soft-surface)]/40 border border-[color:var(--border)]">
+                            <div className="flex items-center justify-between">
+                                <Label className="font-semibold text-[13px] text-[color:var(--text)]">
+                                    Assign Initial Committee Members
+                                </Label>
+                                <span className="text-[11px] text-[color:var(--muted)]">
+                                    {committeeData.member_ids.length} selected
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-[color:var(--muted)]">
+                                Select members involved in this project to join this committee. Committee members can also choose and assign staff later.
+                            </p>
+                            <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1 pt-1">
+                                {assignablePersonnelList
+                                    .filter((p) => String(p.id) !== String(committeeData.user_id))
+                                    .map((person) => {
+                                        const isChecked = committeeData.member_ids.includes(person.id);
+                                        return (
+                                            <label
+                                                key={person.id}
+                                                className={`flex items-center justify-between p-2 rounded-[8px] border text-[12px] cursor-pointer transition-colors ${
+                                                    isChecked
+                                                        ? 'bg-[color:var(--primary)]/10 border-[color:var(--primary)]/40 text-[color:var(--text)]'
+                                                        : 'bg-[color:var(--card)] border-[color:var(--border)] hover:bg-[color:var(--soft-surface)] text-[color:var(--text)]'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setCommitteeData('member_ids', [...committeeData.member_ids, person.id]);
+                                                            } else {
+                                                                setCommitteeData(
+                                                                    'member_ids',
+                                                                    committeeData.member_ids.filter((id) => id !== person.id)
+                                                                );
+                                                            }
+                                                        }}
+                                                        className="rounded text-[color:var(--primary)] focus:ring-[color:var(--primary)]"
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <div className="font-semibold truncate">{person.name}</div>
+                                                        <div className="text-[10px] text-[color:var(--muted)] truncate">{person.email}</div>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-[color:var(--muted)] shrink-0">
+                                                    {person.role}
+                                                    {person.committee_name && ` (${person.committee_name})`}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-2 pt-2">
                         <Button

@@ -80,11 +80,11 @@ export default function Landing() {
                 <section className="py-16 sm:py-24 px-4 sm:px-8 max-w-5xl mx-auto text-center space-y-6">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[color:var(--border)] bg-[color:var(--soft-surface)] text-[12px] font-medium text-[color:var(--muted)]">
                         <span className="w-2 h-2 rounded-full bg-[color:var(--primary)]" />
-                        Built for university capstone & student group projects
+                        Built for Projects & Work Assignments
                     </div>
 
                     <h1 className="text-[34px] sm:text-[48px] font-extrabold tracking-tight text-[color:var(--text)] max-w-3xl mx-auto leading-tight">
-                        Structured project and task coordination for student teams
+                        Structured project and task coordination for teams
                     </h1>
 
                     <p className="text-[16px] sm:text-[18px] text-[color:var(--muted)] max-w-2xl mx-auto leading-relaxed">

@@ -50,7 +50,15 @@ class CommitteePolicy
      */
     public function manageMembers(User $user, Committee $committee): bool
     {
-        return $this->authService->canManageCommittee($user, $committee);
+        return $this->authService->canManageCommitteeMembers($user, $committee);
+    }
+
+    /**
+     * Determine whether the user can assign staff head for this committee.
+     */
+    public function assignStaff(User $user, Committee $committee): bool
+    {
+        return $this->authService->canManageCommitteeMembers($user, $committee);
     }
 }
 

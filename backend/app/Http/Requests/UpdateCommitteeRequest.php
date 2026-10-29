@@ -20,7 +20,15 @@ class UpdateCommitteeRequest extends FormRequest
             $committee = Committee::find($committee);
         }
 
-        return $committee && $this->user()?->can('update', $committee);
+        if (! $committee) {
+            return false;
+        }
+
+        if ($this->routeIs('*staff*') || ($this->has('user_id') && ! $this->has('name'))) {
+            return (bool) $this->user()?->can('manageMembers', $committee);
+        }
+
+        return (bool) $this->user()?->can('update', $committee);
     }
 
     /**
@@ -52,16 +60,12 @@ class UpdateCommitteeRequest extends FormRequest
                         return;
                     }
 
-                    $isStaff = ProjectRoleAssignment::where('project_id', $projectId)
+                    $isInProject = ProjectRoleAssignment::where('project_id', $projectId)
                         ->where('user_id', $value)
-                        ->whereIn('role', [
-                            ProjectRoleAssignment::ROLE_PROJECT_COMMITTEE,
-                            ProjectRoleAssignment::ROLE_PROJECT_STAFF,
-                        ])
                         ->exists();
 
-                    if (! $isStaff) {
-                        $fail('The selected user must be an assigned Project Committee or Staff member of this project.');
+                    if (! $isInProject) {
+                        $fail('The selected user must be an assigned member of this project.');
                     }
                 },
             ],

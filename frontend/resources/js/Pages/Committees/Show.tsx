@@ -563,15 +563,28 @@ export default function CommitteeShow({
                                 {/* Top-Right Action Buttons */}
                                 <div className="flex items-center gap-2.5 shrink-0">
                                     {committee.can.manageMembers && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleOpenAssignModal}
-                                            className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
-                                        >
-                                            Manage Members
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleOpenStaffModal}
+                                                className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
+                                            >
+                                                <UserPlus className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                                                <span>{committee.head ? 'Change Staff' : 'Assign Staff'}</span>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleOpenAssignModal}
+                                                className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
+                                            >
+                                                <Users className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                                                <span>Manage Members</span>
+                                            </Button>
+                                        </div>
                                     )}
 
                                     {committee.can.createActivity && (
@@ -604,22 +617,22 @@ export default function CommitteeShow({
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-lg rounded-xl p-1 z-50">
                                                 {committee.can.update && (
-                                                    <>
-                                                        <DropdownMenuItem
-                                                            onClick={handleOpenEditModal}
-                                                            className="cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg px-2.5 py-2 flex items-center gap-2"
-                                                        >
-                                                            <Edit3 className="w-3.5 h-3.5 text-slate-500" />
-                                                            <span>Edit Committee</span>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={handleOpenStaffModal}
-                                                            className="cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg px-2.5 py-2 flex items-center gap-2"
-                                                        >
-                                                            <UserPlus className="w-3.5 h-3.5 text-slate-500" />
-                                                            <span>{committee.head ? 'Change Project Staff' : 'Assign Project Staff'}</span>
-                                                        </DropdownMenuItem>
-                                                    </>
+                                                    <DropdownMenuItem
+                                                        onClick={handleOpenEditModal}
+                                                        className="cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg px-2.5 py-2 flex items-center gap-2"
+                                                    >
+                                                        <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                                                        <span>Edit Committee</span>
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {committee.can.manageMembers && (
+                                                    <DropdownMenuItem
+                                                        onClick={handleOpenStaffModal}
+                                                        className="cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg px-2.5 py-2 flex items-center gap-2"
+                                                    >
+                                                        <UserPlus className="w-3.5 h-3.5 text-slate-500" />
+                                                        <span>{committee.head ? 'Change Project Staff' : 'Assign Project Staff'}</span>
+                                                    </DropdownMenuItem>
                                                 )}
                                                 {committee.can.delete && (
                                                     <>
@@ -803,28 +816,63 @@ export default function CommitteeShow({
                                                 </div>
                                             </div>
 
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {committee.can.manageMembers && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleOpenStaffModal}
+                                                            className="text-[11px] font-semibold text-slate-600 hover:text-[color:var(--color-brand-action-orange)] px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                                                            title="Change committee staff"
+                                                        >
+                                                            Change
+                                                        </button>
+                                                    )}
+                                                    {(committee.head.tasks_count !== undefined && committee.head.tasks_count > 0) && (
+                                                        <div className="text-right">
+                                                            <span className="text-xs font-bold text-slate-700 tabular-nums">
+                                                                {committee.head.progress ?? 0}%
+                                                            </span>
+                                                            <p className="text-[10px] text-slate-400">
+                                                                {committee.head.tasks_count} tasks
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
                                             {(committee.head.tasks_count !== undefined && committee.head.tasks_count > 0) && (
-                                                <div className="text-right shrink-0">
-                                                    <span className="text-xs font-bold text-slate-700 tabular-nums">
-                                                        {committee.head.progress ?? 0}%
-                                                    </span>
-                                                    <p className="text-[10px] text-slate-400">
-                                                        {committee.head.tasks_count} tasks
-                                                    </p>
+                                                <div className="mt-2.5 w-full h-1.5 rounded-full bg-[color:var(--soft-surface)] overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full ${getProgressBarGradient(committee.head.progress ?? 0).barGradient}`}
+                                                        style={{ width: `${committee.head.progress ?? 0}%` }}
+                                                    />
                                                 </div>
                                             )}
                                         </div>
+                                    )}
 
-                                        {(committee.head.tasks_count !== undefined && committee.head.tasks_count > 0) && (
-                                            <div className="mt-2.5 w-full h-1.5 rounded-full bg-[color:var(--soft-surface)] overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full ${getProgressBarGradient(committee.head.progress ?? 0).barGradient}`}
-                                                    style={{ width: `${committee.head.progress ?? 0}%` }}
-                                                />
+                                    {/* Prompt to assign staff if unassigned */}
+                                    {!committee.head && (
+                                        <div className="bg-amber-50/70 rounded-xl border border-dashed border-amber-300 p-3.5 text-center">
+                                            <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-2">
+                                                <Shield className="w-4 h-4" />
                                             </div>
-                                        )}
-                                    </div>
-                                )}
+                                            <h4 className="text-xs font-bold text-amber-950">No Committee Staff Head</h4>
+                                            <p className="text-[11px] text-amber-800/80 max-w-xs mx-auto mt-0.5 leading-relaxed">
+                                                Committee members can choose and assign who will act as staff for this committee.
+                                            </p>
+                                            {committee.can.manageMembers && (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOpenStaffModal}
+                                                    className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                                                >
+                                                    <UserPlus className="w-3.5 h-3.5" />
+                                                    <span>Assign Staff Head</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
 
                                 {/* Committee Members list */}
                                 {committee.members.map((member) => (

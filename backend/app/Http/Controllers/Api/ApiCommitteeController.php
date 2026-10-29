@@ -42,11 +42,13 @@ class ApiCommitteeController extends Controller
                 $staffUserId = (int) $request->validated('user_id');
                 $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
                     ->where('user_id', $staffUserId)
-                    ->where('role', RoleRegistry::ROLE_PROJECT_STAFF)
                     ->first();
 
                 if ($staffAssignment) {
-                    $staffAssignment->update(['committee_id' => $committee->id]);
+                    $staffAssignment->update([
+                        'committee_id' => $committee->id,
+                        'role' => RoleRegistry::ROLE_PROJECT_STAFF,
+                    ]);
                 } else {
                     ProjectRoleAssignment::create([
                         'project_id' => $project->id,
@@ -54,6 +56,25 @@ class ApiCommitteeController extends Controller
                         'committee_id' => $committee->id,
                         'role' => RoleRegistry::ROLE_PROJECT_STAFF,
                     ]);
+                }
+            }
+
+            if ($request->filled('member_ids') && is_array($request->input('member_ids'))) {
+                foreach ($request->input('member_ids') as $mId) {
+                    $mUserId = (int) $mId;
+                    if ($request->filled('user_id') && $mUserId === (int) $request->validated('user_id')) {
+                        continue;
+                    }
+                    ProjectRoleAssignment::updateOrCreate(
+                        [
+                            'project_id' => $project->id,
+                            'user_id' => $mUserId,
+                            'committee_id' => $committee->id,
+                        ],
+                        [
+                            'role' => RoleRegistry::ROLE_PROJECT_MEMBER,
+                        ]
+                    );
                 }
             }
 
@@ -163,7 +184,7 @@ class ApiCommitteeController extends Controller
             return response()->json(['message' => 'Committee not found in this project.'], 404);
         }
 
-        Gate::authorize('update', $committee);
+        Gate::authorize('manageMembers', $committee);
 
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],

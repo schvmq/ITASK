@@ -37,16 +37,18 @@ class CommitteeController extends Controller
                 'description' => $request->validated('description'),
             ]);
 
-            // Assign the selected Project Staff member as head of this committee if provided
+            // Assign the selected user as staff head of this committee if provided
             if ($request->filled('user_id')) {
                 $staffUserId = (int) $request->validated('user_id');
                 $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
                     ->where('user_id', $staffUserId)
-                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
                     ->first();
 
                 if ($staffAssignment) {
-                    $staffAssignment->update(['committee_id' => $committee->id]);
+                    $staffAssignment->update([
+                        'committee_id' => $committee->id,
+                        'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                    ]);
                 } else {
                     ProjectRoleAssignment::create([
                         'project_id' => $project->id,
@@ -54,6 +56,35 @@ class CommitteeController extends Controller
                         'committee_id' => $committee->id,
                         'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
                     ]);
+                }
+            }
+
+            // Assign any initial members selected during committee creation
+            if ($request->filled('member_ids') && is_array($request->input('member_ids'))) {
+                foreach ($request->input('member_ids') as $mId) {
+                    $mUserId = (int) $mId;
+                    if ($request->filled('user_id') && $mUserId === (int) $request->validated('user_id')) {
+                        continue;
+                    }
+                    $memberAssignment = ProjectRoleAssignment::where('project_id', $project->id)
+                        ->where('user_id', $mUserId)
+                        ->whereNull('committee_id')
+                        ->first();
+
+                    if ($memberAssignment) {
+                        $memberAssignment->update(['committee_id' => $committee->id]);
+                    } else {
+                        ProjectRoleAssignment::firstOrCreate(
+                            [
+                                'project_id' => $project->id,
+                                'user_id' => $mUserId,
+                                'committee_id' => $committee->id,
+                            ],
+                            [
+                                'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+                            ]
+                        );
+                    }
                 }
             }
 
@@ -140,10 +171,15 @@ class CommitteeController extends Controller
             })()
             : [];
 
-        // Available Project Staff in this project for changing committee staff
+        // Available personnel in this project who can be selected as committee staff head
         $availableStaff = $canManage
             ? ProjectRoleAssignment::where('project_id', $project->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+                ->whereIn('role', [
+                    ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                    ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+                    ProjectRoleAssignment::ROLE_PROJECT_COMMITTEE,
+                    ProjectRoleAssignment::ROLE_COMMITTEE_STAFF,
+                ])
                 ->whereHas('user', function ($q) {
                     $q->whereNotNull('email_verified_at');
                 })
@@ -154,6 +190,7 @@ class CommitteeController extends Controller
                     'id' => $assignment->user->id,
                     'name' => $assignment->user->name,
                     'email' => $assignment->user->email,
+                    'role' => $assignment->role,
                     'committee_id' => $assignment->committee_id ? (string) $assignment->committee_id : null,
                     'committee_name' => $assignment->committee?->name,
                 ])
@@ -327,7 +364,47 @@ class CommitteeController extends Controller
      */
     public function assignStaff(UpdateCommitteeRequest $request, Project $project, Committee $committee): RedirectResponse
     {
-        return $this->update($request, $project, $committee);
+        if ((int) $committee->project_id !== (int) $project->id) {
+            abort(404, 'Committee not found in this project.');
+        }
+
+        Gate::authorize('manageMembers', $committee);
+
+        DB::transaction(function () use ($request, $project, $committee) {
+            $newStaffUserId = $request->validated('user_id') ? (int) $request->validated('user_id') : null;
+
+            // Clear previous staff assignment for this committee
+            ProjectRoleAssignment::where('project_id', $project->id)
+                ->where('committee_id', $committee->id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
+                ->when($newStaffUserId, fn ($q) => $q->where('user_id', '!=', $newStaffUserId))
+                ->update(['committee_id' => null]);
+
+            if ($newStaffUserId) {
+                $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
+                    ->where('user_id', $newStaffUserId)
+                    ->first();
+
+                if ($staffAssignment) {
+                    $staffAssignment->update([
+                        'committee_id' => $committee->id,
+                        'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                    ]);
+                } else {
+                    ProjectRoleAssignment::create([
+                        'project_id' => $project->id,
+                        'user_id' => $newStaffUserId,
+                        'committee_id' => $committee->id,
+                        'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                    ]);
+                }
+            }
+        });
+
+        return redirect()->route('projects.committees.show', [
+            'project' => $project->id,
+            'committee' => $committee->id,
+        ])->with('status', 'Committee staff assigned successfully.');
     }
 
     /**

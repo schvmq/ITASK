@@ -52,19 +52,17 @@ class StoreCommitteeRequest extends FormRequest
                         return;
                     }
 
-                    $isStaff = ProjectRoleAssignment::where('project_id', $projectId)
+                    $isInProject = ProjectRoleAssignment::where('project_id', $projectId)
                         ->where('user_id', $value)
-                        ->whereIn('role', [
-                            ProjectRoleAssignment::ROLE_PROJECT_COMMITTEE,
-                            ProjectRoleAssignment::ROLE_PROJECT_STAFF,
-                        ])
                         ->exists();
 
-                    if (! $isStaff) {
-                        $fail('The selected user must be an assigned Project Committee or Staff member of this project.');
+                    if (! $isInProject) {
+                        $fail('The selected user must be an assigned member of this project.');
                     }
                 },
             ],
+            'member_ids' => ['nullable', 'array'],
+            'member_ids.*' => ['integer', 'exists:users,id'],
         ];
     }
 

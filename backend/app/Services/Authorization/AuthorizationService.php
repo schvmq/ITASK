@@ -141,7 +141,7 @@ class AuthorizationService
 
         $project = $committee->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($this->canViewProject($user, $project)) {
             return true;
         }
 
@@ -181,7 +181,8 @@ class AuthorizationService
         }
 
         return $this->isProjectLeader($user, $committee->project)
-            || $this->isStaffInCommittee($user, $committee);
+            || $this->isStaffInCommittee($user, $committee)
+            || $this->isMemberInCommittee($user, $committee);
     }
 
     /**
@@ -193,16 +194,15 @@ class AuthorizationService
             return false;
         }
 
-        $project = $activity->project;
-        $committee = $activity->committee;
+        $project = $activity->project ?? $activity->committee?->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($project && $this->canViewProject($user, $project)) {
             return true;
         }
 
-        return $committee->roleAssignments()
+        return $activity->committee?->roleAssignments()
             ->where('user_id', $user->id)
-            ->exists();
+            ->exists() ?? false;
     }
 
     /**
@@ -269,6 +269,11 @@ class AuthorizationService
             return false;
         }
 
+        $project = $activity->project ?? $activity->committee?->project;
+        if ($project && $this->isProjectLeader($user, $project)) {
+            return true;
+        }
+
         return $this->isStaffInCommittee($user, $activity->committee);
     }
 
@@ -306,16 +311,15 @@ class AuthorizationService
         }
 
         $activity = $task->activity;
-        $project = $activity->project;
-        $committee = $activity->committee;
+        $project = $activity?->project ?? $activity?->committee?->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($project && $this->canViewProject($user, $project)) {
             return true;
         }
 
-        return $committee->roleAssignments()
+        return $activity?->committee?->roleAssignments()
             ->where('user_id', $user->id)
-            ->exists();
+            ->exists() ?? false;
     }
 
     /**
@@ -443,6 +447,11 @@ class AuthorizationService
     {
         if (! $user) {
             return false;
+        }
+
+        $project = $task->activity?->committee?->project ?? $task->activity?->project;
+        if ($project && $this->isProjectLeader($user, $project)) {
+            return true;
         }
 
         return $this->isStaffInCommittee($user, $task->activity->committee);

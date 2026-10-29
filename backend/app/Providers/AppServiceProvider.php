@@ -15,6 +15,7 @@ use App\Policies\TaskPolicy;
 use App\Models\Chat;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -43,5 +44,7 @@ class AppServiceProvider extends ServiceProvider
                 ?: Chat::where('project_id', $value)->first()
                 ?: abort(404, 'Chat not found.');
         });
+
+        Vite::createAssetPathsUsing(fn (string $path) => '/' . ltrim($path, '/'));
     }
 }
