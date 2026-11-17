@@ -196,10 +196,10 @@ export function CreateProjectModal({
                         </div>
                         <div>
                             <h3 className="text-[16px] font-semibold text-[color:var(--text)]">
-                                Create new project
+                                Create new event
                             </h3>
                             <p className="text-[12px] text-[color:var(--muted)]">
-                                Set up workspace details, schedule, and team members
+                                Set up event details, schedule, and committee members
                             </p>
                         </div>
                     </div>
@@ -219,7 +219,7 @@ export function CreateProjectModal({
                     {/* Project Title */}
                     <div>
                         <label className="block text-[13px] font-medium text-[color:var(--text)] mb-1">
-                            Project title <span className="text-[color:var(--primary)]">*</span>
+                            Event title <span className="text-[color:var(--primary)]">*</span>
                         </label>
                         <input
                             type="text"
@@ -227,7 +227,7 @@ export function CreateProjectModal({
                             autoFocus
                             value={data.title}
                             onChange={(e) => setData('title', e.target.value)}
-                            placeholder="e.g. Capstone Research Project 2026"
+                            placeholder="e.g. CCIS Accreditation Visit Task Force 2026"
                             className="w-full px-3.5 py-2 text-[14px] rounded-[8px] border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                         />
                         {errors.title && (
@@ -247,7 +247,7 @@ export function CreateProjectModal({
                             rows={2}
                             value={data.description}
                             onChange={(e) => setData('description', e.target.value)}
-                            placeholder="Summarize project goals, scope, and target outcomes..."
+                            placeholder="Summarize event goals, scope, and target outcomes..."
                             className="w-full px-3.5 py-2 text-[14px] rounded-[8px] border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 resize-none"
                         />
                         {errors.description && (
@@ -309,7 +309,7 @@ export function CreateProjectModal({
                     <div>
                         <div className="flex items-center justify-between mb-1">
                             <label className="text-[13px] font-medium text-[color:var(--text)]">
-                                Approval / supporting document <span className="text-[color:var(--primary)]">*</span>
+                                Special Order / designation document <span className="text-[color:var(--primary)]">*</span>
                             </label>
                             <span className="text-[11px] text-[color:var(--muted)]">
                                 PDF, Word, or Image · Max 10MB
@@ -361,10 +361,10 @@ export function CreateProjectModal({
                                         <Upload className="w-4 h-4 stroke-[2px]" />
                                     </div>
                                     <p className="text-[13px] font-medium text-[color:var(--text)]">
-                                        Click to attach official approval document
+                                        Click to attach official Special Order document
                                     </p>
                                     <p className="text-[11px] text-[color:var(--muted)]">
-                                        Approved project memo, syllabus task design, or endorsement letter
+                                        Official Special Order designating the task force/TWG and responsibilities
                                     </p>
                                 </div>
                             </div>
@@ -383,10 +383,10 @@ export function CreateProjectModal({
                             <div>
                                 <label className="text-[13px] font-medium text-[color:var(--text)] flex items-center gap-1.5">
                                     <Users className="w-4 h-4 text-[color:var(--primary)] stroke-[2px]" />
-                                    <span>Assign team members</span>
+                                    <span>Personnel & Committee Members</span>
                                 </label>
                                 <p className="text-[11px] text-[color:var(--muted)] mt-0.5">
-                                    Add student collaborators. You are automatically set as Project Leader.
+                                    Add faculty and committee members. You are automatically set as Overall Chair.
                                 </p>
                             </div>
 
@@ -406,7 +406,7 @@ export function CreateProjectModal({
                                         type="text"
                                         value={memberSearch}
                                         onChange={(e) => setMemberSearch(e.target.value)}
-                                        placeholder="Search available students by name or email..."
+                                        placeholder="Search available personnel by name or email..."
                                         className="w-full pl-8.5 pr-8 py-1.5 text-[13px] rounded-[8px] border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] placeholder-[color:var(--muted)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     />
                                     {memberSearch && (
@@ -424,7 +424,7 @@ export function CreateProjectModal({
                                 <div className="border border-[color:var(--border)] rounded-[8px] max-h-40 overflow-y-auto divide-y divide-[color:var(--border)] bg-[color:var(--card)]">
                                     {filteredUsers.length === 0 ? (
                                         <div className="p-3 text-center text-[12px] text-[color:var(--muted)]">
-                                            No students found matching "{memberSearch}"
+                                            No personnel found matching "{memberSearch}"
                                         </div>
                                     ) : (
                                         filteredUsers.map((user) => {
@@ -484,7 +484,7 @@ export function CreateProjectModal({
                                                                 className="text-[11px] font-medium px-2 py-1 rounded-[6px] border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] cursor-pointer"
                                                             >
                                                                 <option value="Project Member">Member</option>
-                                                                <option value="Project Staff">Staff</option>
+                                                                <option value="Project Staff">Chairperson</option>
                                                             </select>
                                                         </div>
                                                     )}
@@ -518,7 +518,7 @@ export function CreateProjectModal({
                         isLoading={processing}
                         disabled={processing || !data.title.trim() || !data.approval_document}
                     >
-                        Create project
+                        Create event
                     </Button>
                 </div>
             </div>

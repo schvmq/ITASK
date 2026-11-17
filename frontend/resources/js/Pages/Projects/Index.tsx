@@ -157,17 +157,17 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
 
     return (
         <AppLayout hidePageHeadingBanner={true}>
-            <Head title="Projects" />
+            <Head title="Events" />
 
             <div className="space-y-6">
                 {/* ══ 1. Page Header ══ */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[color:var(--border)]">
                     <div>
                         <h1 className="text-[26px] font-bold text-[color:var(--text)] tracking-tight">
-                            Projects
+                            Events
                         </h1>
                         <p className="text-[15px] text-[color:var(--muted)] mt-1">
-                            Team workspaces, committees, and collective deliverables.
+                            Institutional events, task forces, and Technical Working Groups.
                         </p>
                     </div>
 
@@ -197,7 +197,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                     onClick={() => openCreateProjectModal()}
                                     leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
                                 >
-                                    <span>Create project</span>
+                                    <span>Create event</span>
                                 </Button>
                             </>
                         )}
@@ -212,7 +212,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] pointer-events-none" />
                             <input
                                 type="text"
-                                placeholder="Search projects by title or description..."
+                                placeholder="Search events by title or description..."
                                 value={searchTerm}
                                 onChange={(e) => handleSearchChange(e.target.value)}
                                 className="w-full pl-9 pr-3 py-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] placeholder:text-[color:var(--muted)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors"
@@ -235,7 +235,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                 value={statusFilter}
                                 onChange={(e) => handleStatusFilterChange(e.target.value)}
                                 className="w-full py-2 px-3 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
-                                aria-label="Filter by project status"
+                                aria-label="Filter by event status"
                             >
                                 <option value="ALL">All statuses</option>
                                 <option value="Active">Active only</option>
@@ -253,8 +253,8 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                 aria-label="Filter by my role"
                             >
                                 <option value="ALL">All my roles</option>
-                                <option value="Leader">Leader</option>
-                                <option value="Staff">Staff</option>
+                                <option value="Leader">Overall Chair</option>
+                                <option value="Staff">Chairperson</option>
                                 <option value="Member">Member</option>
                             </select>
                         </div>
@@ -292,9 +292,9 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                 {/* ══ 3. Project Content (Table or Grid) ══ */}
                 {totalItems === 0 ? (
                     <EmptyState
-                        title="No projects found"
-                        description={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'No projects match your active search and filter criteria.' : isAdmin ? 'No projects currently in the catalog.' : 'You have not joined or created any projects yet. Create your first project to get started.'}
-                        actionLabel={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'Reset filters' : isAdmin ? undefined : 'Create a Project'}
+                        title="No events found"
+                        description={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'No events match your active search and filter criteria.' : isAdmin ? 'No events currently in the catalog.' : 'You have not joined or created any events yet. Create your first event to get started.'}
+                        actionLabel={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? 'Reset filters' : isAdmin ? undefined : 'Create an Event'}
                         onAction={searchTerm || statusFilter !== 'ALL' || roleFilter !== 'ALL' ? () => {
                             setStatusFilter('ALL');
                             setRoleFilter('ALL');
@@ -309,9 +309,9 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-[color:var(--border)] text-[12px] font-semibold text-[color:var(--muted)] uppercase tracking-wider">
-                                        <th className="py-2.5 pr-4">Project</th>
+                                        <th className="py-2.5 pr-4">Event</th>
                                         <th className="py-2.5 px-3">Status</th>
-                                        <th className="py-2.5 px-3">Progress</th>
+                                        <th className="py-2.5 px-3">Event Progress</th>
                                         <th className="py-2.5 px-3">Committees</th>
                                         <th className="py-2.5 px-3">Tasks</th>
                                         <th className="py-2.5 px-3">Deadline</th>
@@ -409,7 +409,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleArchiveToggle(project)}
-                                                                title={isArchived ? 'Restore project' : 'Archive project'}
+                                                                title={isArchived ? 'Restore event' : 'Archive event'}
                                                                 className="p-1.5 rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                                                 aria-label={isArchived ? `Restore ${project.title}` : `Archive ${project.title}`}
                                                             >
@@ -500,7 +500,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                                 return (
                                                     <div className="space-y-1.5 pt-1">
                                                         <div className="flex items-center justify-between text-[12px]">
-                                                            <span className="font-semibold text-[color:var(--muted)]">Progress</span>
+                                                            <span className="font-semibold text-[color:var(--muted)]">Event Progress</span>
                                                             <span className={`px-2 py-0.5 rounded-full font-bold text-[11px] tabular-nums border shadow-2xs ${pStyles.badgeBg} ${pStyles.badgeText} ${pStyles.badgeBorder}`}>
                                                                 {project.progress}%
                                                             </span>

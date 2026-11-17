@@ -77,7 +77,7 @@ export default function TimelineIndex({ projects, timelines = [] }: TimelineInde
                             Timeline
                         </h1>
                         <p className="text-[15px] text-[color:var(--muted)] mt-1">
-                            Gantt schedule and activity progress across your CCIS projects.
+                            Gantt schedule and deliverable progress across your CCIS events.
                         </p>
                     </div>
 
@@ -91,7 +91,7 @@ export default function TimelineIndex({ projects, timelines = [] }: TimelineInde
                         <Link href="/projects">
                             <Button variant="secondary" size="md">
                                 <FolderOpen className="w-4 h-4 mr-1.5" />
-                                <span>Projects</span>
+                                <span>Events</span>
                             </Button>
                         </Link>
                     </div>

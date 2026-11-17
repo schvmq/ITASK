@@ -25,6 +25,19 @@ import {
 // ─── Project-Scoped Roles ────────────────────────────────────────────────────
 export type ProjectRole = 'Project Leader' | 'Project Committee' | 'Committee Staff' | 'Project Staff' | 'Project Member';
 
+export const ROLE_DISPLAY_NAMES: Record<string, string> = {
+    'Project Leader': 'Overall Chair',
+    'Project Committee': 'Chairperson',
+    'Committee Staff': 'Member',
+    'Project Staff': 'Chairperson',
+    'Project Member': 'Member',
+};
+
+export function formatRole(role?: string | null): string {
+    if (!role) return '';
+    return ROLE_DISPLAY_NAMES[role] || role;
+}
+
 // ─── Navigation Item Interface ───────────────────────────────────────────────
 export interface NavItem {
     name: string;
@@ -71,8 +84,8 @@ export interface RoleConfig {
 export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
     'Project Leader': {
         role: 'Project Leader',
-        shortTitle: 'Leader',
-        tagline: 'Project Governance, Scope & Timeline',
+        shortTitle: 'Overall Chair',
+        tagline: 'Event Governance, Scope & Timeline',
         icon: Crown,
         accentColor: '#4F46E5', // Indigo
         badgeBg: 'rgba(79, 70, 229, 0.12)',
@@ -80,20 +93,20 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
         badgeText: '#4338CA',
         quickActions: [
             {
-                name: 'New Project',
-                description: 'Initiate a new CCIS project workspace',
+                name: 'New Event',
+                description: 'Initiate a new CCIS event workspace',
                 icon: PlusCircle,
                 actionEvent: 'itask:open-create-project',
             },
             {
                 name: 'Manage Committees',
-                description: 'Organize project committees & assign staff',
+                description: 'Organize event committees & assign members',
                 icon: Users,
                 href: '/projects',
             },
             {
                 name: 'Timeline & Gantt',
-                description: 'Track overall project schedule & milestones',
+                description: 'Track overall event schedule & milestones',
                 icon: GanttChartSquare,
                 href: '/timeline',
             },
@@ -101,8 +114,8 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
     },
     'Project Committee': {
         role: 'Project Committee',
-        shortTitle: 'Committee Lead',
-        tagline: 'Committee Operations, Staff & Review',
+        shortTitle: 'Chairperson',
+        tagline: 'Committee Operations, Deliverables & Review',
         icon: Shield,
         accentColor: '#059669', // Emerald
         badgeBg: 'rgba(5, 150, 105, 0.12)',
@@ -116,14 +129,14 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
                 href: '/my-tasks?status=Under+Review',
             },
             {
-                name: 'Assign Committee Staff',
-                description: 'Assign staff to committee deliverables',
+                name: 'Assign Committee Members',
+                description: 'Assign members to committee deliverables',
                 icon: Users,
                 href: '/projects',
             },
             {
                 name: 'Committee Hub',
-                description: 'Monitor committee activities and deliverables',
+                description: 'Monitor committee deliverables and tasks',
                 icon: FolderOpen,
                 href: '/projects',
             },
@@ -131,8 +144,8 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
     },
     'Committee Staff': {
         role: 'Committee Staff',
-        shortTitle: 'Staff',
-        tagline: 'Tasks, Activities, Checklists & Deliverables',
+        shortTitle: 'Member',
+        tagline: 'Tasks, Checklists & Deliverables',
         icon: Zap,
         accentColor: '#EA580C', // Orange
         badgeBg: 'rgba(234, 88, 12, 0.12)',
@@ -152,7 +165,7 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
                 href: '/calendar',
             },
             {
-                name: 'Project Messages',
+                name: 'Event Messages',
                 description: 'Collaborate with committee & team members',
                 icon: MessageSquare,
                 href: '/messages',
@@ -161,8 +174,8 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
     },
     'Project Staff': {
         role: 'Project Staff',
-        shortTitle: 'Committee Lead',
-        tagline: 'Committee Operations, Staff & Review',
+        shortTitle: 'Chairperson',
+        tagline: 'Committee Operations, Deliverables & Review',
         icon: Shield,
         accentColor: '#059669', // Emerald
         badgeBg: 'rgba(5, 150, 105, 0.12)',
@@ -183,7 +196,7 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
             },
             {
                 name: 'Committee Hub',
-                description: 'Monitor committee activities and deliverables',
+                description: 'Monitor committee deliverables and tasks',
                 icon: FolderOpen,
                 href: '/projects',
             },
@@ -212,8 +225,8 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
                 href: '/calendar',
             },
             {
-                name: 'Project Messages',
-                description: 'Collaborate with staff & team members',
+                name: 'Event Messages',
+                description: 'Collaborate with committee & team members',
                 icon: MessageSquare,
                 href: '/messages',
             },
@@ -238,11 +251,11 @@ export const GLOBAL_NAV_ITEMS: NavItem[] = [
         description: 'Personal task assignments and checklists',
     },
     {
-        name: 'Projects',
+        name: 'Events',
         href: '/projects',
         icon: FolderOpen,
         countKey: 'projects',
-        description: 'Projects and committees directory',
+        description: 'Events and committees directory',
     },
     {
         name: 'Timeline',
@@ -254,14 +267,14 @@ export const GLOBAL_NAV_ITEMS: NavItem[] = [
         name: 'Calendar',
         href: '/calendar',
         icon: CalendarDays,
-        description: 'Project deadlines and events schedule',
+        description: 'Event deadlines and schedule',
     },
     {
         name: 'Messages',
         href: '/messages',
         icon: MessageSquare,
         countKey: 'messages',
-        description: 'Team messaging and group chats',
+        description: 'Event messaging and group chats',
     },
     {
         name: 'Notifications',

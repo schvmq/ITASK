@@ -244,7 +244,7 @@ export function CreateProjectTaskModal({
                     <div className="p-3.5 rounded-[10px] bg-[color:var(--soft-surface)]/60 border border-[color:var(--border)] space-y-3">
                         <div className="flex items-center gap-2 text-[12px] font-semibold text-[color:var(--text)]">
                             <Layers className="w-4 h-4 text-[color:var(--primary)] stroke-[2]" />
-                            <span>Project Organization</span>
+                            <span>Event Organization</span>
                         </div>
 
                         {committees.length > 0 ? (
@@ -268,7 +268,7 @@ export function CreateProjectTaskModal({
 
                                 <div>
                                     <label className="block text-[11px] font-semibold text-[color:var(--muted)] mb-1 uppercase tracking-wider">
-                                        Activity
+                                        Deliverable
                                     </label>
                                     <select
                                         value={data.activity_id}
@@ -282,7 +282,7 @@ export function CreateProjectTaskModal({
                                                 </option>
                                             ))
                                         ) : (
-                                            <option value="">(Will create General Activity)</option>
+                                            <option value="">(Will create General Deliverable)</option>
                                         )}
                                     </select>
                                 </div>
@@ -293,7 +293,7 @@ export function CreateProjectTaskModal({
                                 <span>
                                     No committees yet. This task will automatically create and organize under{' '}
                                     <span className="font-semibold text-[color:var(--text)]">General Committee</span> &rarr;{' '}
-                                    <span className="font-semibold text-[color:var(--text)]">General Project Tasks</span>.
+                                    <span className="font-semibold text-[color:var(--text)]">General Event Tasks</span>.
                                 </span>
                             </div>
                         )}

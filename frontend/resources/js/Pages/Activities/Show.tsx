@@ -906,7 +906,7 @@ export default function ActivityShow({
                         href="/projects"
                         className="hover:text-[color:var(--color-brand-action-orange)] transition-colors"
                     >
-                        Projects
+                        Events
                     </Link>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <Link
@@ -937,7 +937,7 @@ export default function ActivityShow({
                             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="text-sm font-bold text-rose-900">Activity Returned for Revision</h3>
+                                    <h3 className="text-sm font-bold text-rose-900">Deliverable Returned for Revision</h3>
                                     {activity.reviewed_at && (
                                         <span className="text-xs text-rose-700">
                                             Reviewed on {activity.reviewed_at} {activity.reviewer ? `by ${activity.reviewer.name}` : ''}
@@ -946,12 +946,12 @@ export default function ActivityShow({
                                 </div>
                                 {activity.review_feedback && (
                                     <div className="mt-1 p-3 rounded-lg bg-white/90 border border-rose-200 text-xs text-rose-800 leading-relaxed">
-                                        <span className="font-semibold block mb-0.5 text-rose-900">Staff Review Feedback:</span>
+                                        <span className="font-semibold block mb-0.5 text-rose-900">Chairperson Review Feedback:</span>
                                         {activity.review_feedback}
                                     </div>
                                 )}
                                 <p className="text-xs text-rose-700 pt-0.5">
-                                    Please revise your assigned tasks to address the reviewer feedback. You may resubmit the activity when finished.
+                                    Please revise your assigned tasks to address the reviewer feedback. You may resubmit the deliverable when finished.
                                 </p>
                             </div>
                         </div>
@@ -963,7 +963,7 @@ export default function ActivityShow({
                                 className="shrink-0 self-start md:self-center"
                             >
                                 <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-                                <span>Resubmit for Review</span>
+                                <span>Resubmit Deliverable</span>
                             </Button>
                         )}
                     </div>
@@ -975,9 +975,9 @@ export default function ActivityShow({
                         <div className="flex items-start gap-3">
                             <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                             <div className="space-y-1">
-                                <h3 className="text-sm font-bold text-amber-900">Activity is Under Review</h3>
+                                <h3 className="text-sm font-bold text-amber-900">Deliverable is Under Review</h3>
                                 <p className="text-xs text-amber-700">
-                                    This activity has been submitted and is currently awaiting verification by the committee head (Project Staff).
+                                    This deliverable has been submitted and is currently awaiting verification by the committee head (Chairperson).
                                 </p>
                                 {activity.submission_notes && (
                                     <div className="mt-2 p-2.5 rounded-lg bg-white/90 border border-amber-200 text-xs text-amber-800">
@@ -1018,7 +1018,7 @@ export default function ActivityShow({
                         <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                         <div className="space-y-0.5">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="text-sm font-bold text-emerald-900">Activity Completed</h3>
+                                <h3 className="text-sm font-bold text-emerald-900">Deliverable Completed</h3>
                                 {activity.reviewed_at && (
                                     <span className="text-xs text-emerald-700">
                                         Approved on {activity.reviewed_at} {activity.reviewer ? `by ${activity.reviewer.name}` : ''}
@@ -1026,7 +1026,7 @@ export default function ActivityShow({
                                 )}
                             </div>
                             <p className="text-xs text-emerald-700">
-                                All deliverables for this activity have been verified and marked complete.
+                                All tasks for this deliverable have been verified and marked complete.
                             </p>
                             {activity.submission_notes && (
                                 <p className="text-[11px] text-emerald-800 pt-1">
@@ -1059,7 +1059,7 @@ export default function ActivityShow({
                                 </Link>
                                 <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                                    Activity
+                                    Deliverable
                                 </span>
                                 <span
                                     className={`inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full border ${getActivityStatusBadge(
@@ -1132,7 +1132,7 @@ export default function ActivityShow({
                                     onClick={handleOpenSubmitModal}
                                 >
                                     <Send className="w-3.5 h-3.5 mr-1" />
-                                    <span>Submit for Review</span>
+                                    <span>Submit Deliverable for Review</span>
                                 </Button>
                             )}
 
@@ -1221,10 +1221,10 @@ export default function ActivityShow({
                         <div className="flex items-center gap-1.5">
                             <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
                             <span className="text-sm font-bold text-slate-800 truncate">
-                                {committee.head?.name ?? 'Unassigned Staff'}
+                                {committee.head?.name ?? 'Unassigned Chairperson'}
                             </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate">Project Staff Head</p>
+                        <p className="text-[11px] text-slate-400 truncate">Chairperson (Head)</p>
                     </motion.div>
 
                     <motion.div
@@ -1232,7 +1232,7 @@ export default function ActivityShow({
                         whileHover={{ y: -2 }}
                         className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5"
                     >
-                        <span className="text-[11px] font-semibold text-slate-500">Parent Project</span>
+                        <span className="text-[11px] font-semibold text-slate-500">Parent Event</span>
                         <p className="text-sm font-bold text-slate-800 truncate">{project.title}</p>
                         <p className="text-[11px] text-slate-400">Status: {project.status}</p>
                     </motion.div>
@@ -1248,7 +1248,7 @@ export default function ActivityShow({
                                     All {activity.tasks.length} Tasks Completed!
                                 </p>
                                 <p className="text-[11px] text-emerald-800">
-                                    This activity is ready for submission. Submit it to Project Staff for committee-level verification and approval.
+                                    This deliverable is ready for submission. Submit it to Chairperson for committee-level verification and approval.
                                 </p>
                             </div>
                         </div>
@@ -1260,7 +1260,7 @@ export default function ActivityShow({
                             className="shrink-0 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
                         >
                             <Send className="w-3.5 h-3.5 mr-1" />
-                            <span>Submit Activity for Review</span>
+                            <span>Submit Deliverable for Review</span>
                         </Button>
                     </div>
                 )}
@@ -1270,7 +1270,7 @@ export default function ActivityShow({
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
                         <div>
                             <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
-                                Activity Tasks ({activity.tasks.length})
+                                Deliverable Tasks ({activity.tasks.length})
                             </h3>
                             <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
                                 Actionable work items executed by committee members
@@ -1296,11 +1296,11 @@ export default function ActivityShow({
                                 <div className="flex items-center gap-2">
                                     <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                                     <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
-                                        Staff Review Queue ({tasksAwaitingReview.length} awaiting review)
+                                        Chairperson Review Queue ({tasksAwaitingReview.length} awaiting review)
                                     </h4>
                                 </div>
                                 <span className="text-[11px] font-medium text-amber-800">
-                                    {activity.can.review ? 'Action required: Review task deliverables below' : 'Awaiting committee head review'}
+                                    {activity.can.review ? 'Action required: Review task deliverables below' : 'Awaiting Chairperson review'}
                                 </span>
                             </div>
 
@@ -3158,7 +3158,7 @@ export default function ActivityShow({
                         {/* Activity Context Card */}
                         <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
                             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
-                                Activity
+                                Deliverable
                             </span>
                             <p className="text-sm font-bold text-slate-900 mt-1">
                                 {activity.title}
@@ -3171,7 +3171,7 @@ export default function ActivityShow({
                                 Recipients
                             </span>
                             <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                                This reminder will be sent to personnel assigned to tasks under this activity.
+                                This reminder will be sent to personnel assigned to tasks under this deliverable.
                             </p>
                         </div>
 

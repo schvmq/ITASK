@@ -328,20 +328,20 @@ export default function ProjectShow({
 
     if (!initialProject) {
         return (
-            <AppLayout title="Project Not Found" subtitle="Project Workspace">
-                <Head title="Project Not Found" />
+            <AppLayout title="Event Not Found" subtitle="Event Workspace">
+                <Head title="Event Not Found" />
                 <div className="py-16 text-center space-y-4">
                     <div className="w-12 h-12 rounded-full bg-[color:var(--status-danger-bg)] text-[color:var(--status-danger-text)] flex items-center justify-center mx-auto">
                         <AlertCircle className="w-6 h-6" />
                     </div>
-                    <h2 className="text-[20px] font-bold text-[color:var(--text)]">Project not found</h2>
+                    <h2 className="text-[20px] font-bold text-[color:var(--text)]">Event not found</h2>
                     <p className="text-[14px] text-[color:var(--muted)] max-w-sm mx-auto">
-                        This project could not be found or you do not have permission to view it.
+                        This event could not be found or you do not have permission to view it.
                     </p>
                     <Link href="/projects">
                         <Button variant="primary" size="md">
                             <ArrowLeft className="w-4 h-4 mr-1.5" />
-                            <span>Back to projects</span>
+                            <span>Back to events</span>
                         </Button>
                     </Link>
                 </div>
@@ -519,7 +519,7 @@ export default function ProjectShow({
                 status: initialProject.status,
             }}
             breadcrumbs={[
-                { label: 'Projects', href: '/projects' },
+                { label: 'Events', href: '/projects' },
                 { label: initialProject.title },
             ]}
         >
@@ -552,7 +552,7 @@ export default function ProjectShow({
                             {/* Metadata row */}
                             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-[color:var(--muted)] pt-1">
                                 <div>
-                                    <span>Leader: </span>
+                                    <span>Overall Chair: </span>
                                     <span className="font-semibold text-[color:var(--text)]">
                                         {initialProject.leader?.name || 'Unassigned'}
                                     </span>
@@ -603,7 +603,7 @@ export default function ProjectShow({
                             <Link href={`/chat/${initialProject.id}`}>
                                 <Button variant="secondary" size="md">
                                     <MessageSquare className="w-4 h-4 mr-1.5" strokeWidth={2} />
-                                    <span>Project chat</span>
+                                    <span>Event chat</span>
                                 </Button>
                             </Link>
 
@@ -643,7 +643,7 @@ export default function ProjectShow({
                                             className="text-[13px] cursor-pointer"
                                         >
                                             <Edit3 className="w-3.5 h-3.5 mr-2" />
-                                            Edit project
+                                            Edit event
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                                         <DropdownMenuItem
@@ -651,7 +651,7 @@ export default function ProjectShow({
                                             className="text-[13px] text-[color:var(--primary)] cursor-pointer"
                                         >
                                             <Archive className="w-3.5 h-3.5 mr-2" />
-                                            Archive project
+                                            Archive event
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -670,7 +670,7 @@ export default function ProjectShow({
                                             : 'bg-[color:var(--primary)] animate-pulse ring-2 ring-[color:var(--primary)]/20'
                                     }`}
                                 />
-                                <span className="font-semibold text-[color:var(--muted)]">Overall progress</span>
+                                <span className="font-semibold text-[color:var(--muted)]">Overall event progress</span>
                             </div>
                             {(() => {
                                 const progVal = Math.round(initialProject.progress ?? 0);
@@ -752,9 +752,9 @@ export default function ProjectShow({
                     <Card className="p-5 space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border)]">
                             <div>
-                                <h2 className="text-[16px] font-bold text-[color:var(--text)]">Project tasks</h2>
+                                <h2 className="text-[16px] font-bold text-[color:var(--text)]">Event tasks</h2>
                                 <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
-                                    Operational deliverables across all committees
+                                    Operational tasks across all committees and deliverables
                                 </p>
                             </div>
                             <Button
@@ -772,7 +772,7 @@ export default function ProjectShow({
                         {allTasks.length === 0 ? (
                             <EmptyState
                                 title="No tasks created yet"
-                                description="Tasks are created inside committee activities by Project Staff to delegate work."
+                                description="Tasks are created inside committee deliverables by Chairpersons to delegate work."
                                 actionLabel="Create task"
                                 onAction={() => setIsCreateTaskModalOpen(true)}
                             />
@@ -782,10 +782,10 @@ export default function ProjectShow({
                                     <thead>
                                         <tr className="border-b border-[color:var(--border)] text-[12px] font-semibold text-[color:var(--muted)] uppercase tracking-wider">
                                             <th className="py-2.5 pr-4">Task</th>
-                                            <th className="py-2.5 px-3">Committee & Activity</th>
+                                            <th className="py-2.5 px-3">Committee & Deliverable</th>
                                             <th className="py-2.5 px-3">Assignee</th>
                                             <th className="py-2.5 px-3">Checklist</th>
-                                            <th className="py-2.5 px-3">Deliverables</th>
+                                            <th className="py-2.5 px-3">Evidence / MOV</th>
                                             <th className="py-2.5 px-3">Status</th>
                                             <th className="py-2.5 pl-3">Due date</th>
                                             <th className="py-2.5 pl-3 text-right">Action</th>
@@ -894,15 +894,15 @@ export default function ProjectShow({
                             <MessageSquare className="w-6 h-6 stroke-[2]" />
                         </div>
                         <div className="max-w-md mx-auto space-y-1">
-                            <h2 className="text-[18px] font-bold text-[color:var(--text)]">Project group chat</h2>
+                            <h2 className="text-[18px] font-bold text-[color:var(--text)]">Event group chat</h2>
                             <p className="text-[14px] text-[color:var(--muted)]">
-                                Collaborate with team members, share progress updates, and create tasks directly from conversation threads.
+                                Collaborate with committee members, share progress updates, and coordinate deliverables.
                             </p>
                         </div>
                         <div className="pt-2">
                             <Link href={`/chat/${initialProject.id}`}>
                                 <Button variant="primary" size="md">
-                                    <span>Open project chat</span>
+                                    <span>Open event chat</span>
                                     <ArrowRight className="w-4 h-4 ml-1.5" />
                                 </Button>
                             </Link>
@@ -915,9 +915,9 @@ export default function ProjectShow({
                     <Card className="p-5 space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[color:var(--border)]">
                             <div>
-                                <h2 className="text-[16px] font-bold text-[color:var(--text)]">Project files and documents</h2>
+                                <h2 className="text-[16px] font-bold text-[color:var(--text)]">Event files and Special Order documents</h2>
                                 <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
-                                    Official memos, activity designs, approval letters, and course submissions
+                                    Official Special Orders, activity designs, approval letters, and submissions
                                 </p>
                             </div>
                             {initialProject.can?.uploadDocument && (
@@ -939,7 +939,7 @@ export default function ProjectShow({
                         {allDocuments.length === 0 ? (
                             <EmptyState
                                 title="No documents attached"
-                                description="Approval documents such as official project charters or adviser letters will appear here."
+                                description="Special Order documents such as official appointment letters or event charters will appear here."
                                 actionLabel={initialProject.can?.uploadDocument ? "Attach first document" : undefined}
                                 onAction={initialProject.can?.uploadDocument ? () => setIsUploadDocumentModalOpen(true) : undefined}
                             />
@@ -1007,7 +1007,7 @@ export default function ProjectShow({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                         <Card className="p-5 space-y-3">
                             <span className="text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
-                                Total deliverables
+                                Total tasks
                             </span>
                             <p className="text-[28px] font-bold text-[color:var(--text)] tabular-nums">
                                 {allTasks.length}
@@ -1037,7 +1037,7 @@ export default function ProjectShow({
                                 {allDocuments.length}
                             </p>
                             <p className="text-[12px] text-[color:var(--muted)]">
-                                Official MOVs and approval files
+                                Official Special Orders, MOVs, and documentation
                             </p>
                         </Card>
                     </div>
@@ -1049,7 +1049,7 @@ export default function ProjectShow({
                         {allCommittees.length === 0 ? (
                             <EmptyState
                                 title="No committees established"
-                                description="Organize your project into functional committees headed by designated Project Staff members."
+                                description="Organize your event into functional committees headed by designated Chairpersons."
                                 actionLabel={canCreateCommittee ? "+ Add committee" : undefined}
                                 onAction={canCreateCommittee ? () => setIsCreateCommitteeModalOpen(true) : undefined}
                             />
@@ -1072,7 +1072,7 @@ export default function ProjectShow({
                                                 return (
                                                     <div className="w-full h-1.5 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden p-0">
                                                         <div
-                                                            className={`h-full rounded-full transition-all duration-300 ${cStyles.barGradient}`}
+                                                             className={`h-full rounded-full transition-all duration-300 ${cStyles.barGradient}`}
                                                             style={{ width: `${comm.progress > 0 ? Math.max(3, comm.progress) : 0}%` }}
                                                         />
                                                     </div>
@@ -1086,8 +1086,8 @@ export default function ProjectShow({
                                             )}
 
                                             <div className="text-[12px] text-[color:var(--muted)] space-y-1 pt-1">
-                                                <p>Staff: <span className="font-medium text-[color:var(--text)]">{comm.leadName || 'Unassigned'}</span></p>
-                                                <p>{comm.membersCount} members · {comm.activitiesCount} activities</p>
+                                                <p>Chairperson: <span className="font-medium text-[color:var(--text)]">{comm.leadName || 'Unassigned'}</span></p>
+                                                <p>{comm.membersCount} members · {comm.activitiesCount} deliverables</p>
                                             </div>
                                         </div>
 
@@ -1112,12 +1112,12 @@ export default function ProjectShow({
             <Modal
                 isOpen={isEditModalOpen}
                 onClose={() => !editProcessing && setIsEditModalOpen(false)}
-                title="Edit project details"
+                title="Edit event details"
                 maxWidth="md"
             >
                 <form onSubmit={handleEditSubmit} className="space-y-4">
                     <FormField
-                        label="Project title"
+                        label="Event title"
                         name="title"
                         value={editData.title}
                         onChange={(e) => setEditData('title', e.target.value)}
@@ -1159,7 +1159,7 @@ export default function ProjectShow({
             <Modal
                 isOpen={isArchiveModalOpen}
                 onClose={() => !archiveProcessing && setIsArchiveModalOpen(false)}
-                title="Archive project"
+                title="Archive event"
                 maxWidth="sm"
             >
                 <div className="space-y-4">
@@ -1237,7 +1237,7 @@ export default function ProjectShow({
             <Modal
                 isOpen={isUploadDocumentModalOpen}
                 onClose={() => !docProcessing && setIsUploadDocumentModalOpen(false)}
-                title="Attach project document"
+                title="Attach Special Order / event document"
                 maxWidth="md"
             >
                 <form onSubmit={handleUploadDocumentSubmit} className="space-y-4">

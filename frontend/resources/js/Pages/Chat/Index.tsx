@@ -1135,14 +1135,14 @@ export default function ChatIndex({
                     className={`msg-pane-conversations shrink-0 border-r border-[color:var(--border)] flex flex-col h-full bg-[color:var(--card)] overflow-hidden transition-all duration-200 ${
                         showMobileThread ? 'hidden md:flex' : 'flex'
                     }`}
-                    aria-label="Project chats list"
+                    aria-label="Event chats list"
                 >
-                        {/* Header: Project chats title & Search */}
+                        {/* Header: Event chats title & Search */}
                         <div className="p-3.5 pb-2 border-b border-[color:var(--border)] space-y-3 shrink-0">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <h1 className="text-lg font-extrabold text-[color:var(--text)] tracking-tight">
-                                        Project chats
+                                        Event chats
                                     </h1>
                                     {totalUnreadCount > 0 && (
                                         <span className="msg-badge-pulse px-2 py-0.5 rounded-full text-xs font-bold bg-[color:var(--primary)] text-white">
@@ -1159,9 +1159,9 @@ export default function ChatIndex({
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search project chats..."
+                                    placeholder="Search event chats..."
                                     className="w-full pl-9 pr-7 py-2 rounded-xl text-xs bg-[color:var(--soft-surface)] border border-[color:var(--border)] focus:border-[color:var(--primary)] text-[color:var(--text)] outline-none placeholder:text-[color:var(--muted)] transition-all"
-                                    aria-label="Search project chats"
+                                    aria-label="Search event chats"
                                 />
                                 {searchQuery && (
                                     <button
@@ -1212,12 +1212,12 @@ export default function ChatIndex({
                                 <div className="p-6 text-center space-y-2 text-[color:var(--muted)]">
                                     <FolderOpen className="w-8 h-8 mx-auto opacity-40 text-[color:var(--primary)]" />
                                     <p className="text-xs font-semibold text-[color:var(--text)]">
-                                        {searchQuery ? 'No matching chats found' : 'Chats appear with your projects'}
+                                        {searchQuery ? 'No matching chats found' : 'Chats appear with your events'}
                                     </p>
                                     <p className="text-[11px] leading-relaxed text-[color:var(--muted)]">
                                         {searchQuery
                                             ? 'Try searching with different keywords.'
-                                            : 'When you create or join a project, its group chat shows up here.'}
+                                            : 'When you create or join an event, its group chat shows up here.'}
                                     </p>
                                     {!searchQuery && (
                                         <div className="pt-2">
@@ -1226,7 +1226,7 @@ export default function ChatIndex({
                                                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[color:var(--primary)] text-white font-bold text-xs hover:opacity-90 transition-opacity"
                                             >
                                                 <Plus className="w-3.5 h-3.5" />
-                                                <span>Go to Projects</span>
+                                                <span>Go to Events</span>
                                             </Link>
                                         </div>
                                     )}
@@ -1350,7 +1350,7 @@ export default function ChatIndex({
                                                                 {archived.title}
                                                             </p>
                                                             <p className="text-[10px] text-[color:var(--muted)] truncate">
-                                                                Archived project
+                                                                Archived event
                                                             </p>
                                                         </div>
                                                     </button>
@@ -1383,7 +1383,7 @@ export default function ChatIndex({
                                         This chat isn't available
                                     </h2>
                                     <p className="text-xs text-[color:var(--muted)] leading-relaxed">
-                                        You may have been removed from the project, or the project was deleted.
+                                        You may have been removed from the event, or the event was deleted.
                                     </p>
                                 </div>
                                 <Button
@@ -1404,7 +1404,7 @@ export default function ChatIndex({
                                             type="button"
                                             onClick={() => setShowMobileThread(false)}
                                             className="msg-mobile-back-btn md:hidden msg-touch-target p-1.5 rounded-xl hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] cursor-pointer msg-interactive"
-                                            aria-label="Back to project chats"
+                                            aria-label="Back to event chats"
                                         >
                                             <ArrowLeft className="w-5 h-5" />
                                         </button>
@@ -1497,9 +1497,9 @@ export default function ChatIndex({
                                         <Link
                                             href={`/projects/${activeChat.project_id}`}
                                             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[color:var(--border)] text-xs font-bold text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors msg-interactive"
-                                            aria-label="Open project page"
+                                            aria-label="Open event page"
                                         >
-                                            <span>Open project</span>
+                                            <span>Open event</span>
                                             <ExternalLink className="w-3.5 h-3.5 text-[color:var(--muted)]" />
                                         </Link>
                                     </div>
@@ -1509,7 +1509,7 @@ export default function ChatIndex({
                                 {activeChat.is_archived && (
                                     <div className="bg-[color:var(--status-neutral-bg)] border-b border-[color:var(--status-neutral-border)] px-4 py-2 text-xs font-bold text-[color:var(--status-neutral-text)] flex items-center justify-center gap-2">
                                         <Lock className="w-3.5 h-3.5" />
-                                        <span>This project is archived. Messages are read-only.</span>
+                                        <span>This event is archived. Messages are read-only.</span>
                                     </div>
                                 )}
 
@@ -2025,7 +2025,7 @@ export default function ChatIndex({
                                     {mentionFilter !== null && mentionSuggestions.length > 0 && (
                                         <div className="absolute bottom-full left-3 right-3 sm:left-4 sm:right-4 mb-2 p-1.5 rounded-2xl bg-[color:var(--card)] border border-[color:var(--border)] shadow-2xl max-h-48 overflow-y-auto z-40 space-y-0.5 animate-modal-in">
                                             <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
-                                                Mention project member
+                                                Mention event member
                                             </p>
                                             {mentionSuggestions.map((m, idx) => (
                                                 <button
@@ -2101,7 +2101,7 @@ export default function ChatIndex({
                                                 disabled={activeChat.is_archived}
                                                 placeholder={
                                                     activeChat.is_archived
-                                                        ? 'This project is archived. Messages are read-only.'
+                                                        ? 'This event is archived. Messages are read-only.'
                                                         : 'Write a message. Use @ to mention someone'
                                                 }
                                                 className="w-full px-3.5 py-2.5 text-xs bg-transparent text-[color:var(--text)] outline-none resize-none leading-relaxed placeholder:text-[color:var(--muted)] disabled:opacity-50"
@@ -2151,10 +2151,10 @@ export default function ChatIndex({
                                 </div>
                                 <div className="space-y-1 max-w-sm">
                                     <h2 className="text-base font-bold text-[color:var(--text)]">
-                                        Select a project chat
+                                        Select an event chat
                                     </h2>
                                     <p className="text-xs text-[color:var(--muted)] leading-relaxed">
-                                        Choose an existing project chat from the left pane to collaborate with your team.
+                                        Choose an existing event chat from the left pane to collaborate with your team.
                                     </p>
                                 </div>
                             </div>
@@ -2167,12 +2167,12 @@ export default function ChatIndex({
                     {activeChat && (
                         <div
                             className="msg-pane-details shrink-0 border-l border-[color:var(--border)] flex-col h-full bg-[color:var(--card)] overflow-hidden select-none"
-                            aria-label="Project details"
+                            aria-label="Event details"
                         >
                             {/* Panel Header */}
                             <div className="p-4 border-b border-[color:var(--border)] shrink-0 space-y-2">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
-                                    Project Details
+                                    Event Details
                                 </span>
                                 <h3 className="text-sm font-extrabold text-[color:var(--text)] truncate">
                                     {activeChat.title}

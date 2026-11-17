@@ -21,10 +21,10 @@ export default function Landing() {
     return (
         <div className="min-h-screen bg-[color:var(--background)] text-[color:var(--text)] flex flex-col font-sans selection:bg-[color:var(--primary)] selection:text-white">
             <Head>
-                <title>ITASK — Project Management for Student Teams</title>
+                <title>ITASK — Integrated Task Assignment and Knowledge-Sharing System</title>
                 <meta
                     name="description"
-                    content="Structured project management and task coordination for student teams. Organize projects, committee deliverables, calendar timelines, and group chats."
+                    content="Integrated task assignment and knowledge-sharing system for the College of Computing and Information Sciences. Coordinate institutional events, task forces, committee deliverables, calendar timelines, and group chats."
                 />
             </Head>
 
@@ -39,7 +39,7 @@ export default function Landing() {
                         ITASK
                     </span>
                     <span className="hidden sm:inline-block text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)] border-l border-[color:var(--border)] pl-3">
-                        Student Workspaces
+                        CCIS Workspaces
                     </span>
                 </div>
 
@@ -80,15 +80,15 @@ export default function Landing() {
                 <section className="py-16 sm:py-24 px-4 sm:px-8 max-w-5xl mx-auto text-center space-y-6">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[color:var(--border)] bg-[color:var(--soft-surface)] text-[12px] font-medium text-[color:var(--muted)]">
                         <span className="w-2 h-2 rounded-full bg-[color:var(--primary)]" />
-                        Built for university capstone & student group projects
+                        Built for CCIS institutional events, task forces & TWGs
                     </div>
 
                     <h1 className="text-[34px] sm:text-[48px] font-extrabold tracking-tight text-[color:var(--text)] max-w-3xl mx-auto leading-tight">
-                        Structured project and task coordination for student teams
+                        Structured task assignment and coordination for institutional events
                     </h1>
 
                     <p className="text-[16px] sm:text-[18px] text-[color:var(--muted)] max-w-2xl mx-auto leading-relaxed">
-                        Organize coursework, manage committee deliverables, collaborate in project group chats, and track academic deadlines in one focused workspace.
+                        Coordinate college events, manage committee deliverables, collaborate in event group chats, and track milestone deadlines in one focused workspace.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -152,7 +152,7 @@ export default function Landing() {
                         {/* Compact Stats Row */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div className="p-3.5 rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)]">
-                                <span className="text-[12px] text-[color:var(--muted)]">Active projects</span>
+                                <span className="text-[12px] text-[color:var(--muted)]">Active events</span>
                                 <p className="text-[20px] font-bold text-[color:var(--text)] tabular-nums mt-0.5">3</p>
                             </div>
                             <div className="p-3.5 rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)]">
@@ -198,10 +198,10 @@ export default function Landing() {
                                 <MessageSquare className="w-5 h-5" strokeWidth={2} />
                             </div>
                             <h3 className="text-[16px] font-bold text-[color:var(--text)]">
-                                Project group chat
+                                Event group chat
                             </h3>
                             <p className="text-[14px] text-[color:var(--muted)] leading-relaxed">
-                                Coordinate within committee-focused project group chats, pin critical updates, and convert discussion messages directly into action items.
+                                Coordinate within committee-focused event group chats, pin critical updates, and convert discussion messages directly into action items.
                             </p>
                         </Card>
 
@@ -214,7 +214,7 @@ export default function Landing() {
                                 Calendar and timeline
                             </h3>
                             <p className="text-[14px] text-[color:var(--muted)] leading-relaxed">
-                                Visualize upcoming deadlines across all courses and milestones on interactive calendar views and Gantt timeline charts.
+                                Visualize upcoming deadlines across all events and deliverables on interactive calendar views and Gantt timeline charts.
                             </p>
                         </Card>
                     </div>
@@ -227,7 +227,7 @@ export default function Landing() {
                             How ITASK works
                         </h2>
                         <p className="text-[15px] text-[color:var(--muted)]">
-                            Three simple steps from setup to project completion
+                            Three simple steps from Special Order designation to event completion
                         </p>
                     </div>
 
@@ -235,20 +235,20 @@ export default function Landing() {
                         <div className="space-y-2.5">
                             <span className="text-[28px] font-black text-[color:var(--primary)] tabular-nums">01</span>
                             <h3 className="text-[16px] font-bold text-[color:var(--text)]">
-                                Create or join a workspace
+                                Create or join an event
                             </h3>
                             <p className="text-[14px] text-[color:var(--muted)] leading-relaxed">
-                                Start a new team using pre-configured academic templates or join an existing course group with a secure invite code.
+                                Start a new event using institutional templates or join an assigned committee with a secure invite code.
                             </p>
                         </div>
 
                         <div className="space-y-2.5">
                             <span className="text-[28px] font-black text-[color:var(--primary)] tabular-nums">02</span>
                             <h3 className="text-[16px] font-bold text-[color:var(--text)]">
-                                Organize committees & tasks
+                                Organize committees & deliverables
                             </h3>
                             <p className="text-[14px] text-[color:var(--muted)] leading-relaxed">
-                                Break down semester deliverables into functional committees, assign deadlines to team members, and track individual progress.
+                                Break down event responsibilities into functional committees and deliverables, assign tasks to members, and track progress.
                             </p>
                         </div>
 
@@ -258,7 +258,7 @@ export default function Landing() {
                                 Review and complete
                             </h3>
                             <p className="text-[14px] text-[color:var(--muted)] leading-relaxed">
-                                Submit work for review, verify deliverables, attach approval documents, and track milestones to final completion.
+                                Submit deliverables for review, verify completion, attach official Special Orders, and track event progress to final completion.
                             </p>
                         </div>
                     </div>
@@ -267,7 +267,7 @@ export default function Landing() {
                 {/* ══ Closing Call To Action ══ */}
                 <section className="py-16 px-4 sm:px-8 max-w-3xl mx-auto text-center border-t border-[color:var(--border)] space-y-5">
                     <h2 className="text-[26px] font-bold text-[color:var(--text)]">
-                        Ready to organize your student team?
+                        Ready to coordinate your institutional event?
                     </h2>
                     <p className="text-[15px] text-[color:var(--muted)]">
                         Get started in seconds with your institutional email address.
@@ -289,7 +289,7 @@ export default function Landing() {
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-[color:var(--text)]">ITASK</span>
                         <span>·</span>
-                        <span>Project Management for Student Teams</span>
+                        <span>Institutional Event & Task Coordination for CCIS</span>
                     </div>
                     <div className="flex items-center gap-4">
                         <Link href="/login" className="hover:underline">

@@ -46,7 +46,7 @@ export function QuickNewTaskModal({
                                 Create new task
                             </h3>
                             <p className="text-[12px] text-[color:var(--muted)]">
-                                Tasks are organized within project activities
+                                Tasks are organized within committee deliverables
                             </p>
                         </div>
                     </div>
@@ -65,7 +65,7 @@ export function QuickNewTaskModal({
                     {projects.length > 0 ? (
                         <>
                             <p className="text-[13px] font-medium text-[color:var(--text)]">
-                                Select a project to add your task:
+                                Select an event to add your task:
                             </p>
                             <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                                 {projects.map((proj) => (
@@ -94,10 +94,10 @@ export function QuickNewTaskModal({
                             <AlertCircle className="w-8 h-8 text-[color:var(--primary)] mx-auto stroke-[2px]" />
                             <div>
                                 <h4 className="text-[15px] font-semibold text-[color:var(--text)]">
-                                    No active projects yet
+                                    No active events yet
                                 </h4>
                                 <p className="text-[12px] text-[color:var(--muted)] max-w-xs mx-auto mt-1">
-                                    Tasks belong to project activities. Create a project first to start adding tasks.
+                                    Tasks belong to committee deliverables. Create an event first to start adding tasks.
                                 </p>
                             </div>
                             <Button
@@ -108,7 +108,7 @@ export function QuickNewTaskModal({
                                     if (onOpenCreateProject) onOpenCreateProject();
                                 }}
                             >
-                                Create first project
+                                Create first event
                             </Button>
                         </div>
                     )}

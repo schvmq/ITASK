@@ -55,7 +55,7 @@ export function CreateCommitteeModal({
             <form onSubmit={handleSubmit} className="space-y-4">
                 {!projectId && projects.length > 0 && (
                     <div>
-                        <Label>Project</Label>
+                        <Label>Event</Label>
                         <select
                             value={activeProjectId}
                             onChange={(e) => setSelectedProjectId(e.target.value)}

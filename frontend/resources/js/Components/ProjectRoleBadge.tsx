@@ -1,6 +1,6 @@
 import React from 'react';
 import { Shield } from 'lucide-react';
-import { type ProjectRole } from '@/Config/navigation';
+import { type ProjectRole, formatRole } from '@/Config/navigation';
 
 export interface ProjectRoleBadgeProps {
     role?: ProjectRole | string | null;
@@ -38,6 +38,24 @@ const ROLE_STYLES: Record<string, { bg: string; text: string; border: string; ic
         border: 'border-[color:var(--border)]',
         iconColor: 'text-[color:var(--muted)]',
     },
+    'Overall Chair': {
+        bg: 'bg-[color:var(--status-success-bg)]',
+        text: 'text-[color:var(--status-success-text)]',
+        border: 'border-[color:var(--status-success-border)]',
+        iconColor: 'text-[color:var(--accent)]',
+    },
+    'Chairperson': {
+        bg: 'bg-[color:var(--status-neutral-bg)]',
+        text: 'text-[color:var(--status-neutral-text)]',
+        border: 'border-[color:var(--status-neutral-border)]',
+        iconColor: 'text-[color:var(--secondary)]',
+    },
+    'Member': {
+        bg: 'bg-[color:var(--soft-surface)]',
+        text: 'text-[color:var(--text)]',
+        border: 'border-[color:var(--border)]',
+        iconColor: 'text-[color:var(--muted)]',
+    },
 };
 
 export const ProjectRoleBadge: React.FC<ProjectRoleBadgeProps> = ({ role, className = '' }) => {
@@ -45,7 +63,7 @@ export const ProjectRoleBadge: React.FC<ProjectRoleBadgeProps> = ({ role, classN
         return (
             <span
                 className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] text-[11px] font-medium border bg-[color:var(--soft-surface)] text-[color:var(--muted)] border-[color:var(--border)] ${className}`}
-                title="No project role assigned"
+                title="No event role assigned"
             >
                 <Shield className="w-3 h-3 text-[color:var(--muted)] stroke-[2px]" />
                 <span>No role</span>
@@ -53,7 +71,8 @@ export const ProjectRoleBadge: React.FC<ProjectRoleBadgeProps> = ({ role, classN
         );
     }
 
-    const style = ROLE_STYLES[role] ?? {
+    const displayRole = formatRole(role);
+    const style = ROLE_STYLES[role] ?? ROLE_STYLES[displayRole] ?? {
         bg: 'bg-[color:var(--soft-surface)]',
         text: 'text-[color:var(--text)]',
         border: 'border-[color:var(--border)]',
@@ -63,10 +82,10 @@ export const ProjectRoleBadge: React.FC<ProjectRoleBadgeProps> = ({ role, classN
     return (
         <span
             className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[6px] text-[11px] font-medium border ${style.bg} ${style.text} ${style.border} ${className}`}
-            title={`Project role: ${role}`}
+            title={`Event role: ${displayRole}`}
         >
             <Shield className={`w-3 h-3 ${style.iconColor} stroke-[2px]`} />
-            <span>{role}</span>
+            <span>{displayRole}</span>
         </span>
     );
 };

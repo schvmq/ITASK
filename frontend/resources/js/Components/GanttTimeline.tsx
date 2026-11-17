@@ -366,13 +366,13 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                 <Layers className="w-10 h-10 text-[color:var(--muted)] mx-auto mb-3" />
                 <h3 className="text-[16px] font-bold text-[color:var(--text)]">No Timeline Data Scheduled</h3>
                 <p className="text-[14px] text-[color:var(--muted)] mt-1 max-w-sm mx-auto leading-relaxed">
-                    There are no scheduled projects, committees, or activities configured yet.
+                    There are no scheduled events, committees, or deliverables configured yet.
                 </p>
                 {isGlobal && (
                     <div className="mt-4">
                         <Link href="/projects">
                             <Button variant="secondary" size="sm">
-                                Go to Projects
+                                Go to Events
                             </Button>
                         </Link>
                     </div>
@@ -397,7 +397,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                     onChange={(e) => setSelectedProjectId(e.target.value)}
                                     className="appearance-none bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] pl-3 pr-8 py-1.5 text-[13px] font-medium hover:border-[color:var(--primary)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
                                 >
-                                    <option value="all">All Projects</option>
+                                    <option value="all">All Events</option>
                                     {allProjects.map((p) => (
                                         <option key={p.id} value={p.id}>
                                             {p.title || p.name}
@@ -503,7 +503,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                         <div className="w-[270px] sm:w-[310px] shrink-0 sticky left-0 z-30 bg-[color:var(--card)] border-r border-[color:var(--border)] flex flex-col">
                             {/* Column Header */}
                             <div className="h-[48px] px-3.5 bg-[color:var(--soft-surface)] border-b border-[color:var(--border)] flex items-center justify-between text-[11px] font-bold text-[color:var(--muted)] uppercase tracking-wider">
-                                <span>Projects & Workflows</span>
+                                <span>Events & Workflows</span>
                             </div>
 
                             {/* Left Rows */}
@@ -549,7 +549,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                     <Link
                                                         href={`/projects/${project.id}`}
                                                         className="p-1 text-[color:var(--muted)] hover:text-[color:var(--primary)] rounded-[4px] shrink-0 transition-colors"
-                                                        title="Go to project"
+                                                        title="Go to event"
                                                     >
                                                         <ExternalLink className="w-3.5 h-3.5" />
                                                     </Link>
@@ -647,7 +647,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                             <Link
                                                                                                 href={`/projects/${project.id}/committees/${committee.id}/activities/${activity.id}`}
                                                                                                 className="p-1 text-[color:var(--muted)] hover:text-[color:var(--primary)] rounded-[4px] shrink-0 transition-colors"
-                                                                                                title="View activity"
+                                                                                                title="View deliverable"
                                                                                             >
                                                                                                 <ExternalLink className="w-3 h-3" />
                                                                                             </Link>
@@ -677,7 +677,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                                         <Link
                                                                                                             href={`/projects/${project.id}/committees/${committee.id}/activities/${activity.id}`}
                                                                                                             className="p-0.5 text-[color:var(--muted)] hover:text-[color:var(--primary)] rounded-[4px] shrink-0"
-                                                                                                            title="View in activity"
+                                                                                                            title="View in deliverable"
                                                                                                         >
                                                                                                             <ExternalLink className="w-2.5 h-2.5" />
                                                                                                         </Link>

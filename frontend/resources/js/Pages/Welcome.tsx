@@ -537,7 +537,7 @@ export default function Welcome({
                                 size="md"
                                 onClick={() => setIsJoinCodeOpen(true)}
                             >
-                                <span>Join project</span>
+                                <span>Join event</span>
                             </Button>
 
                             {createTaskPerm.allowed ? (
@@ -566,7 +566,7 @@ export default function Welcome({
                                         </span>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" className="text-[12px] font-medium bg-[color:var(--card)] text-[color:var(--text)] border border-[color:var(--border)] max-w-xs shadow-md">
-                                        {createTaskPerm.reason || 'Project Staff cannot create new tasks.'}
+                                        {createTaskPerm.reason || 'Chairpersons cannot create new tasks.'}
                                     </TooltipContent>
                                 </Tooltip>
                             )}
@@ -578,7 +578,7 @@ export default function Welcome({
                                     onClick={() => openCreateProjectModal()}
                                     leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
                                 >
-                                    <span>Create project</span>
+                                    <span>Create event</span>
                                 </Button>
                             ) : (
                                 <Tooltip>
@@ -591,12 +591,12 @@ export default function Welcome({
                                                 className="opacity-50 pointer-events-none"
                                                 leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
                                             >
-                                                <span>Create project</span>
+                                                <span>Create event</span>
                                             </Button>
                                         </span>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" className="text-[12px] font-medium bg-[color:var(--card)] text-[color:var(--text)] border border-[color:var(--border)] max-w-xs shadow-md">
-                                        {createProjectPerm.reason || 'Only Project Leaders can create projects.'}
+                                        {createProjectPerm.reason || 'Only Overall Chairs can create events.'}
                                     </TooltipContent>
                                 </Tooltip>
                             )}
@@ -654,7 +654,7 @@ export default function Welcome({
                                         </h2>
                                     </div>
                                     <p className="text-[14px] text-[color:var(--muted)] mt-1">
-                                        Set up your project workspace, collaborate with teammates, and track assignments.
+                                        Set up your event workspace, collaborate with committees, and track assignments.
                                     </p>
                                 </div>
                                 <Badge variant="accent">
@@ -684,10 +684,10 @@ export default function Welcome({
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-[14px] font-semibold text-[color:var(--text)]">
-                                            2. Create or join a project
+                                            2. Create or join an event
                                         </p>
                                         <p className="text-[12px] text-[color:var(--muted)] mt-0.5">
-                                            Start a new team or enter an invite code.
+                                            Start a new event or enter an invite code.
                                         </p>
                                     </div>
                                 </div>
@@ -714,7 +714,7 @@ export default function Welcome({
                                         onClick={() => openCreateProjectModal()}
                                         leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
                                     >
-                                        <span>Create a project</span>
+                                        <span>Create an event</span>
                                     </Button>
                                 ) : (
                                     <Tooltip>
@@ -727,12 +727,12 @@ export default function Welcome({
                                                     className="opacity-50 pointer-events-none"
                                                     leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
                                                 >
-                                                    <span>Create a project</span>
+                                                    <span>Create an event</span>
                                                 </Button>
                                             </span>
                                         </TooltipTrigger>
                                         <TooltipContent side="bottom" className="text-[12px] font-medium bg-[color:var(--card)] text-[color:var(--text)] border border-[color:var(--border)] max-w-xs shadow-md">
-                                            {createProjectPerm.reason || 'Only Project Leaders can create projects.'}
+                                            {createProjectPerm.reason || 'Only Overall Chairs can create events.'}
                                         </TooltipContent>
                                     </Tooltip>
                                 )}
@@ -748,55 +748,55 @@ export default function Welcome({
                             {/* Template Buttons (pre-fill create modal) */}
                             <div className="pt-2 border-t border-[color:var(--border)]">
                                 <p className="text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)] mb-2.5">
-                                    Or start from a template
+                                    Or start from an institutional event template
                                 </p>
                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     <button
                                         type="button"
                                         onClick={() => handleTemplateClick(
-                                            'Senior Design Thesis & Capstone',
-                                            'Undergraduate engineering capstone project documentation, requirements, and sprint deliverables.'
+                                            'CCIS Accreditation Visit Task Force',
+                                            'Institutional accreditation self-survey tasks, documents, and exhibit preparations.'
                                         )}
                                         className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     >
                                         <BookOpen className="w-4 h-4 text-[color:var(--primary)] mb-1" />
-                                        Thesis or capstone
+                                        Accreditation Visit
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={() => handleTemplateClick(
-                                            'Systems Analysis & Design Group Project',
-                                            'Collaborative coursework deliverables, system architecture models, and milestone reporting.'
+                                            'Curriculum Revision Technical Working Group',
+                                            'Program curricular redesign, syllabus updates, and stakeholder consultations.'
                                         )}
                                         className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     >
                                         <Users className="w-4 h-4 text-[color:var(--primary)] mb-1" />
-                                        Group class project
+                                        Curriculum Revision TWG
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={() => handleTemplateClick(
-                                            'Annual IT Department Hackathon & Symposium',
-                                            'Logistics coordination, sponsorship drives, participant registration, and venue planning.'
+                                            'College Days & IT Congress Coordination',
+                                            'Event logistics, committees, symposium coordination, and registration.'
                                         )}
                                         className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     >
                                         <CalendarDays className="w-4 h-4 text-[color:var(--primary)] mb-1" />
-                                        Event planning
+                                        College Days / Congress
                                     </button>
 
                                     <button
                                         type="button"
                                         onClick={() => handleTemplateClick(
-                                            'Independent Research & Study Tracker',
-                                            'Individual academic research tracking, literature reviews, and personal milestones.'
+                                            'Faculty Research Colloquium Committee',
+                                            'Research presentation scheduling, peer reviews, and proceedings documentation.'
                                         )}
                                         className="p-3 text-left rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer text-[13px] font-medium text-[color:var(--text)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                     >
                                         <FileText className="w-4 h-4 text-[color:var(--primary)] mb-1" />
-                                        Personal to-dos
+                                        Research Colloquium
                                     </button>
                                 </div>
                             </div>
@@ -1124,7 +1124,7 @@ export default function Welcome({
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[color:var(--border)]">
                             <div>
                                 <h2 className="text-[16px] font-bold text-[color:var(--text)]">
-                                    Projects
+                                    Events
                                 </h2>
                                 <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
                                     Collaborative workspaces and committee progress
@@ -1142,21 +1142,21 @@ export default function Welcome({
                         {/* Table View */}
                         {paginatedProjects.length === 0 ? (
                             <EmptyState
-                                title={filteredProjects.length === 0 ? "No projects match this filter" : `No projects on page ${safePage}`}
+                                title={filteredProjects.length === 0 ? "No events match this filter" : `No events on page ${safePage}`}
                                 description={
                                     filteredProjects.length === 0
                                         ? activeTab === 'all'
-                                            ? "You haven't joined or created any projects yet."
-                                            : `There are no projects currently ${activeTab === 'active' ? 'in progress' : 'completed'}.`
-                                        : `You are viewing page ${safePage}. Click page 1 to view your projects.`
+                                            ? "You haven't joined or created any events yet."
+                                            : `There are no events currently ${activeTab === 'active' ? 'in progress' : 'completed'}.`
+                                        : `You are viewing page ${safePage}. Click page 1 to view your events.`
                                 }
                                 actionLabel={
                                     filteredProjects.length === 0
                                         ? activeTab === 'all'
                                             ? createProjectPerm.allowed
-                                                ? "Create a project"
+                                                ? "Create an event"
                                                 : undefined
-                                            : "View all projects"
+                                            : "View all events"
                                         : "Go to page 1"
                                 }
                                 onAction={
@@ -1174,8 +1174,8 @@ export default function Welcome({
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-[color:var(--border)] text-[12px] font-semibold text-[color:var(--muted)] uppercase tracking-wider">
-                                            <th className="py-2.5 pr-4">Project</th>
-                                            <th className="py-2.5 px-3 min-w-[200px]">Progress</th>
+                                            <th className="py-2.5 pr-4">Event</th>
+                                            <th className="py-2.5 px-3 min-w-[200px]">Event Progress</th>
                                             <th className="py-2.5 px-3">Due date</th>
                                             <th className="py-2.5 pl-3 text-right">Team</th>
                                         </tr>

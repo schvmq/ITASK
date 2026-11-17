@@ -36,7 +36,7 @@ export function CommandPalette({
     const quickLinks = [
         { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
         { label: 'My Tasks', href: '/my-tasks', icon: CheckSquare },
-        { label: 'Projects', href: '/projects', icon: FolderOpen },
+        { label: 'Events', href: '/projects', icon: FolderOpen },
         { label: 'Calendar', href: '/calendar', icon: CalendarDays },
         { label: 'Timeline', href: '/timeline', icon: GanttChartSquare },
         { label: 'Messages', href: '/messages', icon: MessageSquare },
@@ -159,7 +159,7 @@ export function CommandPalette({
                             className="flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                         >
                             <FolderOpen className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
-                            Create new project
+                            Create new event
                         </button>
                     </div>
                 </div>

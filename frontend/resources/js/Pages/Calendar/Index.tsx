@@ -172,7 +172,7 @@ export default function CalendarIndex({ events = [] }: CalendarIndexProps) {
                             Calendar
                         </h1>
                         <p className="text-[15px] text-[color:var(--muted)] mt-1">
-                            Project, activity, and task deadlines at a glance.
+                            Event, deliverable, and task deadlines at a glance.
                         </p>
                     </div>
 
@@ -247,7 +247,7 @@ export default function CalendarIndex({ events = [] }: CalendarIndexProps) {
                                         : 'text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)]'
                                 }`}
                             >
-                                Activity due
+                                Deliverable due
                             </button>
                             <button
                                 type="button"
@@ -258,7 +258,7 @@ export default function CalendarIndex({ events = [] }: CalendarIndexProps) {
                                         : 'text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)]'
                                 }`}
                             >
-                                Project deadline
+                                Event deadline
                             </button>
                         </div>
                     </div>
@@ -266,11 +266,11 @@ export default function CalendarIndex({ events = [] }: CalendarIndexProps) {
                     <div className="flex items-center gap-4 text-[12px] text-[color:var(--muted)] shrink-0">
                         <span className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-[color:var(--primary)]" />
-                            Task / Project deadline
+                            Task / Event deadline
                         </span>
                         <span className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-[color:var(--secondary)]" />
-                            Activity due
+                            Deliverable due
                         </span>
                     </div>
                 </Card>

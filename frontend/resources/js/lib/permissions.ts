@@ -57,7 +57,7 @@ export function can(
         if (action === 'create_project' || action === 'create_tasks' || action === 'drag_gantt') {
             return {
                 allowed: false,
-                reason: 'System Administrators manage accounts and system settings; project management actions are reserved for project personnel.',
+                reason: 'System Administrators manage accounts and system settings; event management actions are reserved for event personnel.',
             };
         }
     }
@@ -65,9 +65,10 @@ export function can(
     const currentRole = user.primaryRole || user.role || 'Project Member';
     const hasLeaderRole =
         currentRole === 'Project Leader' ||
-        (Array.isArray(user.userRoles) && user.userRoles.includes('Project Leader'));
-    const isStaff = currentRole === 'Project Staff';
-    const isMember = currentRole === 'Project Member';
+        currentRole === 'Overall Chair' ||
+        (Array.isArray(user.userRoles) && (user.userRoles.includes('Project Leader') || user.userRoles.includes('Overall Chair')));
+    const isStaff = currentRole === 'Project Staff' || currentRole === 'Chairperson';
+    const isMember = currentRole === 'Project Member' || currentRole === 'Member';
 
     switch (action) {
         case 'view_tabs':
@@ -77,7 +78,7 @@ export function can(
             if (user.is_admin) {
                 return {
                     allowed: false,
-                    reason: 'System Administrators manage accounts and system settings; project management actions are reserved for project personnel.',
+                    reason: 'System Administrators manage accounts and system settings; event management actions are reserved for event personnel.',
                 };
             }
             return { allowed: true };
@@ -87,13 +88,13 @@ export function can(
         case 'delete_project': {
             if (hasLeaderRole) {
                 if (resource && resource.created_by && Number(resource.created_by) !== Number(user.id)) {
-                    return { allowed: false, reason: 'You can only manage projects you created or lead.' };
+                    return { allowed: false, reason: 'You can only manage events you created or lead as Overall Chair.' };
                 }
                 return { allowed: true };
             }
             return {
                 allowed: false,
-                reason: 'Only Project Leaders can modify or delete projects.',
+                reason: 'Only Overall Chairs can modify or delete events.',
             };
         }
 
@@ -104,7 +105,7 @@ export function can(
             }
             return {
                 allowed: false,
-                reason: 'Only Project Leaders can invite or remove team members.',
+                reason: 'Only Overall Chairs can invite or remove team members.',
             };
         }
 
@@ -112,7 +113,7 @@ export function can(
             if (isStaff) {
                 return {
                     allowed: false,
-                    reason: 'Project Staff cannot create new tasks. Contact your Project Leader.',
+                    reason: 'Chairpersons cannot create new tasks. Contact your Overall Chair.',
                 };
             }
             return { allowed: true };
@@ -122,7 +123,7 @@ export function can(
             if (isStaff) {
                 return {
                     allowed: false,
-                    reason: 'Project Staff cannot assign tasks to others.',
+                    reason: 'Chairpersons cannot assign tasks to others.',
                 };
             }
             return { allowed: true };
@@ -141,7 +142,7 @@ export function can(
             }
             return {
                 allowed: false,
-                reason: 'Project Staff cannot modify other members’ tasks.',
+                reason: 'Chairpersons cannot modify other members’ tasks.',
             };
         }
 
@@ -160,12 +161,12 @@ export function can(
                 }
                 return {
                     allowed: false,
-                    reason: 'Project Members can only drag and schedule their own assigned tasks.',
+                    reason: 'Members can only drag and schedule their own assigned tasks.',
                 };
             }
             return {
                 allowed: false,
-                reason: 'Project Staff cannot drag Gantt chart schedule bars.',
+                reason: 'Chairpersons cannot drag Gantt chart schedule bars.',
             };
         }
 

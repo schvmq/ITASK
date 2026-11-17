@@ -688,7 +688,7 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                             My Tasks
                         </h1>
                         <p className="text-[14px] text-[color:var(--muted)] mt-1">
-                            Your personal task hub across all projects. Track deadlines, checklists, and submit deliverables.
+                            Your personal task hub across all events. Track deadlines, checklists, and submit deliverables.
                         </p>
                     </div>
 
@@ -844,7 +844,7 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] pointer-events-none" />
                             <input
                                 type="text"
-                                placeholder="Search tasks, activities, projects..."
+                                placeholder="Search tasks, deliverables, events..."
                                 value={searchTerm}
                                 onChange={(e) => handleSearchChange(e.target.value)}
                                 className="w-full pl-9 pr-8 py-2 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] placeholder:text-[color:var(--muted)] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors"
@@ -867,9 +867,9 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                                 value={projectFilter}
                                 onChange={(e) => handleProjectFilterChange(e.target.value)}
                                 className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
-                                aria-label="Filter by project"
+                                aria-label="Filter by event"
                             >
-                                <option value="ALL">All projects ({projectOptions.length})</option>
+                                <option value="ALL">All events ({projectOptions.length})</option>
                                 {projectOptions.map((proj) => (
                                     <option key={proj.id} value={proj.id}>
                                         {proj.title}
@@ -946,7 +946,7 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                                                     : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
                                             }`}
                                         >
-                                            {grp === 'hierarchy' ? 'Hierarchy' : grp === 'due_date' ? 'Due Date' : grp === 'priority' ? 'Priority' : grp === 'project' ? 'Project' : 'Status'}
+                                            {grp === 'hierarchy' ? 'Hierarchy' : grp === 'due_date' ? 'Due Date' : grp === 'priority' ? 'Priority' : grp === 'project' ? 'Event' : 'Status'}
                                         </button>
                                     ))}
                                 </div>
@@ -1346,7 +1346,7 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                                     href={selectedTask.action_url}
                                     className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[color:var(--primary)] hover:underline"
                                 >
-                                    <span>Open Activity Workspace</span>
+                                    <span>Open Deliverable Workspace</span>
                                     <ExternalLink className="w-4 h-4" />
                                 </Link>
 

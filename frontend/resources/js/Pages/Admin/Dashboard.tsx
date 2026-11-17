@@ -38,6 +38,7 @@ import { Button } from '@/Components/Button';
 import { Badge } from '@/Components/Badge';
 import { Card } from '@/Components/Card';
 import { Pagination } from '@/Components/Pagination';
+import { formatRole } from '@/Config/navigation';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -524,7 +525,7 @@ export default function AdminDashboard({
                                 <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                                     Approved
                                 </span>{' '}
-                                & eligible to access projects
+                                & eligible to access events
                             </p>
                         </div>
                     </div>
@@ -569,7 +570,7 @@ export default function AdminDashboard({
                                     {counts.pending} Registration{counts.pending > 1 ? 's' : ''} Awaiting Admin Decision
                                 </h3>
                                 <p className="text-[12px] text-amber-700/90 dark:text-amber-300/80 mt-0.5">
-                                    New accounts must be verified by you before the user can log in or access any project.
+                                    New accounts must be verified by you before the user can log in or access any event.
                                 </p>
                             </div>
                         </div>
@@ -682,9 +683,9 @@ export default function AdminDashboard({
                                 </span>
                                 {[
                                     { key: 'all', label: 'All Roles' },
-                                    { key: 'leader', label: 'Project Leaders' },
-                                    { key: 'staff', label: 'Project Staff' },
-                                    { key: 'member', label: 'Project Members' },
+                                    { key: 'leader', label: 'Overall Chairs' },
+                                    { key: 'staff', label: 'Chairpersons' },
+                                    { key: 'member', label: 'Members' },
                                 ].map((filter) => {
                                     const isActive = selectedRoleFilter === filter.key;
                                     return (
@@ -746,7 +747,7 @@ export default function AdminDashboard({
                                             <th className="py-3 px-4">Institutional Email</th>
                                             <th className="py-3 px-4">Registration Status</th>
                                             <th className="py-3 px-4">System Role</th>
-                                            <th className="py-3 px-4">Project Assignments</th>
+                                            <th className="py-3 px-4">Event Assignments</th>
                                             <th className="py-3 px-4">Workload</th>
                                             <th className="py-3 px-4 text-right">Admin Decisions & Actions</th>
                                         </tr>
@@ -838,14 +839,14 @@ export default function AdminDashboard({
                                                         <div className="flex flex-wrap gap-1.5 max-w-xs">
                                                             {u.project_role_assignments.length === 0 && u.created_projects_count === 0 ? (
                                                                 <span className="text-[11px] text-[color:var(--muted)] italic">
-                                                                    No Project Roles
+                                                                    No Event Roles
                                                                 </span>
                                                             ) : (
                                                                 <>
                                                                     {u.created_projects_count > 0 && (
                                                                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] text-[11px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
                                                                             <Crown className="w-3 h-3 text-indigo-500" />
-                                                                            Leader ({u.created_projects_count})
+                                                                            Overall Chair ({u.created_projects_count})
                                                                         </span>
                                                                     )}
                                                                     {u.project_role_assignments.map((pra) => (
@@ -860,7 +861,7 @@ export default function AdminDashboard({
                                                                             }`}
                                                                             title={`Role in ${pra.project_title}`}
                                                                         >
-                                                                            <span className="font-semibold">{pra.role}</span>
+                                                                            <span className="font-semibold">{formatRole(pra.role)}</span>
                                                                             <span className="text-[10px] opacity-75">
                                                                                 @{pra.project_title}
                                                                             </span>
@@ -885,7 +886,7 @@ export default function AdminDashboard({
                                                                 <strong className="text-[color:var(--text)]">
                                                                     {u.created_projects_count}
                                                                 </strong>{' '}
-                                                                projects
+                                                                events
                                                             </span>
                                                         </div>
                                                     </td>
@@ -928,7 +929,7 @@ export default function AdminDashboard({
                                                                         type="button"
                                                                         onClick={() => openRoleModal(u)}
                                                                         className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium rounded-[6px] border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] hover:border-[color:var(--primary)] hover:text-[color:var(--primary)] transition-colors cursor-pointer"
-                                                                        title="Configure system privileges & project roles"
+                                                                        title="Configure system privileges & event roles"
                                                                     >
                                                                         <UserCog className="w-3.5 h-3.5 stroke-[2px]" />
                                                                         <span>Manage Roles</span>
@@ -1020,7 +1021,7 @@ export default function AdminDashboard({
                 title="Manage User Roles & Access"
                 description={
                     roleModalUser
-                        ? `Configure permissions and project assignments for ${roleModalUser.name}.`
+                        ? `Configure permissions and event assignments for ${roleModalUser.name}.`
                         : undefined
                 }
                 maxWidth="lg"
@@ -1083,28 +1084,28 @@ export default function AdminDashboard({
                         <div className="space-y-3 pt-2 border-t border-[color:var(--border)]">
                             <h4 className="text-[13px] font-bold text-[color:var(--text)] flex items-center gap-1.5">
                                 <Crown className="w-4 h-4 text-indigo-500" />
-                                Assign / Update Project Role
+                                Assign / Update Event Role
                             </h4>
                             <p className="text-[11px] text-[color:var(--muted)]">
-                                Assign this user to a project workspace with an official role.
+                                Assign this user to an event workspace with an official role.
                             </p>
 
                             {projects.length === 0 ? (
                                 <div className="p-3 text-[12px] text-[color:var(--muted)] italic bg-[color:var(--soft-surface)] rounded-[6px]">
-                                    No active projects available to assign.
+                                    No active events available to assign.
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <label className="block text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider mb-1">
-                                            Select Project
+                                            Select Event
                                         </label>
                                         <select
                                             value={selectedProject}
                                             onChange={(e) => setSelectedProject(e.target.value)}
                                             className="w-full h-9 px-2.5 text-[12px] rounded-[6px] border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] focus:outline-none focus:border-[color:var(--primary)]"
                                         >
-                                            <option value="">-- Choose Project (Optional) --</option>
+                                            <option value="">-- Choose Event (Optional) --</option>
                                             {projects.map((p) => (
                                                 <option key={p.id} value={p.id}>
                                                     {p.title}
@@ -1124,7 +1125,7 @@ export default function AdminDashboard({
                                         >
                                             {availableRoles.map((r) => (
                                                 <option key={r} value={r}>
-                                                    {r}
+                                                    {formatRole(r)}
                                                 </option>
                                             ))}
                                         </select>
@@ -1140,7 +1141,7 @@ export default function AdminDashboard({
                             </h4>
                             {roleModalUser.project_role_assignments.length === 0 ? (
                                 <p className="text-[12px] text-[color:var(--muted)] italic">
-                                    No specific project role assignments found.
+                                    No specific event role assignments found.
                                 </p>
                             ) : (
                                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
@@ -1155,7 +1156,7 @@ export default function AdminDashboard({
                                                 </span>
                                                 <span className="text-[color:var(--muted)] ml-1">·</span>
                                                 <span className="text-[color:var(--primary)] ml-1 font-medium">
-                                                    {pra.role}
+                                                    {formatRole(pra.role)}
                                                 </span>
                                             </div>
                                             <button

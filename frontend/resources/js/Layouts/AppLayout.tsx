@@ -70,6 +70,7 @@ import {
     ROLE_CONFIGS,
     ProjectRole,
     NavItem,
+    formatRole,
 } from '@/Config/navigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -274,7 +275,7 @@ function SidebarContent({
                                     ITASK
                                 </span>
                                 <span className="text-[11px] text-[color:var(--muted)] font-normal mt-0.5 truncate">
-                                    {isAdmin ? 'System Admin' : userRole}
+                                    {isAdmin ? 'System Admin' : formatRole(userRole)}
                                 </span>
                             </div>
                         </Link>
@@ -418,7 +419,7 @@ function SidebarContent({
             {currentProject && !isCollapsed && !isAdmin && (
                 <div className="m-3 p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] shrink-0">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--muted)] mb-1">
-                        Active project
+                        Active event
                     </p>
                     <div className="flex items-center gap-2 min-w-0">
                         <FolderOpen className="w-4 h-4 text-[color:var(--primary)] shrink-0 stroke-[2px]" />
@@ -428,7 +429,7 @@ function SidebarContent({
                             </p>
                             {currentProject.role && (
                                 <p className="text-[11px] text-[color:var(--muted)] truncate">
-                                    {currentProject.role}
+                                    {formatRole(currentProject.role)}
                                 </p>
                             )}
                         </div>
@@ -634,7 +635,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                             data-testid="topbar-role-label"
                             className="inline-flex items-center px-2.5 py-1 rounded-[6px] text-[12px] font-semibold bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] select-none shrink-0"
                         >
-                            {isAdmin ? 'System Admin' : userRole}
+                            {isAdmin ? 'System Admin' : formatRole(userRole)}
                         </span>
 
                         {/* Theme Switch */}
@@ -700,7 +701,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                                     color: ROLE_CONFIGS[userRole]?.accentColor || '#4F46E5',
                                                 }}
                                             >
-                                                <span>{userRole}</span>
+                                                <span>{formatRole(userRole)}</span>
                                             </span>
                                             <span className="text-[10px] font-bold text-[color:var(--primary)] bg-[color:var(--soft-surface)] px-1.5 py-0.5 rounded border border-[color:var(--border)]">
                                                 CCIS
@@ -739,7 +740,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                                 className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
                                             >
                                                 <FolderOpen className="w-3.5 h-3.5 mr-2 stroke-[2px]" />
-                                                Projects
+                                                Events
                                             </DropdownMenuItem>
                                         </>
                                     )}

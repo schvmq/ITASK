@@ -378,7 +378,7 @@ export function ProjectTaskDetailsModal({
                             href={`/projects/${projectId}/committees/${task.committee.id}/activities/${task.activity.id}`}
                             className="inline-flex items-center gap-1 font-semibold text-[color:var(--primary)] hover:underline text-[11px]"
                         >
-                            <span>Open Activity Page</span>
+                            <span>Open Deliverable Workspace</span>
                             <ExternalLink className="w-3 h-3" />
                         </Link>
                     </div>
