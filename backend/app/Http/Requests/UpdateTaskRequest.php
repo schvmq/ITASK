@@ -62,6 +62,10 @@ class UpdateTaskRequest extends FormRequest
             ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
             ->exists();
 
+        $isCoChair = $task->activity->committee->coChairDesignations()
+            ->where('user_id', $user->id)
+            ->exists();
+
         $isAssignee = ($task->assigned_to && (int) $task->assigned_to === (int) $user->id)
             || ($task->relationLoaded('assignees') ? $task->assignees->contains('id', $user->id) : $task->assignees()->where('users.id', $user->id)->exists());
 
@@ -72,9 +76,9 @@ class UpdateTaskRequest extends FormRequest
             }
         }
 
-        // 2. Task Configuration Modification: ONLY Project Leader or Committee Staff can change config!
+        // 2. Task Configuration Modification: ONLY Project Leader, Committee Staff, or Committee Co-Chair can change config!
         if ($this->hasAny(['title', 'description', 'due_date', 'priority', 'assigned_to', 'requires_review'])) {
-            if (! $isLeader && ! $isStaff) {
+            if (! $isLeader && ! $isStaff && ! $isCoChair) {
                 return false;
             }
         }
@@ -107,11 +111,16 @@ class UpdateTaskRequest extends FormRequest
         }
 
         $isStaff = false;
+        $isCoChair = false;
         if ($task && $user) {
-            $isStaff = $task->activity?->committee?->roleAssignments()
+            $committee = $task->activity?->committee;
+            $isStaff = $committee?->roleAssignments()
                 ->where('user_id', $user->id)
                 ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-                ->exists();
+                ->exists() ?? false;
+            $isCoChair = $committee?->coChairDesignations()
+                ->where('user_id', $user->id)
+                ->exists() ?? false;
         }
 
         $isAssignee = $task && $user && (
@@ -126,8 +135,8 @@ class UpdateTaskRequest extends FormRequest
             $rules['status'] = ['sometimes', 'required', 'string', Rule::in(Task::STATUSES)];
         }
 
-        // Configuration fields are validated for Leader or Staff
-        if ($isLeader || $isStaff) {
+        // Configuration fields are validated for Leader, Staff, or Committee Co-Chair
+        if ($isLeader || $isStaff || $isCoChair) {
             $rules['title'] = ['sometimes', 'required', 'string', 'max:255'];
             $rules['description'] = ['nullable', 'string'];
             $rules['due_date'] = ['nullable', 'date'];

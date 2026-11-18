@@ -86,6 +86,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(ProjectApprovalDocument::class, 'uploaded_by');
     }
 
+    public function coChairDesignations(): HasMany
+    {
+        return $this->hasMany(CoChairDesignation::class);
+    }
+
     public function chats()
     {
         return Chat::query()

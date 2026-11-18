@@ -27,6 +27,7 @@ import {
     FolderOpen,
     Calendar,
     Users,
+    UserCheck,
     Clock,
     ArrowLeft,
     Edit3,
@@ -86,6 +87,7 @@ export interface CommitteeItem {
         view?: boolean;
         update?: boolean;
         delete?: boolean;
+        createActivity?: boolean;
     };
 }
 
@@ -95,6 +97,7 @@ export interface PersonnelItem {
     email: string;
     role?: string;
     committee_id?: string | null;
+    is_co_chair?: boolean;
 }
 
 export interface ProjectActivityItem {
@@ -102,13 +105,27 @@ export interface ProjectActivityItem {
     title: string;
     description: string | null;
     status: string;
+    progress?: number;
     due_date: string | null;
+    due_date_raw?: string | null;
+    start_date?: string | null;
+    start_date_raw?: string | null;
     tasksCount: number;
     completedTasksCount: number;
+    url?: string;
     committee: {
         id: string;
         name: string;
+        chairperson?: {
+            id: number;
+            name: string;
+            email?: string;
+        } | null;
     };
+    creator?: {
+        id: number;
+        name: string;
+    } | null;
 }
 
 export interface ProjectTaskItem {
@@ -130,6 +147,11 @@ export interface ProjectTaskItem {
     committee: {
         id: string;
         name: string;
+        chairperson?: {
+            id: number;
+            name: string;
+            email?: string;
+        } | null;
     };
     activity: {
         id: string;
@@ -188,7 +210,27 @@ export interface ProjectData {
         archive?: boolean;
         uploadDocument?: boolean;
         createCommittee?: boolean;
+        createTask?: boolean;
+        createActivity?: boolean;
+        designateCoChair?: boolean;
     };
+    committeesForDeliverable?: Array<{
+        id: string;
+        name: string;
+    }>;
+    eventCoChairs?: Array<{
+        id: number;
+        name: string;
+        email: string;
+        designated_at?: string;
+    }>;
+    is_event_co_chair?: boolean;
+    eligibleCoChairs?: Array<{
+        id: number;
+        name: string;
+        email: string;
+        role?: string;
+    }>;
     creator?: {
         id: number;
         name: string;
@@ -216,7 +258,7 @@ export interface ProjectShowProps {
     initialTab?: TabKey | string | null;
 }
 
-type TabKey = 'tasks' | 'chat' | 'files' | 'timeline' | 'overview' | 'committees';
+type TabKey = 'deliverables' | 'tasks' | 'chat' | 'files' | 'timeline' | 'overview' | 'committees';
 
 function getInitials(name: string): string {
     if (!name) return '??';
@@ -238,14 +280,19 @@ function formatFileSize(bytes: number): string {
 export default function ProjectShow({
     project: initialProject,
     timeline: propTimeline,
-    initialTab = 'tasks',
+    initialTab = 'deliverables',
 }: ProjectShowProps) {
     const [activeTab, setActiveTab] = useState<TabKey>(() => {
-        const validTabs: TabKey[] = ['tasks', 'chat', 'files', 'timeline', 'overview', 'committees'];
-        return validTabs.includes(initialTab as TabKey) ? (initialTab as TabKey) : 'tasks';
+        const validTabs: TabKey[] = ['deliverables', 'chat', 'files', 'timeline', 'overview', 'committees'];
+        if (initialTab === 'tasks') return 'deliverables';
+        return validTabs.includes(initialTab as TabKey) ? (initialTab as TabKey) : 'deliverables';
     });
 
-    // Pagination for Tasks tab
+    // Pagination for Deliverables tab
+    const [deliverablePage, setDeliverablePage] = useState(1);
+    const [deliverablePageSize, setDeliverablePageSize] = useState(10);
+
+    // Pagination for Tasks tab (kept for backward compatibility)
     const [taskPage, setTaskPage] = useState(1);
     const [taskPageSize, setTaskPageSize] = useState(10);
 
@@ -261,12 +308,32 @@ export default function ProjectShow({
     const [isEditCommitteeModalOpen, setIsEditCommitteeModalOpen] = useState(false);
     const [isUploadDocumentModalOpen, setIsUploadDocumentModalOpen] = useState(false);
     const [archiveProcessing, setArchiveProcessing] = useState(false);
+    const [isCreateDeliverableModalOpen, setIsCreateDeliverableModalOpen] = useState(false);
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [viewingTask, setViewingTask] = useState<ProjectTaskDetail | null>(null);
+    const [isCoChairModalOpen, setIsCoChairModalOpen] = useState(false);
+    const [selectedCoChairUserId, setSelectedCoChairUserId] = useState<string>('');
+    const [coChairProcessing, setCoChairProcessing] = useState(false);
+    const [coChairError, setCoChairError] = useState<string | null>(null);
 
     const docFileInputRef = useRef<HTMLInputElement>(null);
 
     // Forms
+    const {
+        data: deliverableData,
+        setData: setDeliverableData,
+        post: submitDeliverable,
+        processing: deliverableProcessing,
+        errors: deliverableErrors,
+        reset: resetDeliverableForm,
+        clearErrors: clearDeliverableErrors,
+    } = useForm({
+        committee_id: '',
+        title: '',
+        description: '',
+        start_date: '',
+        due_date: '',
+    });
     const {
         data: editData,
         setData: setEditData,
@@ -352,6 +419,7 @@ export default function ProjectShow({
     const isLeader = (initialProject.role || '').toLowerCase().includes('leader');
     const isStaff = (initialProject.role || '').toLowerCase().includes('staff');
     const canCreateCommittee = Boolean(initialProject.can?.createCommittee || isLeader);
+    const allDeliverables = initialProject.activities || [];
     const allTasks = initialProject.tasks || [];
     const allDocuments = initialProject.documents || [];
     const allCommittees = initialProject.committees || [];
@@ -360,6 +428,37 @@ export default function ProjectShow({
     const reminderTargetUrl = firstTask?.committee && firstTask?.activity
         ? `/projects/${initialProject.id}/committees/${firstTask.committee.id}/activities/${firstTask.activity.id}?remind=1`
         : null;
+
+    // Eligible committees for creating deliverables
+    const eligibleCommitteesForDeliverable = useMemo(() => {
+        if (initialProject.committeesForDeliverable && initialProject.committeesForDeliverable.length > 0) {
+            return initialProject.committeesForDeliverable;
+        }
+        return (initialProject.committees || []).filter((c) => {
+            if (isLeader) return true;
+            return Boolean(c.can?.createActivity);
+        }).map((c) => ({ id: String(c.id), name: c.name }));
+    }, [initialProject, isLeader]);
+
+    const canCreateDeliverable = Boolean(
+        initialProject.can?.createActivity || eligibleCommitteesForDeliverable.length > 0
+    );
+
+    const handleCreateDeliverableSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const targetCommitteeId = deliverableData.committee_id || eligibleCommitteesForDeliverable[0]?.id;
+        if (!targetCommitteeId) return;
+
+        submitDeliverable(
+            `/projects/${initialProject.id}/committees/${targetCommitteeId}/activities`,
+            {
+                onSuccess: () => {
+                    setIsCreateDeliverableModalOpen(false);
+                    resetDeliverableForm();
+                },
+            }
+        );
+    };
 
     // Eligible project assignees for creating tasks
     const projectAssignees = useMemo(() => {
@@ -424,7 +523,16 @@ export default function ProjectShow({
         return () => window.removeEventListener('itask:open-create-task', handleOpenTask);
     }, []);
 
-    // Paginated tasks
+    // Paginated deliverables
+    const totalDeliverables = allDeliverables.length;
+    const totalDeliverablePages = Math.max(1, Math.ceil(totalDeliverables / deliverablePageSize));
+    const safeDeliverablePage = Math.min(deliverablePage, Math.max(1, totalDeliverablePages));
+    const paginatedDeliverables = useMemo(() => {
+        const start = (safeDeliverablePage - 1) * deliverablePageSize;
+        return allDeliverables.slice(start, start + deliverablePageSize);
+    }, [allDeliverables, safeDeliverablePage, deliverablePageSize]);
+
+    // Paginated tasks (retained for backward compatibility / modals)
     const totalTasks = allTasks.length;
     const totalTaskPages = Math.max(1, Math.ceil(totalTasks / taskPageSize));
     const safeTaskPage = Math.min(taskPage, Math.max(5, totalTaskPages));
@@ -499,9 +607,41 @@ export default function ProjectShow({
         });
     };
 
-    // Navigation Tabs per Section 4 requirement: Tasks, Chat, Files, Timeline, Overview, Committees
+    const handleDesignateCoChair = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCoChairUserId || !initialProject) return;
+        setCoChairProcessing(true);
+        setCoChairError(null);
+        router.post(
+            `/projects/${initialProject.id}/co-chairs`,
+            { user_id: Number(selectedCoChairUserId) },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedCoChairUserId('');
+                    setCoChairProcessing(false);
+                },
+                onError: (errs) => {
+                    setCoChairProcessing(false);
+                    setCoChairError(errs.user_id || 'Failed to designate Co-Chair.');
+                },
+                onFinish: () => setCoChairProcessing(false),
+            }
+        );
+    };
+
+    const handleRemoveCoChair = (userId: number) => {
+        if (!initialProject) return;
+        setCoChairProcessing(true);
+        router.delete(`/projects/${initialProject.id}/co-chairs/${userId}`, {
+            preserveScroll: true,
+            onFinish: () => setCoChairProcessing(false),
+        });
+    };
+
+    // Navigation Tabs: Deliverables, Chat, Files, Timeline, Overview, Committees
     const tabs: { key: TabKey; label: string; count?: number }[] = [
-        { key: 'tasks', label: 'Tasks', count: allTasks.length },
+        { key: 'deliverables', label: 'Deliverables', count: allDeliverables.length },
         { key: 'chat', label: 'Chat' },
         { key: 'files', label: 'Files', count: allDocuments.length },
         { key: 'timeline', label: 'Timeline' },
@@ -569,6 +709,20 @@ export default function ProjectShow({
                                         {allCommittees.length}
                                     </span>
                                 </div>
+                                {initialProject.eventCoChairs && initialProject.eventCoChairs.length > 0 && (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span>Event Co-Chairs: </span>
+                                        {initialProject.eventCoChairs.map((cc) => (
+                                            <span
+                                                key={cc.id}
+                                                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                                            >
+                                                <UserCheck className="w-3 h-3 text-amber-600" />
+                                                {cc.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -586,8 +740,8 @@ export default function ProjectShow({
                                 </Button>
                             </Link>
 
-                            {/* Highlighted Send Reminders Button (For Leader & Staff) */}
-                            {(isLeader || isStaff) && reminderTargetUrl && (
+                            {/* Highlighted Send Reminders Button (For Leader, Staff & Event Co-Chair) */}
+                            {(isLeader || isStaff || initialProject.is_event_co_chair) && reminderTargetUrl && (
                                 <Link href={reminderTargetUrl}>
                                     <Button
                                         variant="secondary"
@@ -598,6 +752,22 @@ export default function ProjectShow({
                                         <span>Send Reminders</span>
                                     </Button>
                                 </Link>
+                            )}
+
+                            {initialProject.can?.designateCoChair && (
+                                <Button
+                                    variant="secondary"
+                                    size="md"
+                                    onClick={() => {
+                                        setCoChairError(null);
+                                        setSelectedCoChairUserId('');
+                                        setIsCoChairModalOpen(true);
+                                    }}
+                                    className="flex items-center gap-1.5"
+                                >
+                                    <UserCheck className="w-4 h-4 text-amber-600" />
+                                    <span>Event Co-Chairs</span>
+                                </Button>
                             )}
 
                             <Link href={`/chat/${initialProject.id}`}>
@@ -747,145 +917,185 @@ export default function ProjectShow({
                         exit={{ opacity: 0, y: -6 }}
                         transition={{ type: 'spring', damping: 24, stiffness: 360 }}
                     >
-                        {/* ── TAB: TASKS ── */}
-                        {activeTab === 'tasks' && (
-                    <Card className="p-5 space-y-4">
-                        <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border)]">
-                            <div>
-                                <h2 className="text-[16px] font-bold text-[color:var(--text)]">Event tasks</h2>
-                                <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
-                                    Operational tasks across all committees and deliverables
-                                </p>
-                            </div>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => setIsCreateTaskModalOpen(true)}
-                                className="flex items-center gap-1.5 font-bold shadow-xs cursor-pointer"
-                                data-testid="project-tasks-create-btn"
-                            >
-                                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Create task</span>
-                            </Button>
-                        </div>
+                        {/* ── TAB: DELIVERABLES ── */}
+                        {(activeTab === 'deliverables' || (activeTab as string) === 'tasks') && (
+                            <Card className="p-5 space-y-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[color:var(--border)]">
+                                    <div>
+                                        <h2 className="text-[16px] font-bold text-[color:var(--text)]">Event deliverables</h2>
+                                        <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
+                                            Official deliverables structured across all committees for this event
+                                        </p>
+                                    </div>
+                                    {canCreateDeliverable && (
+                                        <Button
+                                            variant="primary"
+                                            size="sm"
+                                            onClick={() => {
+                                                clearDeliverableErrors();
+                                                if (!deliverableData.committee_id && eligibleCommitteesForDeliverable.length > 0) {
+                                                    setDeliverableData('committee_id', eligibleCommitteesForDeliverable[0].id);
+                                                }
+                                                setIsCreateDeliverableModalOpen(true);
+                                            }}
+                                            className="flex items-center gap-1.5 font-bold shadow-xs cursor-pointer self-start sm:self-auto"
+                                            data-testid="project-deliverables-create-btn"
+                                        >
+                                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Create deliverable</span>
+                                        </Button>
+                                    )}
+                                </div>
 
-                        {allTasks.length === 0 ? (
-                            <EmptyState
-                                title="No tasks created yet"
-                                description="Tasks are created inside committee deliverables by Chairpersons to delegate work."
-                                actionLabel="Create task"
-                                onAction={() => setIsCreateTaskModalOpen(true)}
-                            />
-                        ) : (
-                            <div className="overflow-x-auto -mx-5 px-5">
-                                <table className="w-full text-left border-collapse text-[13px]">
-                                    <thead>
-                                        <tr className="border-b border-[color:var(--border)] text-[12px] font-semibold text-[color:var(--muted)] uppercase tracking-wider">
-                                            <th className="py-2.5 pr-4">Task</th>
-                                            <th className="py-2.5 px-3">Committee & Deliverable</th>
-                                            <th className="py-2.5 px-3">Assignee</th>
-                                            <th className="py-2.5 px-3">Checklist</th>
-                                            <th className="py-2.5 px-3">Evidence / MOV</th>
-                                            <th className="py-2.5 px-3">Status</th>
-                                            <th className="py-2.5 pl-3">Due date</th>
-                                            <th className="py-2.5 pl-3 text-right">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[color:var(--border)]">
-                                        {paginatedTasks.map((task) => (
-                                            <tr key={task.id} className="hover:bg-[color:var(--soft-surface)] transition-colors">
-                                                <td className="py-3 pr-4 max-w-xs">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setViewingTask(task as unknown as ProjectTaskDetail)}
-                                                        className="font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors text-left block truncate cursor-pointer"
-                                                    >
-                                                        {task.title}
-                                                    </button>
-                                                    {task.description && (
-                                                        <p className="text-[11px] text-[color:var(--muted)] truncate max-w-sm mt-0.5">
-                                                            {task.description}
-                                                        </p>
-                                                    )}
-                                                </td>
-                                                <td className="py-3 px-3">
-                                                    <span className="font-medium text-[color:var(--text)] block truncate">
-                                                        {task.activity.title}
-                                                    </span>
-                                                    <span className="text-[11px] text-[color:var(--muted)]">
-                                                        {task.committee.name}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-3 whitespace-nowrap text-[color:var(--muted)]">
-                                                    {task.assignee?.name || <span className="italic">Unassigned</span>}
-                                                </td>
-                                                <td className="py-3 px-3 whitespace-nowrap">
-                                                    {task.checklist_total !== undefined && task.checklist_total > 0 ? (
-                                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-[color:var(--text)] tabular-nums">
-                                                            <ListTodo className="w-3 h-3 text-[color:var(--primary)]" />
-                                                            <span>
-                                                                {task.checklist_completed ?? 0}/{task.checklist_total}
-                                                            </span>
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-[11px] text-[color:var(--muted)]">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-3 px-3 whitespace-nowrap">
-                                                    {task.requires_review ? (
-                                                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
-                                                            <FileText className="w-3 h-3" />
-                                                            <span>
-                                                                {task.evidences && task.evidences.length > 0
-                                                                    ? `${task.evidences.length} MOV`
-                                                                    : 'Required'}
-                                                            </span>
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-[11px] text-[color:var(--muted)]">None</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-3 px-3 whitespace-nowrap">
-                                                    <Badge variant={task.status === 'Completed' ? 'accent' : task.status === 'Under Review' ? 'secondary' : task.status === 'Returned' ? 'danger' : 'soft'}>
-                                                        {task.status}
-                                                    </Badge>
-                                                </td>
-                                                <td className="py-3 pl-3 whitespace-nowrap tabular-nums text-[color:var(--muted)]">
-                                                    {task.due_date || '—'}
-                                                </td>
-                                                <td className="py-3 pl-3 whitespace-nowrap text-right">
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="sm"
-                                                        onClick={() => setViewingTask(task as unknown as ProjectTaskDetail)}
-                                                        className="text-[11px] font-semibold h-7 px-2.5 cursor-pointer"
-                                                    >
-                                                        Details
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                {allDeliverables.length === 0 ? (
+                                    <EmptyState
+                                        title="No deliverables established yet"
+                                        description="Deliverables represent key outputs created inside committees to track official milestones."
+                                        actionLabel={canCreateDeliverable ? 'Create deliverable' : undefined}
+                                        onAction={canCreateDeliverable ? () => {
+                                            clearDeliverableErrors();
+                                            if (!deliverableData.committee_id && eligibleCommitteesForDeliverable.length > 0) {
+                                                setDeliverableData('committee_id', eligibleCommitteesForDeliverable[0].id);
+                                            }
+                                            setIsCreateDeliverableModalOpen(true);
+                                        } : undefined}
+                                    />
+                                ) : (
+                                    <div className="overflow-x-auto -mx-5 px-5">
+                                        <table className="w-full text-left border-collapse text-[13px]">
+                                            <thead>
+                                                <tr className="border-b border-[color:var(--border)] text-[12px] font-semibold text-[color:var(--muted)] uppercase tracking-wider">
+                                                    <th className="py-2.5 pr-4">Deliverable</th>
+                                                    <th className="py-2.5 px-3">Committee</th>
+                                                    <th className="py-2.5 px-3">Official Status</th>
+                                                    <th className="py-2.5 px-3 min-w-[150px]">Task Progress</th>
+                                                    <th className="py-2.5 pl-3">Due date</th>
+                                                    <th className="py-2.5 pl-3 text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[color:var(--border)]">
+                                                {paginatedDeliverables.map((deliverable) => {
+                                                    const deliverableUrl = deliverable.url || `/projects/${initialProject.id}/committees/${deliverable.committee.id}/activities/${deliverable.id}`;
+                                                    const totalTasksInDeliv = deliverable.tasksCount ?? 0;
+                                                    const completedTasksInDeliv = deliverable.completedTasksCount ?? 0;
+                                                    const taskPct = deliverable.progress !== undefined
+                                                        ? deliverable.progress
+                                                        : totalTasksInDeliv > 0
+                                                            ? Math.round((completedTasksInDeliv / totalTasksInDeliv) * 100)
+                                                            : 0;
 
-                        {/* Tasks Client Pagination */}
-                        {totalTasks > 0 && (
-                            <div className="pt-2 border-t border-[color:var(--border)] flex justify-center w-full">
-                                <Pagination
-                                    currentPage={safeTaskPage}
-                                    totalPages={totalTaskPages}
-                                    totalItems={totalTasks}
-                                    pageSize={taskPageSize}
-                                    onPageChange={setTaskPage}
-                                    onPageSizeChange={setTaskPageSize}
-                                    pageSizeOptions={[10, 25, 50]}
-                                />
-                            </div>
+                                                    const isDeliverableCompleted = deliverable.status === 'Completed';
+                                                    const committeeObj = (initialProject.committees || []).find(
+                                                        (c) => String(c.id) === String(deliverable.committee.id)
+                                                    );
+                                                    const chairpersonName = deliverable.committee.chairperson?.name || committeeObj?.head?.name;
+
+                                                    return (
+                                                        <tr key={deliverable.id} className="hover:bg-[color:var(--soft-surface)] transition-colors">
+                                                            <td className="py-3 pr-4 max-w-xs">
+                                                                <Link
+                                                                    href={deliverableUrl}
+                                                                    className="font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors text-left block truncate"
+                                                                >
+                                                                    {deliverable.title}
+                                                                </Link>
+                                                                {deliverable.description && (
+                                                                    <p className="text-[11px] text-[color:var(--muted)] truncate max-w-sm mt-0.5">
+                                                                        {deliverable.description}
+                                                                    </p>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-3 px-3">
+                                                                <Link
+                                                                    href={`/projects/${initialProject.id}/committees/${deliverable.committee.id}`}
+                                                                    className="font-medium text-[color:var(--text)] hover:text-[color:var(--primary)] transition-colors block truncate"
+                                                                >
+                                                                    {deliverable.committee.name}
+                                                                </Link>
+                                                                <p className="text-[11px] text-[color:var(--muted)] truncate mt-0.5">
+                                                                    Chairperson:{' '}
+                                                                    <span className={chairpersonName ? "font-medium text-[color:var(--text)]" : "italic text-[color:var(--muted)] font-normal"}>
+                                                                        {chairpersonName || 'Unassigned'}
+                                                                    </span>
+                                                                </p>
+                                                            </td>
+                                                            <td className="py-3 px-3 whitespace-nowrap">
+                                                                <Badge variant={
+                                                                    deliverable.status === 'Completed'
+                                                                        ? 'accent'
+                                                                        : deliverable.status === 'Under Review'
+                                                                        ? 'secondary'
+                                                                        : deliverable.status === 'Returned'
+                                                                        ? 'danger'
+                                                                        : 'soft'
+                                                                }>
+                                                                    {deliverable.status}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="py-3 px-3">
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center justify-between text-[11px] text-[color:var(--muted)]">
+                                                                        <span>
+                                                                            {totalTasksInDeliv > 0
+                                                                                ? `${completedTasksInDeliv}/${totalTasksInDeliv} tasks`
+                                                                                : '0 tasks'}
+                                                                        </span>
+                                                                        <span className="font-semibold tabular-nums text-[color:var(--text)]">
+                                                                            {taskPct}%
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="w-full h-1.5 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full rounded-full transition-all duration-300 ${
+                                                                                isDeliverableCompleted
+                                                                                    ? 'bg-emerald-500'
+                                                                                    : taskPct > 0
+                                                                                    ? 'bg-[color:var(--primary)]'
+                                                                                    : 'bg-transparent'
+                                                                            }`}
+                                                                            style={{ width: `${taskPct}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3 pl-3 whitespace-nowrap tabular-nums text-[color:var(--muted)]">
+                                                                {deliverable.due_date || '—'}
+                                                            </td>
+                                                            <td className="py-3 pl-3 whitespace-nowrap text-right">
+                                                                <Link href={deliverableUrl}>
+                                                                    <Button
+                                                                        variant="secondary"
+                                                                        size="sm"
+                                                                        className="text-[11px] font-semibold h-7 px-2.5 cursor-pointer"
+                                                                    >
+                                                                        Details
+                                                                    </Button>
+                                                                </Link>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {/* Deliverables Client Pagination */}
+                                {totalDeliverables > 0 && (
+                                    <div className="pt-2 border-t border-[color:var(--border)] flex justify-center w-full">
+                                        <Pagination
+                                            currentPage={safeDeliverablePage}
+                                            totalPages={totalDeliverablePages}
+                                            totalItems={totalDeliverables}
+                                            pageSize={deliverablePageSize}
+                                            onPageChange={setDeliverablePage}
+                                            onPageSizeChange={setDeliverablePageSize}
+                                            pageSizeOptions={[5, 10, 25]}
+                                        />
+                                    </div>
+                                )}
+                            </Card>
                         )}
-                    </Card>
-                )}
 
                 {/* ── TAB: CHAT ── */}
                 {activeTab === 'chat' && (
@@ -1004,19 +1214,7 @@ export default function ProjectShow({
 
                 {/* ── TAB: OVERVIEW ── */}
                 {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <Card className="p-5 space-y-3">
-                            <span className="text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
-                                Total tasks
-                            </span>
-                            <p className="text-[28px] font-bold text-[color:var(--text)] tabular-nums">
-                                {allTasks.length}
-                            </p>
-                            <p className="text-[12px] text-[color:var(--muted)]">
-                                {allTasks.filter(t => t.status === 'Completed').length} completed
-                            </p>
-                        </Card>
-
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                         <Card className="p-5 space-y-3">
                             <span className="text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
                                 Active committees
@@ -1026,6 +1224,30 @@ export default function ProjectShow({
                             </p>
                             <p className="text-[12px] text-[color:var(--muted)]">
                                 Functional team divisions
+                            </p>
+                        </Card>
+
+                        <Card className="p-5 space-y-3">
+                            <span className="text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+                                Deliverables
+                            </span>
+                            <p className="text-[28px] font-bold text-[color:var(--text)] tabular-nums">
+                                {allDeliverables.length}
+                            </p>
+                            <p className="text-[12px] text-[color:var(--muted)]">
+                                {allDeliverables.filter(d => d.status === 'Completed').length} completed
+                            </p>
+                        </Card>
+
+                        <Card className="p-5 space-y-3">
+                            <span className="text-[12px] font-semibold uppercase tracking-wider text-[color:var(--muted)]">
+                                Internal tasks
+                            </span>
+                            <p className="text-[28px] font-bold text-[color:var(--text)] tabular-nums">
+                                {allTasks.length}
+                            </p>
+                            <p className="text-[12px] text-[color:var(--muted)]">
+                                {allTasks.filter(t => t.status === 'Completed').length} completed
                             </p>
                         </Card>
 
@@ -1288,6 +1510,114 @@ export default function ProjectShow({
                 </form>
             </Modal>
 
+            {/* ── Create Deliverable Modal ── */}
+            <Modal
+                isOpen={isCreateDeliverableModalOpen}
+                onClose={() => !deliverableProcessing && setIsCreateDeliverableModalOpen(false)}
+                title="Create Event Deliverable"
+                description={`Establish a key deliverable under a committee for ${initialProject.title}.`}
+                maxWidth="md"
+            >
+                <form onSubmit={handleCreateDeliverableSubmit} className="space-y-4 pt-1">
+                    {/* Committee Selection */}
+                    <div>
+                        <Label htmlFor="create-deliverable-committee" required>Target Committee</Label>
+                        {eligibleCommitteesForDeliverable.length === 0 ? (
+                            <div className="p-3 text-[13px] text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                                No active committees available where you have permission to create deliverables.
+                            </div>
+                        ) : (
+                            <select
+                                id="create-deliverable-committee"
+                                value={deliverableData.committee_id || eligibleCommitteesForDeliverable[0]?.id || ''}
+                                onChange={(e) => setDeliverableData('committee_id', e.target.value)}
+                                className="w-full mt-1.5 py-2 px-3 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
+                                required
+                            >
+                                {eligibleCommitteesForDeliverable.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+                        <InputError message={deliverableErrors.committee_id} />
+                    </div>
+
+                    {/* Title */}
+                    <FormField
+                        label="Deliverable Title"
+                        id="create-deliverable-title"
+                        name="title"
+                        value={deliverableData.title}
+                        onChange={(e) => setDeliverableData('title', e.target.value)}
+                        error={deliverableErrors.title}
+                        required
+                        placeholder="e.g. Program Schedule & Venue Layout"
+                        disabled={deliverableProcessing}
+                        autoFocus
+                    />
+
+                    {/* Description */}
+                    <div>
+                        <Label htmlFor="create-deliverable-description">Description (Optional)</Label>
+                        <textarea
+                            id="create-deliverable-description"
+                            name="description"
+                            rows={3}
+                            value={deliverableData.description}
+                            onChange={(e) => setDeliverableData('description', e.target.value)}
+                            className="w-full mt-1.5 p-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] placeholder:text-[color:var(--muted)]"
+                            placeholder="Describe the scope, objectives, or key outputs of this deliverable..."
+                            disabled={deliverableProcessing}
+                        />
+                        <InputError message={deliverableErrors.description} />
+                    </div>
+
+                    {/* Dates */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField
+                            label="Start Date (Optional)"
+                            id="create-deliverable-start-date"
+                            type="date"
+                            value={deliverableData.start_date}
+                            onChange={(e) => setDeliverableData('start_date', e.target.value)}
+                            error={deliverableErrors.start_date}
+                            disabled={deliverableProcessing}
+                        />
+
+                        <FormField
+                            label="Target Due Date (Optional)"
+                            id="create-deliverable-due-date"
+                            type="date"
+                            value={deliverableData.due_date}
+                            onChange={(e) => setDeliverableData('due_date', e.target.value)}
+                            error={deliverableErrors.due_date}
+                            disabled={deliverableProcessing}
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[color:var(--border)]">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setIsCreateDeliverableModalOpen(false)}
+                            disabled={deliverableProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            isLoading={deliverableProcessing}
+                            disabled={deliverableProcessing || eligibleCommitteesForDeliverable.length === 0}
+                        >
+                            Create Deliverable
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
             {/* In-Project Create Task Pop-up Modal with Checklist & Deliverables */}
             <CreateProjectTaskModal
                 isOpen={isCreateTaskModalOpen}
@@ -1306,6 +1636,113 @@ export default function ProjectShow({
                 projectId={initialProject.id}
                 task={viewingTask}
             />
+
+            {/* ── Manage Event Co-Chairs Modal ── */}
+            <Modal
+                isOpen={isCoChairModalOpen}
+                onClose={() => !coChairProcessing && setIsCoChairModalOpen(false)}
+                title="Event Co-Chair Designations"
+                maxWidth="md"
+            >
+                <div className="space-y-5">
+                    <p className="text-[13px] text-[color:var(--muted)] leading-relaxed">
+                        Designate existing event participants as Event-level Co-Chairs to assist with overall event monitoring, timeline tracking, and committee coordination.
+                    </p>
+
+                    {/* Current Co-Chairs */}
+                    <div className="space-y-2">
+                        <h4 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
+                            Current Event Co-Chairs ({(initialProject.eventCoChairs || []).length})
+                        </h4>
+                        {(initialProject.eventCoChairs || []).length === 0 ? (
+                            <div className="p-3.5 rounded-lg border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)] text-center text-[12px] text-[color:var(--muted)]">
+                                No Event Co-Chairs currently designated.
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {(initialProject.eventCoChairs || []).map((cc) => (
+                                    <div
+                                        key={cc.id}
+                                        className="flex items-center justify-between p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] text-xs"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-bold text-[color:var(--text)]">{cc.name}</span>
+                                                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                                                    Event Co-Chair
+                                                </span>
+                                            </div>
+                                            <span className="text-[11px] text-[color:var(--muted)]">{cc.email}</span>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={coChairProcessing}
+                                            onClick={() => handleRemoveCoChair(cc.id)}
+                                            className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300 text-xs"
+                                        >
+                                            Remove
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Form to designate new Co-Chair */}
+                    <div className="pt-4 border-t border-[color:var(--border)] space-y-3">
+                        <h4 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
+                            Designate New Event Co-Chair
+                        </h4>
+
+                        {(initialProject.eligibleCoChairs || []).length === 0 ? (
+                            <p className="text-xs text-[color:var(--muted)] italic">
+                                No eligible participants available to designate. All event participants are already designated or are the Overall Chair.
+                            </p>
+                        ) : (
+                            <form onSubmit={handleDesignateCoChair} className="space-y-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="designate-cochair-select">Select Event Participant</Label>
+                                    <select
+                                        id="designate-cochair-select"
+                                        value={selectedCoChairUserId}
+                                        onChange={(e) => setSelectedCoChairUserId(e.target.value)}
+                                        className="w-full px-3 py-2 text-xs bg-[color:var(--card-bg)] border border-[color:var(--border)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-[color:var(--text)] cursor-pointer"
+                                    >
+                                        <option value="">-- Choose an existing participant --</option>
+                                        {(initialProject.eligibleCoChairs || []).map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name} ({p.role || 'Member'} — {p.email})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {coChairError && <InputError message={coChairError} />}
+                                </div>
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setIsCoChairModalOpen(false)}
+                                        disabled={coChairProcessing}
+                                    >
+                                        Close
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        variant="primary"
+                                        disabled={!selectedCoChairUserId || coChairProcessing}
+                                        isLoading={coChairProcessing}
+                                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                                    >
+                                        Designate as Co-Chair
+                                    </Button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            </Modal>
         </AppLayout>
     );
 }

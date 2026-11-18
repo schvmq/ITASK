@@ -83,4 +83,21 @@ class Project extends Model
     {
         return $this->belongsToMany(User::class, 'project_role_assignments', 'project_id', 'user_id')->distinct();
     }
+
+    public function coChairDesignations(): HasMany
+    {
+        return $this->hasMany(CoChairDesignation::class);
+    }
+
+    public function eventCoChairDesignations(): HasMany
+    {
+        return $this->hasMany(CoChairDesignation::class)->whereNull('committee_id');
+    }
+
+    public function eventCoChairs(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'co_chair_designations', 'project_id', 'user_id')
+            ->whereNull('co_chair_designations.committee_id')
+            ->withTimestamps();
+    }
 }

@@ -59,4 +59,12 @@ class ProjectPolicy
     {
         return $this->update($user, $project);
     }
+
+    /**
+     * Determine whether the user can designate or remove an Event-level Co-Chair.
+     */
+    public function designateCoChair(User $user, Project $project): bool
+    {
+        return $this->authService->canDesignateEventCoChair($user, $project);
+    }
 }

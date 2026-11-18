@@ -47,6 +47,7 @@ interface MemberItem {
     tasks_count?: number;
     completed_tasks_count?: number;
     progress?: number;
+    is_co_chair?: boolean;
 }
 
 interface StaffItem {
@@ -91,12 +92,25 @@ export interface CommitteeData {
     };
     head: StaffItem | null;
     members: MemberItem[];
+    coChairs?: Array<{
+        id: number;
+        name: string;
+        email: string;
+        designated_at?: string;
+    }>;
+    is_committee_co_chair?: boolean;
+    eligibleCoChairs?: Array<{
+        id: number;
+        name: string;
+        email: string;
+    }>;
     activities?: CommitteeActivityItem[];
     can: {
         update: boolean;
         delete: boolean;
         manageMembers: boolean;
         createActivity?: boolean;
+        designateCoChair?: boolean;
     };
 }
 
@@ -153,11 +167,49 @@ export default function CommitteeShow({
     const [isUnassignStaffModalOpen, setIsUnassignStaffModalOpen] = useState(false);
     const [isRemoveMemberModalOpen, setIsRemoveMemberModalOpen] = useState(false);
     const [isCreateActivityModalOpen, setIsCreateActivityModalOpen] = useState(false);
+    const [isCoChairModalOpen, setIsCoChairModalOpen] = useState(false);
+    const [selectedCoChairUserId, setSelectedCoChairUserId] = useState<string>('');
+    const [coChairProcessing, setCoChairProcessing] = useState(false);
+    const [coChairError, setCoChairError] = useState<string | null>(null);
 
     const [deleteProcessing, setDeleteProcessing] = useState(false);
     const [unassignProcessing, setUnassignProcessing] = useState(false);
     const [removeMemberProcessing, setRemoveMemberProcessing] = useState(false);
     const [memberToRemove, setMemberToRemove] = useState<MemberItem | null>(null);
+
+    const handleDesignateCoChair = (userId?: number) => {
+        const idToDesignate = userId || (selectedCoChairUserId ? Number(selectedCoChairUserId) : null);
+        if (!idToDesignate) return;
+        setCoChairProcessing(true);
+        setCoChairError(null);
+        router.post(
+            `/projects/${project.id}/committees/${committee.id}/co-chairs`,
+            { user_id: idToDesignate },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedCoChairUserId('');
+                    setCoChairProcessing(false);
+                },
+                onError: (errs) => {
+                    setCoChairProcessing(false);
+                    setCoChairError(errs.user_id || 'Failed to designate Co-Chair.');
+                },
+                onFinish: () => setCoChairProcessing(false),
+            }
+        );
+    };
+
+    const handleRemoveCoChair = (userId: number) => {
+        setCoChairProcessing(true);
+        router.delete(
+            `/projects/${project.id}/committees/${committee.id}/co-chairs/${userId}`,
+            {
+                preserveScroll: true,
+                onFinish: () => setCoChairProcessing(false),
+            }
+        );
+    };
 
     // Assign / Change Staff form
     const {
@@ -775,7 +827,23 @@ export default function CommitteeShow({
 
                         {/* Right Column: Committee Members (~32-35%) */}
                         <div className="lg:col-span-4 space-y-4">
-                            <h2 className="text-base font-bold text-slate-900">Committee Members</h2>
+                            <div className="flex items-center justify-between gap-2">
+                                <h2 className="text-base font-bold text-slate-900">Committee Members</h2>
+                                {committee.can?.designateCoChair && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCoChairError(null);
+                                            setSelectedCoChairUserId('');
+                                            setIsCoChairModalOpen(true);
+                                        }}
+                                        className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                                    >
+                                        <UserCheck className="w-3 h-3 text-amber-600" />
+                                        <span>Co-Chairs ({committee.coChairs?.length || 0})</span>
+                                    </button>
+                                )}
+                            </div>
 
                             <div className="space-y-3">
                                 {/* Project Staff (Head) Card */}
@@ -838,10 +906,16 @@ export default function CommitteeShow({
                                                     {getInitials(member.name)}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="flex items-center gap-1.5">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
                                                         <p className="text-xs font-bold text-slate-900 truncate">
                                                             {member.name}
                                                         </p>
+                                                        {member.is_co_chair && (
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-amber-50 text-amber-800 border border-amber-300 inline-flex items-center gap-0.5">
+                                                                <UserCheck className="w-2.5 h-2.5 text-amber-600" />
+                                                                Co-Chair
+                                                            </span>
+                                                        )}
                                                         {currentUserId && member.id === currentUserId && (
                                                             <span className="text-[9px] px-1 py-0.2 rounded font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                                 You
@@ -849,7 +923,7 @@ export default function CommitteeShow({
                                                         )}
                                                     </div>
                                                     <p className="text-[11px] font-medium text-slate-500">
-                                                        Member
+                                                        {member.is_co_chair ? 'Member · Committee Co-Chair' : 'Member'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -863,6 +937,22 @@ export default function CommitteeShow({
                                                         {member.tasks_count ?? 0} task{(member.tasks_count ?? 0) === 1 ? '' : 's'}
                                                     </p>
                                                 </div>
+                                                {committee.can?.designateCoChair && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => member.is_co_chair ? handleRemoveCoChair(member.id) : handleDesignateCoChair(member.id)}
+                                                        disabled={coChairProcessing}
+                                                        className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded cursor-pointer ${
+                                                            member.is_co_chair
+                                                                ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
+                                                                : 'text-slate-400 hover:text-amber-600 hover:bg-slate-50'
+                                                        }`}
+                                                        title={member.is_co_chair ? 'Remove Co-Chair designation' : 'Designate as Committee Co-Chair'}
+                                                        aria-label={member.is_co_chair ? 'Remove Co-Chair designation' : 'Designate as Committee Co-Chair'}
+                                                    >
+                                                        <UserCheck className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
                                                 {committee.can.manageMembers && (
                                                     <button
                                                         type="button"
@@ -1453,6 +1543,114 @@ export default function CommitteeShow({
                             </Button>
                         </div>
                     </form>
+                </Modal>
+
+                {/* ── Manage Committee Co-Chairs Modal ── */}
+                <Modal
+                    isOpen={isCoChairModalOpen}
+                    onClose={() => !coChairProcessing && setIsCoChairModalOpen(false)}
+                    title="Committee Co-Chair Designations"
+                    maxWidth="md"
+                >
+                    <div className="space-y-5">
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                            Designate committee members as Committee-level Co-Chairs to assist with coordinating tasks, managing deadlines, and preliminary evidence review.
+                        </p>
+
+                        {/* Current Co-Chairs */}
+                        <div className="space-y-2">
+                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                Current Committee Co-Chairs ({(committee.coChairs || []).length})
+                            </h4>
+                            {(committee.coChairs || []).length === 0 ? (
+                                <div className="p-3.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-center text-xs text-slate-500">
+                                    No Committee Co-Chairs currently designated.
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {(committee.coChairs || []).map((cc) => (
+                                        <div
+                                            key={cc.id}
+                                            className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white text-xs"
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-bold text-slate-900">{cc.name}</span>
+                                                    <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                                        Committee Co-Chair
+                                                    </span>
+                                                </div>
+                                                <span className="text-[11px] text-slate-500">{cc.email}</span>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={coChairProcessing}
+                                                onClick={() => handleRemoveCoChair(cc.id)}
+                                                className="text-rose-600 border-rose-200 hover:bg-rose-50 text-xs"
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Form to designate new Co-Chair */}
+                        <div className="pt-4 border-t border-slate-100 space-y-3">
+                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                Designate New Committee Co-Chair
+                            </h4>
+
+                            {(committee.eligibleCoChairs || []).length === 0 ? (
+                                <p className="text-xs text-slate-500 italic">
+                                    No eligible members available to designate. All committee members are already designated as Co-Chairs.
+                                </p>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="designate-comm-cochair-select">Select Committee Member</Label>
+                                        <select
+                                            id="designate-comm-cochair-select"
+                                            value={selectedCoChairUserId}
+                                            onChange={(e) => setSelectedCoChairUserId(e.target.value)}
+                                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900 cursor-pointer"
+                                        >
+                                            <option value="">-- Choose an existing committee member --</option>
+                                            {(committee.eligibleCoChairs || []).map((m) => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.name} ({m.email})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {coChairError && <InputError message={coChairError} />}
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setIsCoChairModalOpen(false)}
+                                            disabled={coChairProcessing}
+                                        >
+                                            Close
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="primary"
+                                            disabled={!selectedCoChairUserId || coChairProcessing}
+                                            isLoading={coChairProcessing}
+                                            onClick={() => handleDesignateCoChair()}
+                                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                                        >
+                                            Designate as Co-Chair
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </Modal>
         </AppLayout>
     );

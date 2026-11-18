@@ -313,7 +313,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                         <th className="py-2.5 px-3">Status</th>
                                         <th className="py-2.5 px-3">Event Progress</th>
                                         <th className="py-2.5 px-3">Committees</th>
-                                        <th className="py-2.5 px-3">Tasks</th>
+                                        <th className="py-2.5 px-3">Deliverables</th>
                                         <th className="py-2.5 px-3">Deadline</th>
                                         <th className="py-2.5 pl-3 text-right">Actions</th>
                                     </tr>
@@ -386,9 +386,9 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                                     {project.committeesCount}
                                                 </td>
 
-                                                {/* Tasks */}
+                                                {/* Deliverables */}
                                                 <td className="py-3.5 px-3 whitespace-nowrap text-[13px] text-[color:var(--muted)] tabular-nums">
-                                                    {project.tasksCount}
+                                                    {project.activitiesCount ?? 0}
                                                 </td>
 
                                                 {/* Deadline */}
@@ -518,7 +518,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                             {/* Stats list */}
                                             <div className="flex items-center justify-between text-[12px] text-[color:var(--muted)] pt-2 border-t border-[color:var(--border)]">
                                                 <span>{project.committeesCount} committees</span>
-                                                <span>{project.tasksCount} tasks</span>
+                                                <span>{project.activitiesCount ?? 0} deliverables</span>
                                             </div>
                                         </div>
 

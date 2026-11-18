@@ -13,7 +13,7 @@ class ProjectProgressService
      * Calculate progress for a single task.
      *
      * A completed task contributes 100% progress.
-     * Any other status (To Do, In Progress, Under Review, Returned) contributes 0%.
+     * Any other status contributes 0%.
      *
      * @return array{progress: int, is_completed: bool, status: string}
      */
@@ -29,13 +29,15 @@ class ProjectProgressService
     }
 
     /**
-     * Calculate progress for an activity based on its child tasks.
+     * Calculate internal task progress for an activity (deliverable).
      *
-     * Edge cases:
-     * - If activity has tasks: (completed_tasks / total_tasks) * 100 rounded.
-     * - If activity has zero tasks: 100% if activity status is Completed, else 0%.
+     * Hierarchy & Rules:
+     * - Deliverable Task Progress: (completed_tasks / total_tasks) * 100 rounded.
+     * - If total tasks is 0: 0% progress.
+     * - Deliverable can be officially 'Completed' even if task progress < 100%.
+     * - Reaching 100% task progress does NOT automatically mark deliverable as Completed.
      *
-     * @return array{total_tasks: int, completed_tasks: int, progress: int, status: string}
+     * @return array{total_tasks: int, completed_tasks: int, progress: int, status: string, is_completed: bool}
      */
     public function calculateActivityProgress(Activity $activity): array
     {
@@ -43,27 +45,25 @@ class ProjectProgressService
         $totalTasks = $tasks->count();
         $completedTasks = $tasks->where('status', Task::STATUS_COMPLETED)->count();
 
-        if ($totalTasks > 0) {
-            $progress = (int) round(($completedTasks / $totalTasks) * 100);
-        } else {
-            $progress = ($activity->status === Activity::STATUS_COMPLETED) ? 100 : 0;
-        }
+        $progress = $totalTasks > 0 ? (int) round(($completedTasks / $totalTasks) * 100) : 0;
+        $isCompleted = ($activity->status === Activity::STATUS_COMPLETED);
 
         return [
             'total_tasks' => $totalTasks,
             'completed_tasks' => $completedTasks,
             'progress' => $progress,
             'status' => $activity->status,
+            'is_completed' => $isCompleted,
         ];
     }
 
     /**
-     * Calculate progress for a committee based on tasks across all its activities.
+     * Calculate progress for a committee based exclusively on its deliverables.
      *
-     * Edge cases:
-     * - If committee has tasks across its activities: (completed_tasks / total_tasks) * 100 rounded.
-     * - If committee has zero tasks but has activities: 100% if all activities are Completed, else 0%.
-     * - If committee has zero activities: 0%.
+     * Formula:
+     * - (completed_committee_deliverables / total_committee_deliverables) * 100 rounded.
+     * - Task completion NEVER directly affects Committee progress.
+     * - If committee has 0 deliverables: 0%.
      *
      * @return array{total_tasks: int, completed_tasks: int, total_activities: int, completed_activities: int, progress: int}
      */
@@ -83,13 +83,9 @@ class ProjectProgressService
         $totalActivities = $activities->count();
         $completedActivities = $activities->where('status', Activity::STATUS_COMPLETED)->count();
 
-        if ($totalTasks > 0) {
-            $progress = (int) round(($completedTasks / $totalTasks) * 100);
-        } elseif ($totalActivities > 0 && $completedActivities === $totalActivities) {
-            $progress = 100;
-        } else {
-            $progress = 0;
-        }
+        $progress = $totalActivities > 0
+            ? (int) round(($completedActivities / $totalActivities) * 100)
+            : 0;
 
         return [
             'total_tasks' => $totalTasks,
@@ -101,14 +97,12 @@ class ProjectProgressService
     }
 
     /**
-     * Calculate progress for a project across all its activities and tasks.
-     * Fully deterministic and shared between Dashboard and Gantt/Timeline.
+     * Calculate progress for an entire event (project) based exclusively on its deliverables.
      *
-     * Edge cases:
-     * - If project has tasks: (completed_tasks / total_tasks) * 100 rounded.
-     * - If project has zero tasks and status is Completed: 100%.
-     * - If project has zero tasks but has activities and all are Completed: 100%.
-     * - Otherwise: 0%.
+     * Formula:
+     * - (completed_deliverables / total_deliverables) * 100 rounded.
+     * - Task completion NEVER directly affects Event progress.
+     * - If event has 0 deliverables: 0%.
      *
      * @return array{total_tasks: int, completed_tasks: int, total_committees: int, total_activities: int, completed_activities: int, progress: int}
      */
@@ -147,15 +141,9 @@ class ProjectProgressService
             ? $project->committees->count()
             : $project->committees()->count();
 
-        if ($totalTasks > 0) {
-            $progress = (int) round(($completedTasks / $totalTasks) * 100);
-        } elseif ($project->status === Project::STATUS_COMPLETED) {
-            $progress = 100;
-        } elseif ($totalActivities > 0 && $completedActivities === $totalActivities) {
-            $progress = 100;
-        } else {
-            $progress = 0;
-        }
+        $progress = $totalActivities > 0
+            ? (int) round(($completedActivities / $totalActivities) * 100)
+            : 0;
 
         return [
             'total_tasks' => $totalTasks,
@@ -167,6 +155,9 @@ class ProjectProgressService
         ];
     }
 
+    /**
+     * Clear the cached progress for a project.
+     */
     public static function clearProjectProgressCache(int|string $projectId): void
     {
         \Illuminate\Support\Facades\Cache::forget("project_progress_{$projectId}");

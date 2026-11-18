@@ -203,7 +203,8 @@ class ProjectTimelineAndProgressTest extends TestCase
             'created_by' => $this->staff1->id,
         ]);
         $calcZeroCompleted = $this->progressService->calculateActivityProgress($actZeroCompleted);
-        $this->assertSame(100, $calcZeroCompleted['progress']);
+        $this->assertSame(0, $calcZeroCompleted['progress']);
+        $this->assertTrue($calcZeroCompleted['is_completed']);
 
         // 3. Single task completed
         $actSingle = Activity::create([
@@ -493,18 +494,26 @@ class ProjectTimelineAndProgressTest extends TestCase
 
     public function test_dashboard_and_timeline_progress_match(): void
     {
-        $act = Activity::create([
+        $act1 = Activity::create([
             'project_id' => $this->project->id,
             'committee_id' => $this->committee1->id,
-            'title' => 'Shared Metric Activity',
+            'title' => 'Shared Metric Activity 1',
+            'status' => Activity::STATUS_COMPLETED,
+            'created_by' => $this->staff1->id,
+        ]);
+
+        $act2 = Activity::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $this->committee1->id,
+            'title' => 'Shared Metric Activity 2',
             'status' => Activity::STATUS_IN_PROGRESS,
             'created_by' => $this->staff1->id,
         ]);
 
-        Task::create(['activity_id' => $act->id, 'title' => 'T1 Done', 'status' => Task::STATUS_COMPLETED]);
-        Task::create(['activity_id' => $act->id, 'title' => 'T2 In Prog', 'status' => Task::STATUS_IN_PROGRESS]);
+        Task::create(['activity_id' => $act1->id, 'title' => 'T1 Done', 'status' => Task::STATUS_COMPLETED]);
+        Task::create(['activity_id' => $act2->id, 'title' => 'T2 In Prog', 'status' => Task::STATUS_IN_PROGRESS]);
 
-        // Timeline progress
+        // Timeline progress (1 of 2 deliverables completed = 50%)
         $timeline = $this->timelineService->getTimelineData($this->project, $this->leader);
         $timelineProgress = $timeline['progress'];
 
@@ -564,24 +573,24 @@ class ProjectTimelineAndProgressTest extends TestCase
         $this->assertSame(1, $act3['completed_tasks']);
         $this->assertSame(25, $act3['progress']);
 
-        // Overall committee & project progress: 2 / 10 = 20%
+        // Overall committee & project progress: 0 of 3 deliverables completed = 0%
         $this->assertSame(10, $committee['total_tasks']);
         $this->assertSame(2, $committee['completed_tasks']);
-        $this->assertSame(20, $committee['progress']);
+        $this->assertSame(0, $committee['progress']);
 
         $this->assertSame(10, $leaderTimeline['total_tasks']);
         $this->assertSame(2, $leaderTimeline['completed_tasks']);
-        $this->assertSame(20, $leaderTimeline['progress']);
+        $this->assertSame(0, $leaderTimeline['progress']);
 
         // 2. Staff access
         $staffTimeline = $this->timelineService->getTimelineData($seededProject, $staff);
-        $this->assertSame(20, $staffTimeline['progress']);
+        $this->assertSame(0, $staffTimeline['progress']);
         $this->assertSame(1, count($staffTimeline['committees']));
 
         // 3. Members access
         foreach ([$member01, $member02, $member03] as $member) {
             $memberTimeline = $this->timelineService->getTimelineData($seededProject, $member);
-            $this->assertSame(20, $memberTimeline['progress']);
+            $this->assertSame(0, $memberTimeline['progress']);
             $this->assertSame(1, count($memberTimeline['committees']));
             $this->assertSame(3, count($memberTimeline['committees'][0]['activities']));
         }

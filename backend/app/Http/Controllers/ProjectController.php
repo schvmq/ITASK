@@ -211,7 +211,8 @@ class ProjectController extends Controller
                 'committees.activities.tasks.checklistItems',
                 'committees.activities.tasks.evidences.uploader',
                 'roleAssignments.user',
-                'activities.committee',
+                'eventCoChairDesignations.user',
+                'activities.committee.staffAssignment.user',
                 'activities.tasks.assignee',
                 'activities.tasks.checklistItems',
                 'activities.tasks.evidences.uploader',
@@ -244,6 +245,16 @@ class ProjectController extends Controller
             ? $this->timelineService->getTimelineData($projectModel, Auth::user())
             : null;
 
+        $eventCoChairs = $projectModel ? $projectModel->eventCoChairDesignations->map(fn ($d) => [
+            'id' => $d->user->id,
+            'name' => $d->user->name,
+            'email' => $d->user->email,
+            'designated_at' => $d->created_at?->format('M d, Y'),
+        ])->values()->all() : [];
+
+        $eventCoChairUserIds = $projectModel ? $projectModel->eventCoChairDesignations->pluck('user_id')->all() : [];
+        $isEventCoChair = (Auth::check() && in_array(Auth::id(), $eventCoChairUserIds, true));
+
         $projectData = $projectModel ? [
             'id' => (string) $projectModel->id,
             'title' => $projectModel->title,
@@ -258,13 +269,26 @@ class ProjectController extends Controller
             'created_at' => $projectModel->created_at?->toISOString(),
             'role' => $userRole,
             'userCommittee' => $userCommittee,
+            'eventCoChairs' => $eventCoChairs,
+            'is_event_co_chair' => $isEventCoChair,
             'can' => [
                 'update'          => Auth::check() ? Auth::user()->can('update', $projectModel) : false,
                 'archive'         => Auth::check() ? Auth::user()->can('archive', $projectModel) : false,
                 'uploadDocument'  => Auth::check() ? Auth::user()->can('uploadDocument', $projectModel) : false,
                 'createCommittee' => Auth::check() ? Auth::user()->can('create', [\App\Models\Committee::class, $projectModel]) : false,
                 'createTask'      => Auth::check() ? Auth::user()->can('createForProject', [\App\Models\Task::class, $projectModel]) : false,
+                'createActivity'  => Auth::check() ? ($userRole === ProjectRoleAssignment::ROLE_PROJECT_LEADER || $projectModel->committees->contains(fn ($c) => Auth::user()->can('create', [\App\Models\Activity::class, $c]))) : false,
+                'designateCoChair'=> Auth::check() ? Auth::user()->can('designateCoChair', $projectModel) : false,
             ],
+            'committeesForDeliverable' => (Auth::check() && $projectModel)
+                ? $projectModel->committees
+                    ->filter(fn ($c) => Auth::user()->can('create', [\App\Models\Activity::class, $c]))
+                    ->values()
+                    ->map(fn ($c) => [
+                        'id' => (string) $c->id,
+                        'name' => $c->name,
+                    ])->all()
+                : [],
             'creator' => $projectModel->creator ? [
                 'id' => $projectModel->creator->id,
                 'name' => $projectModel->creator->name,
@@ -308,30 +332,49 @@ class ProjectController extends Controller
                         'view' => $canView,
                         'update' => Auth::check() ? Auth::user()->can('update', $committee) : false,
                         'delete' => Auth::check() ? Auth::user()->can('delete', $committee) : false,
+                        'createActivity' => Auth::check() ? Auth::user()->can('create', [\App\Models\Activity::class, $committee]) : false,
                     ],
                 ];
             })->values()->all(),
-            'activities' => $projectModel->activities->map(function ($act) {
-                return [
-                    'id' => (string) $act->id,
-                    'title' => $act->title,
-                    'description' => $act->description,
-                    'status' => $act->status,
-                    'progress' => $this->progressService->calculateActivityProgress($act)['progress'],
-                    'due_date' => $act->due_date?->format('M d, Y'),
-                    'due_date_raw' => $act->due_date?->format('Y-m-d'),
-                    'committee' => [
-                        'id' => (string) $act->committee_id,
-                        'name' => $act->committee?->name ?? 'Unknown Committee',
-                    ],
-                    'tasksCount' => $act->tasks->count(),
-                    'completedTasksCount' => $act->tasks->where('status', Task::STATUS_COMPLETED)->count(),
-                    'creator' => $act->creator ? [
-                        'id' => $act->creator->id,
-                        'name' => $act->creator->name,
-                    ] : null,
-                ];
-            })->values()->all(),
+            'activities' => $projectModel->activities
+                ->filter(fn ($act) => !Auth::check() || Auth::user()->can('view', $act))
+                ->map(function ($act) use ($projectModel) {
+                    $activityProgress = $this->progressService->calculateActivityProgress($act);
+                    $comm = $projectModel->committees->firstWhere('id', $act->committee_id) ?? $act->committee;
+                    $staffUser = $comm?->staffAssignment?->user;
+
+                    return [
+                        'id' => (string) $act->id,
+                        'title' => $act->title,
+                        'description' => $act->description,
+                        'status' => $act->status,
+                        'progress' => $activityProgress['progress'],
+                        'start_date' => $act->start_date?->format('M d, Y'),
+                        'start_date_raw' => $act->start_date?->format('Y-m-d'),
+                        'due_date' => $act->due_date?->format('M d, Y'),
+                        'due_date_raw' => $act->due_date?->format('Y-m-d'),
+                        'committee' => [
+                            'id' => (string) $act->committee_id,
+                            'name' => $comm?->name ?? $act->committee?->name ?? 'Unknown Committee',
+                            'chairperson' => $staffUser ? [
+                                'id' => $staffUser->id,
+                                'name' => $staffUser->name,
+                                'email' => $staffUser->email,
+                            ] : null,
+                        ],
+                        'url' => route('projects.committees.activities.show', [
+                            'project' => $projectModel->id,
+                            'committee' => $act->committee_id,
+                            'activity' => $act->id,
+                        ]),
+                        'tasksCount' => $act->tasks->count(),
+                        'completedTasksCount' => $act->tasks->where('status', Task::STATUS_COMPLETED)->count(),
+                        'creator' => $act->creator ? [
+                            'id' => $act->creator->id,
+                            'name' => $act->creator->name,
+                        ] : null,
+                    ];
+                })->values()->all(),
             'tasks' => $projectModel->activities->flatMap(function ($act) use ($projectModel) {
                 $user = Auth::user();
                 return $act->tasks->map(function ($task) use ($act, $projectModel, $user) {
@@ -409,6 +452,7 @@ class ProjectController extends Controller
                     'name' => $assignment->user->name,
                     'email' => $assignment->user->email,
                     'committee_id' => $assignment->committee_id ? (string) $assignment->committee_id : null,
+                    'is_co_chair' => in_array($assignment->user->id, $eventCoChairUserIds, true),
                 ])->values()->all(),
             'projectMembers' => $projectModel->roleAssignments
                 ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
@@ -417,7 +461,20 @@ class ProjectController extends Controller
                     'name' => $assignment->user->name,
                     'email' => $assignment->user->email,
                     'committee_id' => $assignment->committee_id ? (string) $assignment->committee_id : null,
+                    'is_co_chair' => in_array($assignment->user->id, $eventCoChairUserIds, true),
                 ])->values()->all(),
+            'eligibleCoChairs' => (Auth::check() && Auth::user()->can('designateCoChair', $projectModel))
+                ? $projectModel->roleAssignments
+                    ->where('role', '!=', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                    ->filter(fn ($a) => (int) $a->user_id !== (int) $projectModel->created_by && ! in_array($a->user_id, $eventCoChairUserIds, true))
+                    ->unique('user_id')
+                    ->map(fn ($a) => [
+                        'id' => $a->user->id,
+                        'name' => $a->user->name,
+                        'email' => $a->user->email,
+                        'role' => $a->role,
+                    ])->values()->all()
+                : [],
             'availablePersonnel' => (Auth::check() && $userRole === ProjectRoleAssignment::ROLE_PROJECT_LEADER)
                 ? User::whereNotNull('email_verified_at')
                     ->whereNotIn('id', $projectModel->roleAssignments->pluck('user_id'))
@@ -447,6 +504,9 @@ class ProjectController extends Controller
         ] : null;
 
         $currentTab = $initialTab ?? request('tab');
+        if ($currentTab === 'tasks') {
+            $currentTab = 'deliverables';
+        }
 
         return Inertia::render('Projects/Show', [
             'projectId' => $project,

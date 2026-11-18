@@ -108,6 +108,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Project Personnel / Roles
     Route::post('/projects/{project}/personnel', [ProjectPersonnelController::class, 'store'])->name('projects.personnel.store');
     Route::delete('/projects/{project}/personnel/{user}', [ProjectPersonnelController::class, 'destroy'])->name('projects.personnel.destroy');
+    Route::post('/projects/{project}/co-chairs', [\App\Http\Controllers\CoChairDesignationController::class, 'storeEvent'])->name('projects.co-chairs.store');
+    Route::delete('/projects/{project}/co-chairs/{user}', [\App\Http\Controllers\CoChairDesignationController::class, 'destroyEvent'])->name('projects.co-chairs.destroy');
 
     // Committees
     Route::post('/projects/{project}/committees', [CommitteeController::class, 'store'])->name('projects.committees.store');
@@ -119,6 +121,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Committee Members
     Route::post('/projects/{project}/committees/{committee}/members', [CommitteeController::class, 'assignMember'])->name('projects.committees.members.store');
     Route::delete('/projects/{project}/committees/{committee}/members/{user}', [CommitteeController::class, 'removeMember'])->name('projects.committees.members.destroy');
+    Route::post('/projects/{project}/committees/{committee}/co-chairs', [\App\Http\Controllers\CoChairDesignationController::class, 'storeCommittee'])->name('projects.committees.co-chairs.store');
+    Route::delete('/projects/{project}/committees/{committee}/co-chairs/{user}', [\App\Http\Controllers\CoChairDesignationController::class, 'destroyCommittee'])->name('projects.committees.co-chairs.destroy');
 
     // Activities
     Route::post('/projects/{project}/committees/{committee}/activities', [\App\Http\Controllers\ActivityController::class, 'store'])->name('projects.committees.activities.store');

@@ -50,4 +50,15 @@ class Committee extends Model
     {
         return $this->hasMany(Activity::class);
     }
+
+    public function coChairDesignations(): HasMany
+    {
+        return $this->hasMany(CoChairDesignation::class);
+    }
+
+    public function coChairs(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'co_chair_designations', 'committee_id', 'user_id')
+            ->withTimestamps();
+    }
 }

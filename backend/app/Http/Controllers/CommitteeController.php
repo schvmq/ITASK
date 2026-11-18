@@ -80,6 +80,7 @@ class CommitteeController extends Controller
             'project',
             'staffAssignment.user',
             'memberAssignments.user',
+            'coChairDesignations.user',
             'activities.tasks.assignee',
             'activities.creator',
         ]);
@@ -183,7 +184,15 @@ class CommitteeController extends Controller
             ];
         }
 
-        $membersData = $committee->memberAssignments->map(function ($assignment) use ($allCommitteeTasks) {
+        $committeeCoChairs = $committee->coChairDesignations->map(fn ($d) => [
+            'id' => $d->user->id,
+            'name' => $d->user->name,
+            'email' => $d->user->email,
+            'designated_at' => $d->created_at?->format('M d, Y'),
+        ]);
+        $committeeCoChairUserIds = $committee->coChairDesignations->pluck('user_id')->all();
+
+        $membersData = $committee->memberAssignments->map(function ($assignment) use ($allCommitteeTasks, $committeeCoChairUserIds) {
             $memberTasks = $allCommitteeTasks->where('assigned_to', $assignment->user->id);
             $tasksCount = $memberTasks->count();
             $completedCount = $memberTasks->where('status', Task::STATUS_COMPLETED)->count();
@@ -197,8 +206,11 @@ class CommitteeController extends Controller
                 'tasks_count' => $tasksCount,
                 'completed_tasks_count' => $completedCount,
                 'progress' => $progress,
+                'is_co_chair' => in_array($assignment->user->id, $committeeCoChairUserIds, true),
             ];
         })->values()->all();
+
+        $canDesignateCoChair = $user ? Gate::forUser($user)->allows('designateCoChair', $committee) : false;
 
         $committeeData = [
             'id' => (string) $committee->id,
@@ -212,10 +224,22 @@ class CommitteeController extends Controller
             ],
             'head' => $headData,
             'members' => $membersData,
+            'coChairs' => $committeeCoChairs->values()->all(),
+            'is_committee_co_chair' => $user ? in_array($user->id, $committeeCoChairUserIds, true) : false,
+            'eligibleCoChairs' => $canDesignateCoChair
+                ? $committee->memberAssignments
+                    ->filter(fn ($a) => ! in_array($a->user->id, $committeeCoChairUserIds, true))
+                    ->map(fn ($a) => [
+                        'id' => $a->user->id,
+                        'name' => $a->user->name,
+                        'email' => $a->user->email,
+                    ])->values()->all()
+                : [],
             'can' => [
                 'update' => $user ? Gate::forUser($user)->allows('update', $committee) : false,
                 'delete' => $user ? Gate::forUser($user)->allows('delete', $committee) : false,
                 'manageMembers' => $canManage,
+                'designateCoChair' => $canDesignateCoChair,
                 'createActivity' => $user ? Gate::forUser($user)->allows('create', [Activity::class, $committee]) : false,
             ],
             'activities' => $committee->activities->map(function ($act) {

@@ -33,6 +33,8 @@ Route::middleware(['web'])->group(function () {
         Route::delete('/projects/{project}', [ApiProjectController::class, 'destroy'])->name('api.projects.destroy');
         Route::post('/projects/{project}/personnel', [ApiProjectController::class, 'storePersonnel'])->name('api.projects.personnel.store');
         Route::delete('/projects/{project}/personnel/{user}', [ApiProjectController::class, 'destroyPersonnel'])->name('api.projects.personnel.destroy');
+        Route::post('/projects/{project}/co-chairs', [\App\Http\Controllers\CoChairDesignationController::class, 'storeEvent'])->name('api.projects.co-chairs.store');
+        Route::delete('/projects/{project}/co-chairs/{user}', [\App\Http\Controllers\CoChairDesignationController::class, 'destroyEvent'])->name('api.projects.co-chairs.destroy');
 
         // Committee Endpoints
         Route::post('/projects/{project}/committees', [ApiCommitteeController::class, 'store'])->name('api.committees.store');
@@ -42,6 +44,8 @@ Route::middleware(['web'])->group(function () {
         Route::post('/projects/{project}/committees/{committee}/staff', [ApiCommitteeController::class, 'assignStaff'])->name('api.committees.staff.store');
         Route::post('/projects/{project}/committees/{committee}/members', [ApiCommitteeController::class, 'assignMember'])->name('api.committees.members.store');
         Route::delete('/projects/{project}/committees/{committee}/members/{user}', [ApiCommitteeController::class, 'removeMember'])->name('api.committees.members.destroy');
+        Route::post('/projects/{project}/committees/{committee}/co-chairs', [\App\Http\Controllers\CoChairDesignationController::class, 'storeCommittee'])->name('api.committees.co-chairs.store');
+        Route::delete('/projects/{project}/committees/{committee}/co-chairs/{user}', [\App\Http\Controllers\CoChairDesignationController::class, 'destroyCommittee'])->name('api.committees.co-chairs.destroy');
 
         // Activity Endpoints
         Route::post('/projects/{project}/committees/{committee}/activities', [ApiActivityController::class, 'store'])->name('api.activities.store');

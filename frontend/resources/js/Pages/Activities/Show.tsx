@@ -1026,7 +1026,7 @@ export default function ActivityShow({
                                 )}
                             </div>
                             <p className="text-xs text-emerald-700">
-                                All tasks for this deliverable have been verified and marked complete.
+                                This deliverable has been officially verified and approved as complete.
                             </p>
                             {activity.submission_notes && (
                                 <p className="text-[11px] text-emerald-800 pt-1">

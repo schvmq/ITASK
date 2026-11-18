@@ -52,5 +52,13 @@ class CommitteePolicy
     {
         return $this->authService->canManageCommittee($user, $committee);
     }
+
+    /**
+     * Determine whether the user can designate or remove a Committee-level Co-Chair.
+     */
+    public function designateCoChair(User $user, Committee $committee): bool
+    {
+        return $this->authService->canDesignateCommitteeCoChair($user, $committee);
+    }
 }
 

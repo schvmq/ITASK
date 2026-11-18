@@ -277,3 +277,11 @@ export interface ProjectTimelineData {
     type: 'project';
 }
 
+export interface CoChairDesignation {
+    id: number;
+    name: string;
+    email: string;
+    designated_at?: string;
+}
+
+

@@ -77,6 +77,62 @@ class AuthorizationService
     }
 
     /**
+     * Check if a user is designated as an Event-level Co-Chair.
+     */
+    public function isEventCoChair(?User $user, Project $project): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $project->coChairDesignations()
+            ->where('user_id', $user->id)
+            ->whereNull('committee_id')
+            ->exists();
+    }
+
+    /**
+     * Check if a user is designated as a Committee-level Co-Chair.
+     */
+    public function isCommitteeCoChair(?User $user, Committee $committee): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $committee->coChairDesignations()
+            ->where('user_id', $user->id)
+            ->exists();
+    }
+
+    /**
+     * Determine whether the user can designate or remove an Event-level Co-Chair.
+     * Exclusive to the Overall Chair (Project Leader).
+     */
+    public function canDesignateEventCoChair(?User $user, Project $project): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $this->isProjectLeader($user, $project);
+    }
+
+    /**
+     * Determine whether the user can designate or remove a Committee-level Co-Chair.
+     * Accessible by Committee Chairperson (staff in committee) or Overall Chair.
+     */
+    public function canDesignateCommitteeCoChair(?User $user, Committee $committee): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $this->isStaffInCommittee($user, $committee)
+            || $this->isProjectLeader($user, $committee->project);
+    }
+
+    /**
      * Determine whether the user can create projects.
      * In the general peer system, all non-admin verified users can create their own projects.
      */
@@ -99,6 +155,10 @@ class AuthorizationService
         }
 
         if ((int) $project->created_by === (int) $user->id) {
+            return true;
+        }
+
+        if ($this->isEventCoChair($user, $project)) {
             return true;
         }
 
@@ -141,7 +201,11 @@ class AuthorizationService
 
         $project = $committee->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project)) {
+            return true;
+        }
+
+        if ($this->isCommitteeCoChair($user, $committee)) {
             return true;
         }
 
@@ -196,13 +260,17 @@ class AuthorizationService
         $project = $activity->project;
         $committee = $activity->committee;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($project && ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project))) {
             return true;
         }
 
-        return $committee->roleAssignments()
+        if ($committee && $this->isCommitteeCoChair($user, $committee)) {
+            return true;
+        }
+
+        return $committee?->roleAssignments()
             ->where('user_id', $user->id)
-            ->exists();
+            ->exists() ?? false;
     }
 
     /**
@@ -283,7 +351,7 @@ class AuthorizationService
 
         $project = $activity->project ?? $activity->committee?->project;
 
-        if ($project && $this->isProjectLeader($user, $project)) {
+        if ($project && ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project))) {
             return true;
         }
 
@@ -306,16 +374,20 @@ class AuthorizationService
         }
 
         $activity = $task->activity;
-        $project = $activity->project;
-        $committee = $activity->committee;
+        $project = $activity?->project;
+        $committee = $activity?->committee;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($project && ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project))) {
             return true;
         }
 
-        return $committee->roleAssignments()
+        if ($committee && $this->isCommitteeCoChair($user, $committee)) {
+            return true;
+        }
+
+        return $committee?->roleAssignments()
             ->where('user_id', $user->id)
-            ->exists();
+            ->exists() ?? false;
     }
 
     /**
@@ -327,13 +399,17 @@ class AuthorizationService
             return false;
         }
 
-        $project = $activity->committee->project;
+        $project = $activity->committee?->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($project && $this->isProjectLeader($user, $project)) {
             return true;
         }
 
-        return $this->isStaffInCommittee($user, $activity->committee);
+        if ($this->isStaffInCommittee($user, $activity->committee) || $this->isCommitteeCoChair($user, $activity->committee)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -367,13 +443,13 @@ class AuthorizationService
             return false;
         }
 
-        $project = $task->activity->committee->project;
+        $project = $task->activity?->committee?->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($project && $this->isProjectLeader($user, $project)) {
             return true;
         }
 
-        if ($this->isStaffInCommittee($user, $task->activity->committee)) {
+        if ($this->isStaffInCommittee($user, $task->activity->committee) || $this->isCommitteeCoChair($user, $task->activity->committee)) {
             return true;
         }
 
@@ -445,7 +521,13 @@ class AuthorizationService
             return false;
         }
 
-        return $this->isStaffInCommittee($user, $task->activity->committee);
+        $committee = $task->activity?->committee;
+        if (! $committee) {
+            return false;
+        }
+
+        return $this->isStaffInCommittee($user, $committee)
+            || $this->isCommitteeCoChair($user, $committee);
     }
 
     /**
@@ -532,6 +614,7 @@ class AuthorizationService
                 RoleRegistry::ROLE_PROJECT_STAFF,
             ])
             ->exists()
+            || $this->isCommitteeCoChair($user, $committee)
             || $project->roleAssignments()
             ->where('user_id', $user->id)
             ->whereIn('role', [
@@ -578,16 +661,20 @@ class AuthorizationService
      */
     public function isAssignedUserAuthorizedInCommittee(User $user, Task $task): bool
     {
-        $committee = $task->activity->committee;
-        $project = $committee->project;
+        $committee = $task->activity?->committee;
+        $project = $committee?->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($project && ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project))) {
             return true;
         }
 
-        return $committee->roleAssignments()
+        if ($committee && $this->isCommitteeCoChair($user, $committee)) {
+            return true;
+        }
+
+        return $committee?->roleAssignments()
             ->where('user_id', $user->id)
-            ->exists();
+            ->exists() ?? false;
     }
 
     /**
