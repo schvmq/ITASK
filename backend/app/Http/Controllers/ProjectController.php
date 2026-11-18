@@ -29,7 +29,8 @@ class ProjectController extends Controller
 {
     public function __construct(
         protected ProjectProgressService $progressService,
-        protected ProjectTimelineService $timelineService
+        protected ProjectTimelineService $timelineService,
+        protected \App\Services\Authorization\AuthorizationService $authService
     ) {}
 
     /**
@@ -205,44 +206,91 @@ class ProjectController extends Controller
                 'creator',
                 'leaderAssignment.user',
                 'approvalDocuments.uploader',
+                'committees.roleAssignments.user',
+                'committees.coChairDesignations.user',
                 'committees.staffAssignment.user',
                 'committees.memberAssignments.user',
-                'committees.activities.tasks.assignee',
-                'committees.activities.tasks.checklistItems',
-                'committees.activities.tasks.evidences.uploader',
                 'roleAssignments.user',
                 'eventCoChairDesignations.user',
-                'activities.committee.staffAssignment.user',
+                'activities.creator',
                 'activities.tasks.assignee',
                 'activities.tasks.checklistItems',
                 'activities.tasks.evidences.uploader',
-                'activities.creator',
             ])->findOrFail($project)
             : null;
 
         // Enforce project-scoped view authorization for database projects
         if ($projectModel) {
             Gate::authorize('view', $projectModel);
+
+            // Tie parent-child relationships in memory to prevent N+1 backwards queries
+            $committeesById = $projectModel->committees->keyBy('id');
+            foreach ($projectModel->committees as $comm) {
+                $comm->setRelation('project', $projectModel);
+                $commActs = $projectModel->activities->where('committee_id', $comm->id)->values();
+                $comm->setRelation('activities', $commActs);
+            }
+
+            foreach ($projectModel->activities as $act) {
+                $comm = $committeesById->get($act->committee_id);
+                if ($comm) {
+                    $act->setRelation('committee', $comm);
+                }
+                $act->setRelation('project', $projectModel);
+
+                foreach ($act->tasks as $task) {
+                    $task->setRelation('activity', $act);
+                }
+            }
         }
 
-        $userAssignment = (Auth::check() && $projectModel)
-            ? $projectModel->roleAssignments()
-                ->where('user_id', Auth::id())
-                ->with('committee')
+        $user = Auth::user();
+        $userAssignment = ($user && $projectModel)
+            ? $projectModel->roleAssignments
+                ->where('user_id', $user->id)
                 ->first()
             : null;
 
         $userRole = $userAssignment?->role
-            ?? ($projectModel && $projectModel->created_by === Auth::id() ? ProjectRoleAssignment::ROLE_PROJECT_LEADER : null);
+            ?? ($projectModel && (int) $projectModel->created_by === (int) $user?->id ? ProjectRoleAssignment::ROLE_PROJECT_LEADER : null);
 
-        $userCommittee = $userAssignment?->committee ? [
-            'id' => (string) $userAssignment->committee->id,
-            'name' => $userAssignment->committee->name,
-        ] : null;
+        $userCommittee = ($userAssignment && $userAssignment->committee_id)
+            ? [
+                'id' => (string) $userAssignment->committee_id,
+                'name' => $projectModel->committees->firstWhere('id', $userAssignment->committee_id)?->name ?? '',
+            ]
+            : null;
+
+        $eventCoChairUserIds = $projectModel ? $projectModel->eventCoChairDesignations->pluck('user_id')->all() : [];
+        $isEventCoChair = ($user && in_array($user->id, $eventCoChairUserIds, true));
+        $isLeader = ($user && $projectModel && $this->authService->isProjectLeader($user, $projectModel));
+
+        // Committee IDs where user is Chairperson or Committee Co-Chair
+        $managedCommitteeIds = ($user && $projectModel)
+            ? $projectModel->committees->filter(function ($c) use ($user) {
+                return $this->authService->isStaffInCommittee($user, $c) || $this->authService->isCommitteeCoChair($user, $c);
+            })->pluck('id')->all()
+            : [];
+
+        // Committee IDs where user is Member
+        $memberCommitteeIds = ($user && $projectModel)
+            ? $projectModel->committees->filter(function ($c) use ($user) {
+                return $this->authService->isMemberInCommittee($user, $c);
+            })->pluck('id')->all()
+            : [];
 
         $projectProgress = $projectModel ? $this->progressService->calculateProjectProgress($projectModel) : null;
-        $timelineData = (Auth::check() && $projectModel)
-            ? $this->timelineService->getTimelineData($projectModel, Auth::user())
+
+        $currentTab = $initialTab ?? request('tab');
+        if ($currentTab === 'tasks') {
+            $currentTab = 'deliverables';
+        }
+
+        // Defer expensive Gantt timeline data when user is not viewing the Timeline tab
+        $timelineData = ($projectModel && $user)
+            ? (($currentTab === 'timeline')
+                ? $this->timelineService->getTimelineData($projectModel, $user)
+                : Inertia::defer(fn () => $this->timelineService->getTimelineData($projectModel, $user)))
             : null;
 
         $eventCoChairs = $projectModel ? $projectModel->eventCoChairDesignations->map(fn ($d) => [
@@ -252,16 +300,13 @@ class ProjectController extends Controller
             'designated_at' => $d->created_at?->format('M d, Y'),
         ])->values()->all() : [];
 
-        $eventCoChairUserIds = $projectModel ? $projectModel->eventCoChairDesignations->pluck('user_id')->all() : [];
-        $isEventCoChair = (Auth::check() && in_array(Auth::id(), $eventCoChairUserIds, true));
-
         $projectData = $projectModel ? [
             'id' => (string) $projectModel->id,
             'title' => $projectModel->title,
             'description' => $projectModel->description,
             'status' => $projectModel->status,
             'progress' => $projectProgress ? $projectProgress['progress'] : 0,
-            'timeline' => $timelineData,
+            'timeline' => null, // Served via top-level deferred 'timeline' prop
             'start_date' => $projectModel->start_date?->format('F d, Y'),
             'end_date' => $projectModel->end_date?->format('F d, Y'),
             'start_date_raw' => $projectModel->start_date?->format('Y-m-d'),
@@ -272,17 +317,17 @@ class ProjectController extends Controller
             'eventCoChairs' => $eventCoChairs,
             'is_event_co_chair' => $isEventCoChair,
             'can' => [
-                'update'          => Auth::check() ? Auth::user()->can('update', $projectModel) : false,
-                'archive'         => Auth::check() ? Auth::user()->can('archive', $projectModel) : false,
-                'uploadDocument'  => Auth::check() ? Auth::user()->can('uploadDocument', $projectModel) : false,
-                'createCommittee' => Auth::check() ? Auth::user()->can('create', [\App\Models\Committee::class, $projectModel]) : false,
-                'createTask'      => Auth::check() ? Auth::user()->can('createForProject', [\App\Models\Task::class, $projectModel]) : false,
-                'createActivity'  => Auth::check() ? ($userRole === ProjectRoleAssignment::ROLE_PROJECT_LEADER || $projectModel->committees->contains(fn ($c) => Auth::user()->can('create', [\App\Models\Activity::class, $c]))) : false,
-                'designateCoChair'=> Auth::check() ? Auth::user()->can('designateCoChair', $projectModel) : false,
+                'update'          => $user ? $this->authService->canUpdateProject($user, $projectModel) : false,
+                'archive'         => $user ? $this->authService->canArchiveProject($user, $projectModel) : false,
+                'uploadDocument'  => $user ? ($this->authService->isProjectLeader($user, $projectModel) || $this->authService->isEventCoChair($user, $projectModel)) : false,
+                'createCommittee' => $user ? $this->authService->canCreateCommittee($user, $projectModel) : false,
+                'createTask'      => $user ? $this->authService->canCreateProjectTask($user, $projectModel) : false,
+                'createActivity'  => $user ? ($this->authService->isProjectLeader($user, $projectModel) || $projectModel->committees->contains(fn ($c) => $this->authService->canCreateActivity($user, $c))) : false,
+                'designateCoChair'=> $user ? $this->authService->canDesignateEventCoChair($user, $projectModel) : false,
             ],
-            'committeesForDeliverable' => (Auth::check() && $projectModel)
+            'committeesForDeliverable' => ($user && $projectModel)
                 ? $projectModel->committees
-                    ->filter(fn ($c) => Auth::user()->can('create', [\App\Models\Activity::class, $c]))
+                    ->filter(fn ($c) => $this->authService->canCreateActivity($user, $c))
                     ->values()
                     ->map(fn ($c) => [
                         'id' => (string) $c->id,
@@ -299,8 +344,9 @@ class ProjectController extends Controller
                 'name' => $projectModel->leaderAssignment->user->name,
                 'email' => $projectModel->leaderAssignment->user->email,
             ] : null,
-            'committees' => $projectModel->committees->sortBy('id')->values()->map(function ($committee) {
-                $canView = Auth::check() ? Auth::user()->can('view', $committee) : false;
+            'committees' => $projectModel->committees->sortBy('id')->values()->map(function ($committee) use ($user) {
+                $canView = $user ? $this->authService->canViewCommittee($user, $committee) : false;
+                $canManage = $user ? $this->authService->canManageCommittee($user, $committee) : false;
 
                 return [
                     'id' => (string) $committee->id,
@@ -330,14 +376,14 @@ class ProjectController extends Controller
                     ])->values()->all() : [],
                     'can' => [
                         'view' => $canView,
-                        'update' => Auth::check() ? Auth::user()->can('update', $committee) : false,
-                        'delete' => Auth::check() ? Auth::user()->can('delete', $committee) : false,
-                        'createActivity' => Auth::check() ? Auth::user()->can('create', [\App\Models\Activity::class, $committee]) : false,
+                        'update' => $canManage,
+                        'delete' => $canManage,
+                        'createActivity' => $user ? $this->authService->canCreateActivity($user, $committee) : false,
                     ],
                 ];
             })->values()->all(),
             'activities' => $projectModel->activities
-                ->filter(fn ($act) => !Auth::check() || Auth::user()->can('view', $act))
+                ->filter(fn ($act) => ! $user || $this->authService->canViewActivity($user, $act))
                 ->map(function ($act) use ($projectModel) {
                     $activityProgress = $this->progressService->calculateActivityProgress($act);
                     $comm = $projectModel->committees->firstWhere('id', $act->committee_id) ?? $act->committee;
@@ -375,9 +421,10 @@ class ProjectController extends Controller
                         ] : null,
                     ];
                 })->values()->all(),
-            'tasks' => $projectModel->activities->flatMap(function ($act) use ($projectModel) {
-                $user = Auth::user();
-                return $act->tasks->map(function ($task) use ($act, $projectModel, $user) {
+            'tasks' => $projectModel->activities->flatMap(function ($act) use ($user, $projectModel) {
+                return $act->tasks->map(function ($task) use ($act, $user, $projectModel) {
+                    $isAssignedToMe = $user && (int) $task->assigned_to === (int) $user->id;
+
                     return [
                         'id' => (string) $task->id,
                         'title' => $task->title,
@@ -387,7 +434,7 @@ class ProjectController extends Controller
                         'requires_review' => (bool) $task->requires_review,
                         'due_date' => $task->due_date?->format('M d, Y'),
                         'due_date_raw' => $task->due_date?->format('Y-m-d'),
-                        'is_assigned_to_me' => $user ? (int) $task->assigned_to === (int) $user->id : false,
+                        'is_assigned_to_me' => $isAssignedToMe,
                         'activity' => [
                             'id' => (string) $act->id,
                             'title' => $act->title,
@@ -409,38 +456,40 @@ class ProjectController extends Controller
                         ])->values()->all(),
                         'checklist_total' => $task->checklistItems->count(),
                         'checklist_completed' => $task->checklistItems->where('is_completed', true)->count(),
-                        'evidences' => $task->evidences->map(fn ($ev) => [
-                            'id' => (string) $ev->id,
-                            'original_name' => $ev->original_name,
-                            'file_size' => $ev->file_size,
-                            'file_size_formatted' => $this->formatFileSize($ev->file_size),
-                            'mime_type' => $ev->mime_type,
-                            'remarks' => $ev->remarks,
-                            'uploaded_at' => $ev->created_at?->format('M d, Y, g:i A'),
-                            'uploader' => $ev->uploader ? [
-                                'id' => $ev->uploader->id,
-                                'name' => $ev->uploader->name,
-                            ] : null,
-                            'download_url' => route('projects.committees.activities.tasks.evidence.download', [
-                                'project' => $projectModel->id,
-                                'committee' => $act->committee_id,
-                                'activity' => $act->id,
-                                'task' => $task->id,
-                                'evidence' => $ev->id,
-                            ]),
-                            'can' => [
-                                'delete' => $user ? Gate::forUser($user)->allows('deleteEvidence', [$task, $ev]) : false,
-                            ],
-                        ])->values()->all(),
+                        'evidences' => $task->evidences->map(function ($ev) use ($user, $task) {
+                            return [
+                                'id' => (string) $ev->id,
+                                'original_name' => $ev->original_name,
+                                'file_size' => $ev->file_size,
+                                'file_size_formatted' => $this->formatFileSize($ev->file_size),
+                                'mime_type' => $ev->mime_type,
+                                'remarks' => $ev->remarks,
+                                'uploaded_at' => $ev->created_at?->format('M d, Y, g:i A'),
+                                'uploader' => $ev->uploader ? [
+                                    'id' => $ev->uploader->id,
+                                    'name' => $ev->uploader->name,
+                                ] : null,
+                                'download_url' => route('projects.committees.activities.tasks.evidence.download', [
+                                    'project' => $task->activity->project_id,
+                                    'committee' => $task->activity->committee_id,
+                                    'activity' => $task->activity->id,
+                                    'task' => $task->id,
+                                    'evidence' => $ev->id,
+                                ]),
+                                'can' => [
+                                    'delete' => $user ? $this->authService->canDeleteEvidence($user, $task, $ev) : false,
+                                ],
+                            ];
+                        })->values()->all(),
                         'can' => [
-                            'update' => $user ? Gate::forUser($user)->allows('update', $task) : false,
-                            'delete' => $user ? Gate::forUser($user)->allows('delete', $task) : false,
-                            'updateStatus' => $user ? Gate::forUser($user)->allows('updateStatus', $task) : false,
-                            'manageChecklist' => $user ? Gate::forUser($user)->allows('manageChecklist', $task) : false,
-                            'uploadEvidence' => $user ? Gate::forUser($user)->allows('uploadEvidence', $task) : false,
-                            'submitReview' => $user ? Gate::forUser($user)->allows('submitReview', $task) : false,
-                            'review' => $user ? Gate::forUser($user)->allows('review', $task) : false,
-                            'resubmit' => $user ? Gate::forUser($user)->allows('resubmit', $task) : false,
+                            'update'          => $user ? $this->authService->canUpdateTask($user, $task) : false,
+                            'delete'          => $user ? $this->authService->canDeleteTask($user, $task) : false,
+                            'updateStatus'    => $user ? $this->authService->canUpdateTaskStatus($user, $task) : false,
+                            'manageChecklist' => $user ? $this->authService->canManageChecklist($user, $task) : false,
+                            'uploadEvidence'  => $user ? $this->authService->canUploadEvidence($user, $task) : false,
+                            'submitReview'    => $user ? $this->authService->canSubmitTaskReview($user, $task) : false,
+                            'review'          => $user ? $this->authService->canReviewTask($user, $task) : false,
+                            'resubmit'        => $user ? $this->authService->canResubmitTask($user, $task) : false,
                         ],
                     ];
                 });
@@ -463,7 +512,7 @@ class ProjectController extends Controller
                     'committee_id' => $assignment->committee_id ? (string) $assignment->committee_id : null,
                     'is_co_chair' => in_array($assignment->user->id, $eventCoChairUserIds, true),
                 ])->values()->all(),
-            'eligibleCoChairs' => (Auth::check() && Auth::user()->can('designateCoChair', $projectModel))
+            'eligibleCoChairs' => ($user && $isLeader)
                 ? $projectModel->roleAssignments
                     ->where('role', '!=', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
                     ->filter(fn ($a) => (int) $a->user_id !== (int) $projectModel->created_by && ! in_array($a->user_id, $eventCoChairUserIds, true))
@@ -475,7 +524,7 @@ class ProjectController extends Controller
                         'role' => $a->role,
                     ])->values()->all()
                 : [],
-            'availablePersonnel' => (Auth::check() && $userRole === ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            'availablePersonnel' => ($user && $isLeader)
                 ? User::whereNotNull('email_verified_at')
                     ->whereNotIn('id', $projectModel->roleAssignments->pluck('user_id'))
                     ->select(['id', 'name', 'email'])
@@ -502,11 +551,6 @@ class ProjectController extends Controller
                 ];
             })->values()->all(),
         ] : null;
-
-        $currentTab = $initialTab ?? request('tab');
-        if ($currentTab === 'tasks') {
-            $currentTab = 'deliverables';
-        }
 
         return Inertia::render('Projects/Show', [
             'projectId' => $project,

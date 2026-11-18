@@ -32,6 +32,21 @@ class ProjectRoleAssignment extends Model
         'role',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function () {
+            if (class_exists(\Illuminate\Support\Once::class)) {
+                \Illuminate\Support\Once::flush();
+            }
+        });
+
+        static::deleted(function () {
+            if (class_exists(\Illuminate\Support\Once::class)) {
+                \Illuminate\Support\Once::flush();
+            }
+        });
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);

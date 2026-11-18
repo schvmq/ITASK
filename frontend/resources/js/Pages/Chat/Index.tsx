@@ -50,6 +50,9 @@ import { UndoToast } from '@/Components/Chat/UndoToast';
 import { CreateTaskModal } from '@/Components/Chat/CreateTaskModal';
 import './messaging.css';
 
+// Centralized configuration for Chat polling fallback
+export const CHAT_FALLBACK_POLL_INTERVAL_MS = 8000;
+
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
 interface Participant {
@@ -771,39 +774,115 @@ export default function ChatIndex({
 
     // Resilient fallback sync if websocket disconnected or reconnecting
     useEffect(() => {
-        if (!activeChat) return;
-        if (connectionStatus !== 'connected') {
-            const interval = setInterval(async () => {
-                try {
-                    const res = await axios.get(`/chat/${activeChat.id}`, {
-                        headers: {
-                            Accept: 'application/json',
-                            ...getCsrfHeader(),
-                        },
-                    });
-                    const data = res.data;
-                    if (data?.messages) {
-                        setMessages((prev) => {
-                            const existingIds = new Set(prev.map((m) => m.id));
-                            const toAdd = data.messages.filter((m: any) => !existingIds.has(m.id));
-                            if (toAdd.length === 0) return prev;
-                            return [...prev, ...toAdd];
-                        });
-                    }
-                    if (data?.active_chat?.participants) {
-                        setParticipants(data.active_chat.participants);
-                    }
-                    if (data?.chats) {
-                        setChats(data.chats);
-                    }
-                } catch (e) {
-                    router.reload({
-                        only: ['messages', 'chats', 'archivedChats'],
+        if (!activeChat || connectionStatus === 'connected') {
+            return;
+        }
+
+        const activeChatId = activeChat.id;
+        let isMounted = true;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let abortController: AbortController | null = null;
+        let isPolling = false;
+
+        const scheduleNextPoll = (delayMs: number = CHAT_FALLBACK_POLL_INTERVAL_MS) => {
+            if (!isMounted || timeoutId !== null) return;
+            timeoutId = setTimeout(pollOnce, delayMs);
+        };
+
+        const pollOnce = async () => {
+            timeoutId = null;
+
+            // Guard against stale triggers, concurrent polling, chat switch, or hidden tab
+            if (!isMounted || isPolling || activeChat.id !== activeChatId) return;
+            if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+                return;
+            }
+
+            isPolling = true;
+            abortController = new AbortController();
+
+            try {
+                const res = await axios.get(`/chat/${activeChatId}`, {
+                    signal: abortController.signal,
+                    headers: {
+                        Accept: 'application/json',
+                        ...getCsrfHeader(),
+                    },
+                });
+
+                // Ignore response if unmounted or conversation switched while request was in-flight
+                if (!isMounted || activeChat.id !== activeChatId) {
+                    return;
+                }
+
+                const data = res.data;
+                if (data?.messages) {
+                    setMessages((prev) => {
+                        const existingIds = new Set(prev.map((m) => m.id));
+                        const toAdd = data.messages.filter((m: any) => !existingIds.has(m.id));
+                        if (toAdd.length === 0) return prev;
+                        return [...prev, ...toAdd];
                     });
                 }
-            }, 2500);
-            return () => clearInterval(interval);
-        }
+                if (data?.active_chat?.participants) {
+                    setParticipants(data.active_chat.participants);
+                }
+                if (data?.chats) {
+                    setChats(data.chats);
+                }
+            } catch (e: any) {
+                // If request was canceled (chat switch, unmount, or navigation), ignore quietly
+                if (axios.isCancel(e) || e?.name === 'CanceledError' || e?.code === 'ERR_CANCELED' || !isMounted) {
+                    return;
+                }
+                // Handle genuine polling errors without full-page reloads or user disruption
+                console.debug('[Chat Fallback Poll] Poll request failed:', e?.message || e);
+            } finally {
+                isPolling = false;
+                abortController = null;
+
+                // Schedule next poll strictly after this one settles, if conditions still hold
+                if (isMounted && activeChat.id === activeChatId && connectionStatus !== 'connected') {
+                    if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+                        scheduleNextPoll(CHAT_FALLBACK_POLL_INTERVAL_MS);
+                    }
+                }
+            }
+        };
+
+        // Visibility listener: pause polling when tab is hidden, resume when visible
+        const handleVisibilityChange = () => {
+            if (!isMounted || connectionStatus === 'connected') return;
+
+            if (document.visibilityState === 'visible') {
+                if (!isPolling && timeoutId === null) {
+                    scheduleNextPoll(500);
+                }
+            } else {
+                if (timeoutId !== null) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // Schedule initial fallback request after the configured interval
+        scheduleNextPoll(CHAT_FALLBACK_POLL_INTERVAL_MS);
+
+        return () => {
+            isMounted = false;
+            if (timeoutId !== null) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [activeChat?.id, connectionStatus]);
 
     // Total unread count across all project chats

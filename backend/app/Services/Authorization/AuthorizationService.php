@@ -34,6 +34,13 @@ class AuthorizationService
             return true;
         }
 
+        if ($project->relationLoaded('roleAssignments')) {
+            return $project->roleAssignments
+                ->where('user_id', $user->id)
+                ->where('role', RoleRegistry::ROLE_PROJECT_LEADER)
+                ->isNotEmpty();
+        }
+
         return $project->roleAssignments()
             ->where('user_id', $user->id)
             ->where('role', RoleRegistry::ROLE_PROJECT_LEADER)
@@ -47,6 +54,16 @@ class AuthorizationService
     {
         if (! $user) {
             return false;
+        }
+
+        if ($committee->relationLoaded('roleAssignments')) {
+            return $committee->roleAssignments
+                ->where('user_id', $user->id)
+                ->whereIn('role', [
+                    RoleRegistry::ROLE_PROJECT_COMMITTEE,
+                    RoleRegistry::ROLE_PROJECT_STAFF,
+                ])
+                ->isNotEmpty();
         }
 
         return $committee->roleAssignments()
@@ -67,6 +84,16 @@ class AuthorizationService
             return false;
         }
 
+        if ($committee->relationLoaded('roleAssignments')) {
+            return $committee->roleAssignments
+                ->where('user_id', $user->id)
+                ->whereIn('role', [
+                    RoleRegistry::ROLE_COMMITTEE_STAFF,
+                    RoleRegistry::ROLE_PROJECT_MEMBER,
+                ])
+                ->isNotEmpty();
+        }
+
         return $committee->roleAssignments()
             ->where('user_id', $user->id)
             ->whereIn('role', [
@@ -85,6 +112,19 @@ class AuthorizationService
             return false;
         }
 
+        if ($project->relationLoaded('eventCoChairDesignations')) {
+            return $project->eventCoChairDesignations
+                ->where('user_id', $user->id)
+                ->isNotEmpty();
+        }
+
+        if ($project->relationLoaded('coChairDesignations')) {
+            return $project->coChairDesignations
+                ->where('user_id', $user->id)
+                ->whereNull('committee_id')
+                ->isNotEmpty();
+        }
+
         return $project->coChairDesignations()
             ->where('user_id', $user->id)
             ->whereNull('committee_id')
@@ -98,6 +138,12 @@ class AuthorizationService
     {
         if (! $user) {
             return false;
+        }
+
+        if ($committee->relationLoaded('coChairDesignations')) {
+            return $committee->coChairDesignations
+                ->where('user_id', $user->id)
+                ->isNotEmpty();
         }
 
         return $committee->coChairDesignations()
@@ -268,6 +314,10 @@ class AuthorizationService
             return true;
         }
 
+        if ($committee?->relationLoaded('roleAssignments')) {
+            return $committee->roleAssignments->where('user_id', $user->id)->isNotEmpty();
+        }
+
         return $committee?->roleAssignments()
             ->where('user_id', $user->id)
             ->exists() ?? false;
@@ -385,6 +435,10 @@ class AuthorizationService
             return true;
         }
 
+        if ($committee?->relationLoaded('roleAssignments')) {
+            return $committee->roleAssignments->where('user_id', $user->id)->isNotEmpty();
+        }
+
         return $committee?->roleAssignments()
             ->where('user_id', $user->id)
             ->exists() ?? false;
@@ -493,7 +547,11 @@ class AuthorizationService
             return false;
         }
 
-        if ($task->evidences()->exists()) {
+        if ($task->relationLoaded('evidences')) {
+            if ($task->evidences->isNotEmpty()) {
+                return false;
+            }
+        } elseif ($task->evidences()->exists()) {
             return false;
         }
 
@@ -607,22 +665,8 @@ class AuthorizationService
             return true;
         }
 
-        $isStaff = $committee->roleAssignments()
-            ->where('user_id', $user->id)
-            ->whereIn('role', [
-                RoleRegistry::ROLE_PROJECT_COMMITTEE,
-                RoleRegistry::ROLE_PROJECT_STAFF,
-            ])
-            ->exists()
-            || $this->isCommitteeCoChair($user, $committee)
-            || $project->roleAssignments()
-            ->where('user_id', $user->id)
-            ->whereIn('role', [
-                RoleRegistry::ROLE_PROJECT_COMMITTEE,
-                RoleRegistry::ROLE_PROJECT_STAFF,
-            ])
-            ->whereNull('committee_id')
-            ->exists();
+        $isStaff = $this->isStaffInCommittee($user, $committee)
+            || $this->isCommitteeCoChair($user, $committee);
 
         if ($isStaff) {
             return true;
@@ -641,12 +685,7 @@ class AuthorizationService
         }
 
         if (! $hasAssignee) {
-            $isMember = $committee->roleAssignments()
-                ->where('user_id', $user->id)
-                ->exists()
-                || $project->roleAssignments()
-                ->where('user_id', $user->id)
-                ->exists();
+            $isMember = $this->isMemberInCommittee($user, $committee);
 
             if ($isMember) {
                 return true;
@@ -672,6 +711,10 @@ class AuthorizationService
             return true;
         }
 
+        if ($committee?->relationLoaded('roleAssignments')) {
+            return $committee->roleAssignments->where('user_id', $user->id)->isNotEmpty();
+        }
+
         return $committee?->roleAssignments()
             ->where('user_id', $user->id)
             ->exists() ?? false;
@@ -679,63 +722,77 @@ class AuthorizationService
 
     /**
      * Compute primary role for a user across projects (for UI navigation & display).
+     *
+     * Memoised per request via once() — subsequent calls within the same PHP
+     * process (e.g., from middleware AND a controller policy) return the cached
+     * value without firing additional DB queries.
      */
     public function getPrimaryRole(User $user): string
     {
         $userId = $user->id;
-        $isLeader = Project::where('created_by', $userId)
-            ->orWhereHas('roleAssignments', fn ($q) => $q->where('user_id', $userId)->where('role', RoleRegistry::ROLE_PROJECT_LEADER))
-            ->exists();
 
-        if ($isLeader) {
-            return RoleRegistry::ROLE_PROJECT_LEADER;
-        }
+        return once(function () use ($userId) {
+            $isLeader = Project::where('created_by', $userId)
+                ->orWhereHas('roleAssignments', fn ($q) => $q->where('user_id', $userId)->where('role', RoleRegistry::ROLE_PROJECT_LEADER))
+                ->exists();
 
-        $isCommittee = ProjectRoleAssignment::where('user_id', $userId)
-            ->whereIn('role', [RoleRegistry::ROLE_PROJECT_COMMITTEE, RoleRegistry::ROLE_PROJECT_STAFF])
-            ->exists();
+            if ($isLeader) {
+                return RoleRegistry::ROLE_PROJECT_LEADER;
+            }
 
-        if ($isCommittee) {
-            return RoleRegistry::ROLE_PROJECT_COMMITTEE;
-        }
+            $isCommittee = ProjectRoleAssignment::where('user_id', $userId)
+                ->whereIn('role', [RoleRegistry::ROLE_PROJECT_COMMITTEE, RoleRegistry::ROLE_PROJECT_STAFF])
+                ->exists();
 
-        $isStaff = ProjectRoleAssignment::where('user_id', $userId)
-            ->whereIn('role', [RoleRegistry::ROLE_COMMITTEE_STAFF, RoleRegistry::ROLE_PROJECT_MEMBER])
-            ->exists();
+            if ($isCommittee) {
+                return RoleRegistry::ROLE_PROJECT_COMMITTEE;
+            }
 
-        if ($isStaff) {
+            $isStaff = ProjectRoleAssignment::where('user_id', $userId)
+                ->whereIn('role', [RoleRegistry::ROLE_COMMITTEE_STAFF, RoleRegistry::ROLE_PROJECT_MEMBER])
+                ->exists();
+
+            if ($isStaff) {
+                return RoleRegistry::ROLE_COMMITTEE_STAFF;
+            }
+
             return RoleRegistry::ROLE_COMMITTEE_STAFF;
-        }
-
-        return RoleRegistry::ROLE_COMMITTEE_STAFF;
+        });
     }
 
     /**
      * Compute all distinct roles held by a user across all projects.
+     *
+     * Memoised per request via once() — subsequent calls within the same PHP
+     * process return the cached value without firing additional DB queries.
      */
     public function getUserRoles(User $user): array
     {
-        $roles = [];
+        $userId = $user->id;
 
-        if (Project::where('created_by', $user->id)->orWhereHas('roleAssignments', fn ($q) => $q->where('user_id', $user->id)->where('role', RoleRegistry::ROLE_PROJECT_LEADER))->exists()) {
-            $roles[] = RoleRegistry::ROLE_PROJECT_LEADER;
-        }
+        return once(function () use ($userId) {
+            $roles = [];
 
-        if (ProjectRoleAssignment::where('user_id', $user->id)->whereIn('role', [RoleRegistry::ROLE_PROJECT_COMMITTEE, RoleRegistry::ROLE_PROJECT_STAFF])->exists()) {
-            $roles[] = RoleRegistry::ROLE_PROJECT_COMMITTEE;
-            $roles[] = RoleRegistry::ROLE_PROJECT_STAFF;
-        }
+            if (Project::where('created_by', $userId)->orWhereHas('roleAssignments', fn ($q) => $q->where('user_id', $userId)->where('role', RoleRegistry::ROLE_PROJECT_LEADER))->exists()) {
+                $roles[] = RoleRegistry::ROLE_PROJECT_LEADER;
+            }
 
-        if (ProjectRoleAssignment::where('user_id', $user->id)->whereIn('role', [RoleRegistry::ROLE_COMMITTEE_STAFF, RoleRegistry::ROLE_PROJECT_MEMBER])->exists()) {
-            $roles[] = RoleRegistry::ROLE_COMMITTEE_STAFF;
-            $roles[] = RoleRegistry::ROLE_PROJECT_MEMBER;
-        }
+            if (ProjectRoleAssignment::where('user_id', $userId)->whereIn('role', [RoleRegistry::ROLE_PROJECT_COMMITTEE, RoleRegistry::ROLE_PROJECT_STAFF])->exists()) {
+                $roles[] = RoleRegistry::ROLE_PROJECT_COMMITTEE;
+                $roles[] = RoleRegistry::ROLE_PROJECT_STAFF;
+            }
 
-        if (empty($roles)) {
-            $roles[] = RoleRegistry::ROLE_COMMITTEE_STAFF;
-            $roles[] = RoleRegistry::ROLE_PROJECT_MEMBER;
-        }
+            if (ProjectRoleAssignment::where('user_id', $userId)->whereIn('role', [RoleRegistry::ROLE_COMMITTEE_STAFF, RoleRegistry::ROLE_PROJECT_MEMBER])->exists()) {
+                $roles[] = RoleRegistry::ROLE_COMMITTEE_STAFF;
+                $roles[] = RoleRegistry::ROLE_PROJECT_MEMBER;
+            }
 
-        return array_values(array_unique($roles));
+            if (empty($roles)) {
+                $roles[] = RoleRegistry::ROLE_COMMITTEE_STAFF;
+                $roles[] = RoleRegistry::ROLE_PROJECT_MEMBER;
+            }
+
+            return array_values(array_unique($roles));
+        });
     }
 }
