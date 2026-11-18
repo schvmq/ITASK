@@ -283,5 +283,3 @@ export interface CoChairDesignation {
     email: string;
     designated_at?: string;
 }
-
-

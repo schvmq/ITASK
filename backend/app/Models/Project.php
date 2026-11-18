@@ -97,7 +97,7 @@ class Project extends Model
     public function eventCoChairs(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'co_chair_designations', 'project_id', 'user_id')
-            ->whereNull('co_chair_designations.committee_id')
+            ->wherePivotNull('committee_id')
             ->withTimestamps();
     }
 }

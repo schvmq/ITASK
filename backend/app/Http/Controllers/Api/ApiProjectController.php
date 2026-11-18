@@ -128,7 +128,7 @@ class ApiProjectController extends Controller
             $chat->messages()->create([
                 'sender_id' => null,
                 'type' => Message::TYPE_SYSTEM,
-                'body' => 'Project chat created. Everyone in this project can message here.',
+                'body' => 'Group chat created. Everyone in this event can message here.',
             ]);
 
             $memberIds = $request->validated('member_ids') ?? [];

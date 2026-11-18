@@ -131,7 +131,7 @@ class ProjectController extends Controller
                 $chat->messages()->create([
                     'sender_id' => null,
                     'type' => Message::TYPE_SYSTEM,
-                    'body' => 'Project chat created. Everyone in this project can message here.',
+                    'body' => 'Group chat created. Everyone in this event can message here.',
                 ]);
 
                 // Assign initial project members if provided
@@ -163,7 +163,7 @@ class ProjectController extends Controller
                         $chat->messages()->create([
                             'sender_id' => null,
                             'type' => Message::TYPE_SYSTEM,
-                            'body' => "{$memberUser->name} joined the project",
+                            'body' => "{$memberUser->name} joined the event",
                         ]);
                     }
                 }

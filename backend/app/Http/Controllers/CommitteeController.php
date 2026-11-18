@@ -37,16 +37,18 @@ class CommitteeController extends Controller
                 'description' => $request->validated('description'),
             ]);
 
-            // Assign the selected Project Staff member as head of this committee if provided
+            // Assign Chairperson (Project Staff) if provided
             if ($request->filled('user_id')) {
                 $staffUserId = (int) $request->validated('user_id');
                 $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
                     ->where('user_id', $staffUserId)
-                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
                     ->first();
 
                 if ($staffAssignment) {
-                    $staffAssignment->update(['committee_id' => $committee->id]);
+                    $staffAssignment->update([
+                        'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                        'committee_id' => $committee->id,
+                    ]);
                 } else {
                     ProjectRoleAssignment::create([
                         'project_id' => $project->id,
@@ -55,6 +57,34 @@ class CommitteeController extends Controller
                         'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
                     ]);
                 }
+            }
+
+            // Assign Co-Chair if provided
+            if ($request->filled('co_chair_id')) {
+                $coChairUserId = (int) $request->validated('co_chair_id');
+                $coChairAssignment = ProjectRoleAssignment::where('project_id', $project->id)
+                    ->where('user_id', $coChairUserId)
+                    ->first();
+
+                if ($coChairAssignment) {
+                    $coChairAssignment->update([
+                        'committee_id' => $committee->id,
+                    ]);
+                } else {
+                    ProjectRoleAssignment::create([
+                        'project_id' => $project->id,
+                        'user_id' => $coChairUserId,
+                        'committee_id' => $committee->id,
+                        'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+                    ]);
+                }
+
+                \App\Models\CoChairDesignation::create([
+                    'project_id' => $project->id,
+                    'committee_id' => $committee->id,
+                    'user_id' => $coChairUserId,
+                    'designated_by' => Auth::id(),
+                ]);
             }
 
             return $committee;
@@ -88,17 +118,22 @@ class CommitteeController extends Controller
         $user = Auth::user();
         $canManage = $user ? Gate::forUser($user)->allows('manageMembers', $committee) : false;
 
-        $alreadyInCommitteeMemberIds = ProjectRoleAssignment::where('project_id', $project->id)
+        $alreadyInCommitteeUserIds = ProjectRoleAssignment::where('project_id', $project->id)
             ->where('committee_id', $committee->id)
-            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
             ->pluck('user_id');
 
-        // Retrieve available Project Members in this project who are not yet in this committee
+        $eventCoChairUserIds = \App\Models\CoChairDesignation::eventLevel()
+            ->where('project_id', $project->id)
+            ->pluck('user_id')
+            ->all();
+
+        // Retrieve available participants in this project who are not yet in this committee
         $availableMembers = $canManage
-            ? (function () use ($project, $committee, $alreadyInCommitteeMemberIds) {
+            ? (function () use ($project, $committee, $alreadyInCommitteeUserIds, $eventCoChairUserIds) {
                 $candidateAssignments = ProjectRoleAssignment::where('project_id', $project->id)
-                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-                    ->whereNotIn('user_id', $alreadyInCommitteeMemberIds)
+                    ->where('role', '!=', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                    ->where('user_id', '!=', $project->created_by)
+                    ->whereNotIn('user_id', $alreadyInCommitteeUserIds)
                     ->whereHas('user', function ($q) {
                         $q->whereNotNull('email_verified_at');
                     })
@@ -117,7 +152,7 @@ class CommitteeController extends Controller
                     ->get()
                     ->groupBy('user_id');
 
-                return $candidateAssignments->map(function ($assignment) use ($otherCommitteeAssignments) {
+                return $candidateAssignments->map(function ($assignment) use ($otherCommitteeAssignments, $eventCoChairUserIds) {
                     $otherCommittees = ($otherCommitteeAssignments->get($assignment->user_id) ?? collect())
                         ->pluck('committee.name')
                         ->filter()
@@ -130,36 +165,48 @@ class CommitteeController extends Controller
                         $context = "Currently assigned to {$otherCommittees->count()} other committees";
                     }
 
+                    $isEventCoChair = in_array($assignment->user_id, $eventCoChairUserIds, true);
+                    if ($isEventCoChair) {
+                        $context = $context ? "Event Co-Chair • {$context}" : "Event Co-Chair";
+                    }
+
                     return [
-                        'id'                   => $assignment->user->id,
-                        'name'                 => $assignment->user->name,
-                        'email'                => $assignment->user->email,
-                        'context'              => $context,
+                        'id'                     => $assignment->user->id,
+                        'name'                   => $assignment->user->name,
+                        'email'                  => $assignment->user->email,
+                        'context'                => $context,
+                        'is_event_co_chair'      => $isEventCoChair,
                         'other_committees_count' => $otherCommittees->count(),
                     ];
                 })->values()->all();
             })()
             : [];
 
-        // Available Project Staff in this project for changing committee staff
+        // Available participants in this project for changing committee staff
         $availableStaff = $canManage
-            ? ProjectRoleAssignment::where('project_id', $project->id)
-                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
-                ->whereHas('user', function ($q) {
-                    $q->whereNotNull('email_verified_at');
-                })
-                ->with(['user', 'committee'])
-                ->get()
-                ->unique('user_id')
-                ->map(fn ($assignment) => [
-                    'id' => $assignment->user->id,
-                    'name' => $assignment->user->name,
-                    'email' => $assignment->user->email,
-                    'committee_id' => $assignment->committee_id ? (string) $assignment->committee_id : null,
-                    'committee_name' => $assignment->committee?->name,
-                ])
-                ->values()
-                ->all()
+            ? (function () use ($project, $eventCoChairUserIds) {
+                $assignments = ProjectRoleAssignment::where('project_id', $project->id)
+                    ->where('role', '!=', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                    ->where('user_id', '!=', $project->created_by)
+                    ->whereHas('user', function ($q) {
+                        $q->whereNotNull('email_verified_at');
+                    })
+                    ->with(['user', 'committee'])
+                    ->get()
+                    ->unique('user_id');
+
+                return $assignments->map(function ($assignment) use ($eventCoChairUserIds) {
+                    $isEventCoChair = in_array($assignment->user_id, $eventCoChairUserIds, true);
+                    return [
+                        'id' => $assignment->user->id,
+                        'name' => $assignment->user->name,
+                        'email' => $assignment->user->email,
+                        'committee_id' => $assignment->committee_id ? (string) $assignment->committee_id : null,
+                        'committee_name' => $assignment->committee?->name,
+                        'is_event_co_chair' => $isEventCoChair,
+                    ];
+                })->values()->all();
+            })()
             : [];
 
         $committeeProgress = $this->progressService->calculateCommitteeProgress($committee);
@@ -319,11 +366,13 @@ class CommitteeController extends Controller
                 if ($newStaffUserId) {
                     $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
                         ->where('user_id', $newStaffUserId)
-                        ->where('role', ProjectRoleAssignment::ROLE_PROJECT_STAFF)
                         ->first();
 
                     if ($staffAssignment) {
-                        $staffAssignment->update(['committee_id' => $committee->id]);
+                        $staffAssignment->update([
+                            'committee_id' => $committee->id,
+                            'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+                        ]);
                     } else {
                         ProjectRoleAssignment::create([
                             'project_id' => $project->id,
@@ -385,26 +434,24 @@ class CommitteeController extends Controller
 
         DB::transaction(function () use ($project, $committee, $userIds) {
             foreach ($userIds as $userId) {
-                // Check if user has an unassigned member role (committee_id is null) in this project
-                $unassigned = ProjectRoleAssignment::where('project_id', $project->id)
+                $assignment = ProjectRoleAssignment::where('project_id', $project->id)
                     ->where('user_id', $userId)
-                    ->where('role', ProjectRoleAssignment::ROLE_PROJECT_MEMBER)
-                    ->whereNull('committee_id')
                     ->first();
 
-                if ($unassigned) {
-                    $unassigned->update(['committee_id' => $committee->id]);
+                if ($assignment) {
+                    $assignment->update([
+                        'committee_id' => $committee->id,
+                        'role' => $assignment->role === ProjectRoleAssignment::ROLE_PROJECT_STAFF
+                            ? ProjectRoleAssignment::ROLE_PROJECT_STAFF
+                            : ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+                    ]);
                 } else {
-                    ProjectRoleAssignment::firstOrCreate(
-                        [
-                            'project_id' => $project->id,
-                            'user_id' => $userId,
-                            'committee_id' => $committee->id,
-                        ],
-                        [
-                            'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
-                        ]
-                    );
+                    ProjectRoleAssignment::create([
+                        'project_id' => $project->id,
+                        'user_id' => $userId,
+                        'committee_id' => $committee->id,
+                        'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+                    ]);
                 }
             }
         });

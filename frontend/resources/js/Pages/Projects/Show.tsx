@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Head, Link, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'motion/react';
 import { staggerContainer, cardVariant, rowVariant } from '@/animations';
 import { AppLayout } from '@/Layouts/AppLayout';
@@ -27,7 +27,6 @@ import {
     FolderOpen,
     Calendar,
     Users,
-    UserCheck,
     Clock,
     ArrowLeft,
     Edit3,
@@ -47,6 +46,7 @@ import {
     Plus,
     Paperclip,
     ListTodo,
+    UserCheck,
 } from 'lucide-react';
 import { CreateProjectTaskModal } from '@/Components/CreateProjectTaskModal';
 import { ProjectTaskDetailsModal, ProjectTaskDetail } from '@/Components/ProjectTaskDetailsModal';
@@ -214,10 +214,6 @@ export interface ProjectData {
         createActivity?: boolean;
         designateCoChair?: boolean;
     };
-    committeesForDeliverable?: Array<{
-        id: string;
-        name: string;
-    }>;
     eventCoChairs?: Array<{
         id: number;
         name: string;
@@ -230,6 +226,10 @@ export interface ProjectData {
         name: string;
         email: string;
         role?: string;
+    }>;
+    committeesForDeliverable?: Array<{
+        id: string;
+        name: string;
     }>;
     creator?: {
         id: number;
@@ -316,6 +316,12 @@ export default function ProjectShow({
     const [coChairProcessing, setCoChairProcessing] = useState(false);
     const [coChairError, setCoChairError] = useState<string | null>(null);
 
+    const [isMembersModalOpen, setIsMembersModalOpen] = useState(false);
+    const [newMemberUserId, setNewMemberUserId] = useState<string>('');
+    const [newMemberRole, setNewMemberRole] = useState<'Project Member' | 'Project Staff'>('Project Member');
+    const [memberProcessing, setMemberProcessing] = useState(false);
+    const [memberError, setMemberError] = useState<string | null>(null);
+
     const docFileInputRef = useRef<HTMLInputElement>(null);
 
     // Forms
@@ -361,6 +367,7 @@ export default function ProjectShow({
         name: '',
         description: '',
         user_id: '',
+        co_chair_id: '',
     });
 
     const {
@@ -503,6 +510,89 @@ export default function ProjectShow({
         return list;
     }, [initialProject]);
 
+    const pageProps = usePage().props as any;
+    const globalAvailableUsers: Array<{ id: number; name: string; email: string }> = pageProps?.available_users || [];
+
+    // Eligible candidates for Committee Chairperson and Co-Chair (Overall Chair is excluded)
+    const committeeCandidates = useMemo(() => {
+        const leaderId = initialProject?.leader?.id || initialProject?.creator?.id;
+        const seen = new Set<number>();
+        if (leaderId) seen.add(Number(leaderId));
+
+        const list: Array<{ id: number; name: string; email: string; label: string }> = [];
+
+        // 0. Existing Event Co-Chairs
+        (initialProject?.eventCoChairs || []).forEach((u) => {
+            const uid = Number(u.id);
+            if (!seen.has(uid)) {
+                seen.add(uid);
+                list.push({
+                    id: uid,
+                    name: u.name,
+                    email: u.email,
+                    label: `${u.name} (${u.email}) — Event Co-Chair`,
+                });
+            }
+        });
+
+        // 1. Existing Project Staff
+        (initialProject?.projectStaff || []).forEach((u) => {
+            const uid = Number(u.id);
+            if (!seen.has(uid)) {
+                seen.add(uid);
+                list.push({
+                    id: uid,
+                    name: u.name,
+                    email: u.email,
+                    label: `${u.name} (${u.email}) — Project Staff`,
+                });
+            }
+        });
+
+        // 2. Existing Project Members
+        (initialProject?.projectMembers || []).forEach((u) => {
+            const uid = Number(u.id);
+            if (!seen.has(uid)) {
+                seen.add(uid);
+                list.push({
+                    id: uid,
+                    name: u.name,
+                    email: u.email,
+                    label: `${u.name} (${u.email}) — Member`,
+                });
+            }
+        });
+
+        // 3. Available Personnel / Institutional Users
+        (initialProject?.availablePersonnel || []).forEach((u) => {
+            const uid = Number(u.id);
+            if (!seen.has(uid)) {
+                seen.add(uid);
+                list.push({
+                    id: uid,
+                    name: u.name,
+                    email: u.email,
+                    label: `${u.name} (${u.email})`,
+                });
+            }
+        });
+
+        (globalAvailableUsers || []).forEach((u) => {
+            const uid = Number(u.id);
+            if (!seen.has(uid)) {
+                seen.add(uid);
+                list.push({
+                    id: uid,
+                    name: u.name,
+                    email: u.email,
+                    label: `${u.name} (${u.email})`,
+                });
+            }
+        });
+
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+    }, [initialProject, globalAvailableUsers]);
+
     // Keep viewingTask up to date when tasks are refreshed
     useEffect(() => {
         if (viewingTask) {
@@ -609,7 +699,8 @@ export default function ProjectShow({
 
     const handleDesignateCoChair = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedCoChairUserId || !initialProject) return;
+        if (!initialProject || !selectedCoChairUserId) return;
+
         setCoChairProcessing(true);
         setCoChairError(null);
         router.post(
@@ -620,10 +711,11 @@ export default function ProjectShow({
                 onSuccess: () => {
                     setSelectedCoChairUserId('');
                     setCoChairProcessing(false);
+                    setIsCoChairModalOpen(false);
                 },
                 onError: (errs) => {
                     setCoChairProcessing(false);
-                    setCoChairError(errs.user_id || 'Failed to designate Co-Chair.');
+                    setCoChairError(errs.user_id || 'Failed to designate Event Co-Chair.');
                 },
                 onFinish: () => setCoChairProcessing(false),
             }
@@ -639,14 +731,138 @@ export default function ProjectShow({
         });
     };
 
-    // Navigation Tabs: Deliverables, Chat, Files, Timeline, Overview, Committees
+    // All distinct participants involved in this event
+    const allEventParticipants = useMemo(() => {
+        const list: Array<{
+            id: number;
+            name: string;
+            email: string;
+            roleLabel: string;
+            badgeColor: string;
+            isLeader?: boolean;
+            isCoChair?: boolean;
+            canRemove?: boolean;
+            committeeName?: string;
+        }> = [];
+        const seen = new Set<number>();
+
+        // Overall Chair
+        if (initialProject.leader) {
+            seen.add(initialProject.leader.id);
+            list.push({
+                id: initialProject.leader.id,
+                name: initialProject.leader.name,
+                email: initialProject.leader.email,
+                roleLabel: 'Overall Chair',
+                badgeColor: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20',
+                isLeader: true,
+                canRemove: false,
+            });
+        }
+
+        // Event Co-Chairs
+        (initialProject.eventCoChairs || []).forEach((cc) => {
+            if (!seen.has(cc.id)) {
+                seen.add(cc.id);
+                list.push({
+                    id: cc.id,
+                    name: cc.name,
+                    email: cc.email,
+                    roleLabel: 'Event Co-Chair',
+                    badgeColor: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+                    isCoChair: true,
+                    canRemove: isLeader,
+                });
+            }
+        });
+
+        // Project Staff (Chairpersons)
+        (initialProject.projectStaff || []).forEach((s) => {
+            if (!seen.has(s.id)) {
+                seen.add(s.id);
+                const comm = s.committee_id ? (initialProject.committees || []).find((c) => String(c.id) === String(s.committee_id)) : null;
+                list.push({
+                    id: s.id,
+                    name: s.name,
+                    email: s.email,
+                    roleLabel: comm ? `Chairperson (${comm.name})` : 'Project Staff',
+                    badgeColor: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20',
+                    canRemove: isLeader && s.id !== initialProject.leader?.id,
+                    committeeName: comm?.name,
+                });
+            }
+        });
+
+        // Project Members
+        (initialProject.projectMembers || []).forEach((m) => {
+            if (!seen.has(m.id)) {
+                seen.add(m.id);
+                const comm = m.committee_id ? (initialProject.committees || []).find((c) => String(c.id) === String(m.committee_id)) : null;
+                list.push({
+                    id: m.id,
+                    name: m.name,
+                    email: m.email,
+                    roleLabel: comm ? `Member (${comm.name})` : 'Member',
+                    badgeColor: 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20',
+                    canRemove: isLeader && m.id !== initialProject.leader?.id,
+                    committeeName: comm?.name,
+                });
+            }
+        });
+
+        return list;
+    }, [initialProject, isLeader]);
+
+    // Available personnel from institution not yet in this event
+    const assignablePersonnel = useMemo(() => {
+        const existingIds = new Set(allEventParticipants.map((p) => p.id));
+        return (initialProject.availablePersonnel || []).filter((u) => !existingIds.has(u.id));
+    }, [allEventParticipants, initialProject.availablePersonnel]);
+
+    // Handlers for Event Members
+    const handleAddMember = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!initialProject || !newMemberUserId) return;
+        setMemberProcessing(true);
+        setMemberError(null);
+        router.post(
+            `/projects/${initialProject.id}/personnel`,
+            {
+                user_id: Number(newMemberUserId),
+                role: newMemberRole,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setNewMemberUserId('');
+                    setNewMemberRole('Project Member');
+                },
+                onError: (errs) => {
+                    setMemberError((Object.values(errs)[0] as string) || 'Failed to add participant to event.');
+                },
+                onFinish: () => setMemberProcessing(false),
+            }
+        );
+    };
+
+    const handleRemoveMember = (userId: number) => {
+        if (!initialProject) return;
+        if (!confirm('Are you sure you want to remove this participant from the event?')) return;
+        setMemberProcessing(true);
+        router.delete(`/projects/${initialProject.id}/personnel/${userId}`, {
+            preserveScroll: true,
+            onFinish: () => setMemberProcessing(false),
+        });
+    };
+
+    // Navigation Tabs: Deliverables, Committees, Timeline, Files, Chat, Overview
     const tabs: { key: TabKey; label: string; count?: number }[] = [
         { key: 'deliverables', label: 'Deliverables', count: allDeliverables.length },
-        { key: 'chat', label: 'Chat' },
-        { key: 'files', label: 'Files', count: allDocuments.length },
-        { key: 'timeline', label: 'Timeline' },
-        { key: 'overview', label: 'Overview' },
         { key: 'committees', label: 'Committees', count: allCommittees.length },
+        { key: 'timeline', label: 'Timeline' },
+        { key: 'files', label: 'Files', count: allDocuments.length },
+        { key: 'chat', label: 'Chat' },
+        { key: 'overview', label: 'Overview' },
     ];
 
     return (
@@ -697,6 +913,21 @@ export default function ProjectShow({
                                         {initialProject.leader?.name || 'Unassigned'}
                                     </span>
                                 </div>
+                                {initialProject.eventCoChairs && initialProject.eventCoChairs.length > 0 && (
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span>Event Co-Chair(s): </span>
+                                        {initialProject.eventCoChairs.map((cc) => (
+                                            <span
+                                                key={cc.id}
+                                                className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
+                                                title={`Supporting Overall Chair · Designated ${cc.designated_at || ''}`}
+                                            >
+                                                <UserCheck className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                                <span>{cc.name}</span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                                 {initialProject.end_date && (
                                     <div className="flex items-center gap-1.5 tabular-nums">
                                         <Clock className="w-3.5 h-3.5" />
@@ -709,20 +940,6 @@ export default function ProjectShow({
                                         {allCommittees.length}
                                     </span>
                                 </div>
-                                {initialProject.eventCoChairs && initialProject.eventCoChairs.length > 0 && (
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span>Event Co-Chairs: </span>
-                                        {initialProject.eventCoChairs.map((cc) => (
-                                            <span
-                                                key={cc.id}
-                                                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20"
-                                            >
-                                                <UserCheck className="w-3 h-3 text-amber-600" />
-                                                {cc.name}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
                         </div>
 
@@ -740,7 +957,7 @@ export default function ProjectShow({
                                 </Button>
                             </Link>
 
-                            {/* Highlighted Send Reminders Button (For Leader, Staff & Event Co-Chair) */}
+                            {/* Highlighted Send Reminders Button (For Leader, Staff & Event Co-Chairs) */}
                             {(isLeader || isStaff || initialProject.is_event_co_chair) && reminderTargetUrl && (
                                 <Link href={reminderTargetUrl}>
                                     <Button
@@ -754,75 +971,83 @@ export default function ProjectShow({
                                 </Link>
                             )}
 
-                            {initialProject.can?.designateCoChair && (
-                                <Button
-                                    variant="secondary"
-                                    size="md"
-                                    onClick={() => {
-                                        setCoChairError(null);
-                                        setSelectedCoChairUserId('');
-                                        setIsCoChairModalOpen(true);
-                                    }}
-                                    className="flex items-center gap-1.5"
-                                >
-                                    <UserCheck className="w-4 h-4 text-amber-600" />
-                                    <span>Event Co-Chairs</span>
-                                </Button>
-                            )}
-
-                            <Link href={`/chat/${initialProject.id}`}>
-                                <Button variant="secondary" size="md">
-                                    <MessageSquare className="w-4 h-4 mr-1.5" strokeWidth={2} />
-                                    <span>Event chat</span>
-                                </Button>
-                            </Link>
-
-                            {canCreateCommittee && (
-                                <Button
-                                    variant="outline"
-                                    size="md"
-                                    onClick={() => {
-                                        resetCommitteeForm();
-                                        clearCommitteeErrors();
-                                        setIsCreateCommitteeModalOpen(true);
-                                    }}
-                                >
-                                    + Add committee
-                                </Button>
-                            )}
-
-                            {isLeader && (
+                            {/* Three Dots Menu for Event Options */}
+                            {(isLeader || canCreateCommittee || initialProject.can?.designateCoChair) && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" size="md" className="px-2.5" aria-label="More options">
+                                        <Button variant="outline" size="md" className="px-2.5 cursor-pointer" aria-label="More options">
                                             <MoreHorizontal className="w-4 h-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-44 bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)]">
+                                    <DropdownMenuContent align="end" className="w-52 bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] shadow-lg">
+                                        {canCreateCommittee && (
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    resetCommitteeForm();
+                                                    clearCommitteeErrors();
+                                                    setIsCreateCommitteeModalOpen(true);
+                                                }}
+                                                className="text-[13px] cursor-pointer"
+                                            >
+                                                <Plus className="w-3.5 h-3.5 mr-2" />
+                                                Add committee
+                                            </DropdownMenuItem>
+                                        )}
+
                                         <DropdownMenuItem
                                             onClick={() => {
-                                                setEditData({
-                                                    title: initialProject.title,
-                                                    description: initialProject.description ?? '',
-                                                    start_date: initialProject.start_date_raw ?? '',
-                                                    end_date: initialProject.end_date_raw ?? '',
-                                                    status: initialProject.status,
-                                                });
-                                                setIsEditModalOpen(true);
+                                                setMemberError(null);
+                                                setNewMemberUserId('');
+                                                setIsMembersModalOpen(true);
                                             }}
                                             className="text-[13px] cursor-pointer"
                                         >
-                                            <Edit3 className="w-3.5 h-3.5 mr-2" />
-                                            Edit event
+                                            <Users className="w-3.5 h-3.5 mr-2" />
+                                            Members ({allEventParticipants.length})
                                         </DropdownMenuItem>
-                                        <DropdownMenuSeparator className="bg-[color:var(--border)]" />
-                                        <DropdownMenuItem
-                                            onClick={() => setIsArchiveModalOpen(true)}
-                                            className="text-[13px] text-[color:var(--primary)] cursor-pointer"
-                                        >
-                                            <Archive className="w-3.5 h-3.5 mr-2" />
-                                            Archive event
-                                        </DropdownMenuItem>
+
+                                        {initialProject.can?.designateCoChair && (
+                                            <DropdownMenuItem
+                                                onClick={() => {
+                                                    setCoChairError(null);
+                                                    setSelectedCoChairUserId('');
+                                                    setIsCoChairModalOpen(true);
+                                                }}
+                                                className="text-[13px] cursor-pointer text-amber-700 dark:text-amber-400"
+                                            >
+                                                <UserCheck className="w-3.5 h-3.5 mr-2 text-amber-600 dark:text-amber-400" />
+                                                Event Co-Chairs ({(initialProject.eventCoChairs || []).length})
+                                            </DropdownMenuItem>
+                                        )}
+
+                                        {isLeader && (
+                                            <>
+                                                <DropdownMenuSeparator className="bg-[color:var(--border)]" />
+                                                <DropdownMenuItem
+                                                    onClick={() => {
+                                                        setEditData({
+                                                            title: initialProject.title,
+                                                            description: initialProject.description ?? '',
+                                                            start_date: initialProject.start_date_raw ?? '',
+                                                            end_date: initialProject.end_date_raw ?? '',
+                                                            status: initialProject.status,
+                                                        });
+                                                        setIsEditModalOpen(true);
+                                                    }}
+                                                    className="text-[13px] cursor-pointer"
+                                                >
+                                                    <Edit3 className="w-3.5 h-3.5 mr-2" />
+                                                    Edit event
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => setIsArchiveModalOpen(true)}
+                                                    className="text-[13px] text-rose-600 dark:text-rose-400 cursor-pointer"
+                                                >
+                                                    <Archive className="w-3.5 h-3.5 mr-2" />
+                                                    Archive event
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             )}
@@ -1431,10 +1656,59 @@ export default function ProjectShow({
                             rows={3}
                             value={committeeData.description}
                             onChange={(e) => setCommitteeData('description', e.target.value)}
+                            placeholder="Brief overview of committee scope and responsibilities"
                             className="w-full mt-1 p-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px]"
                         />
                         <InputError message={committeeErrors.description} />
                     </div>
+
+                    {isLeader && (
+                        <div className="space-y-4 pt-1 border-t border-[color:var(--border)]">
+                            <div>
+                                <Label htmlFor="create-committee-chair">Chairperson (Optional)</Label>
+                                <select
+                                    id="create-committee-chair"
+                                    value={committeeData.user_id}
+                                    onChange={(e) => setCommitteeData('user_id', e.target.value)}
+                                    className="w-full mt-1 p-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus:outline-none focus:border-[color:var(--primary)] cursor-pointer"
+                                >
+                                    <option value="">-- None (Assign later) --</option>
+                                    {committeeCandidates.map((c) => (
+                                        <option
+                                            key={c.id}
+                                            value={c.id}
+                                            disabled={String(c.id) === String(committeeData.co_chair_id)}
+                                        >
+                                            {c.label} {String(c.id) === String(committeeData.co_chair_id) ? '(Selected as Co-Chair)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={committeeErrors.user_id} />
+                            </div>
+
+                            <div>
+                                <Label htmlFor="create-committee-cochair">Co-Chair (Optional)</Label>
+                                <select
+                                    id="create-committee-cochair"
+                                    value={committeeData.co_chair_id}
+                                    onChange={(e) => setCommitteeData('co_chair_id', e.target.value)}
+                                    className="w-full mt-1 p-2 text-[14px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus:outline-none focus:border-[color:var(--primary)] cursor-pointer"
+                                >
+                                    <option value="">-- None (Assign later) --</option>
+                                    {committeeCandidates.map((c) => (
+                                        <option
+                                            key={c.id}
+                                            value={c.id}
+                                            disabled={String(c.id) === String(committeeData.user_id)}
+                                        >
+                                            {c.label} {String(c.id) === String(committeeData.user_id) ? '(Selected as Chairperson)' : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError message={committeeErrors.co_chair_id} />
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-2 pt-2">
                         <Button
@@ -1646,10 +1920,10 @@ export default function ProjectShow({
             >
                 <div className="space-y-5">
                     <p className="text-[13px] text-[color:var(--muted)] leading-relaxed">
-                        Designate existing event participants as Event-level Co-Chairs to assist with overall event monitoring, timeline tracking, and committee coordination.
+                        Designate existing event participants as Event-level Co-Chairs to support the Overall Chair with event-wide coordination, deliverable tracking, and reminders. Note: Committee-level Co-Chairs are managed independently within each committee.
                     </p>
 
-                    {/* Current Co-Chairs */}
+                    {/* Current Event Co-Chairs */}
                     <div className="space-y-2">
                         <h4 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
                             Current Event Co-Chairs ({(initialProject.eventCoChairs || []).length})
@@ -1663,7 +1937,7 @@ export default function ProjectShow({
                                 {(initialProject.eventCoChairs || []).map((cc) => (
                                     <div
                                         key={cc.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card-bg)] text-xs"
+                                        className="flex items-center justify-between p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] text-xs"
                                     >
                                         <div className="min-w-0">
                                             <div className="flex items-center gap-1.5">
@@ -1680,7 +1954,7 @@ export default function ProjectShow({
                                             size="sm"
                                             disabled={coChairProcessing}
                                             onClick={() => handleRemoveCoChair(cc.id)}
-                                            className="text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300 text-xs"
+                                            className="text-rose-600 border-rose-200 hover:bg-rose-50 text-xs"
                                         >
                                             Remove
                                         </Button>
@@ -1690,30 +1964,30 @@ export default function ProjectShow({
                         )}
                     </div>
 
-                    {/* Form to designate new Co-Chair */}
+                    {/* Form to designate new Event Co-Chair */}
                     <div className="pt-4 border-t border-[color:var(--border)] space-y-3">
                         <h4 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
                             Designate New Event Co-Chair
                         </h4>
 
                         {(initialProject.eligibleCoChairs || []).length === 0 ? (
-                            <p className="text-xs text-[color:var(--muted)] italic">
-                                No eligible participants available to designate. All event participants are already designated or are the Overall Chair.
+                            <p className="text-[12px] text-[color:var(--muted)] italic">
+                                No eligible participants available to designate. All event participants are already designated or not eligible.
                             </p>
                         ) : (
                             <form onSubmit={handleDesignateCoChair} className="space-y-3">
                                 <div className="space-y-1">
-                                    <Label htmlFor="designate-cochair-select">Select Event Participant</Label>
+                                    <Label htmlFor="designate-event-cochair-select">Select Event Participant</Label>
                                     <select
-                                        id="designate-cochair-select"
+                                        id="designate-event-cochair-select"
                                         value={selectedCoChairUserId}
                                         onChange={(e) => setSelectedCoChairUserId(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs bg-[color:var(--card-bg)] border border-[color:var(--border)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-[color:var(--text)] cursor-pointer"
+                                        className="w-full px-3 py-2 text-xs bg-[color:var(--soft-surface)] border border-[color:var(--border)] rounded-md shadow-xs focus:outline-none focus:border-[color:var(--primary)] text-[color:var(--text)] cursor-pointer"
                                     >
-                                        <option value="">-- Choose an existing participant --</option>
-                                        {(initialProject.eligibleCoChairs || []).map((p) => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.name} ({p.role || 'Member'} — {p.email})
+                                        <option value="">-- Choose an event participant --</option>
+                                        {(initialProject.eligibleCoChairs || []).map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name} ({m.email}) {m.role ? `— ${m.role}` : ''}
                                             </option>
                                         ))}
                                     </select>
@@ -1735,12 +2009,141 @@ export default function ProjectShow({
                                         isLoading={coChairProcessing}
                                         className="bg-amber-600 hover:bg-amber-700 text-white"
                                     >
-                                        Designate as Co-Chair
+                                        Designate as Event Co-Chair
                                     </Button>
                                 </div>
                             </form>
                         )}
                     </div>
+                </div>
+            </Modal>
+
+            {/* ── Manage Event Members Modal ── */}
+            <Modal
+                isOpen={isMembersModalOpen}
+                onClose={() => !memberProcessing && setIsMembersModalOpen(false)}
+                title="Event Members & Personnel"
+                maxWidth="lg"
+            >
+                <div className="space-y-5">
+                    <p className="text-[13px] text-[color:var(--muted)] leading-relaxed">
+                        View and manage designated leaders, staff, committee members, and participants for this event.
+                    </p>
+
+                    {/* Current Event Participants */}
+                    <div className="space-y-2">
+                        <h4 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
+                            Current Participants ({allEventParticipants.length})
+                        </h4>
+
+                        {allEventParticipants.length === 0 ? (
+                            <div className="p-3.5 rounded-lg border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)] text-center text-[12px] text-[color:var(--muted)]">
+                                No members assigned to this event yet.
+                            </div>
+                        ) : (
+                            <div className="max-h-72 overflow-y-auto divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-lg">
+                                {allEventParticipants.map((p) => (
+                                    <div
+                                        key={p.id}
+                                        className="p-3 flex items-center justify-between gap-3 bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)] transition-colors text-xs"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-bold text-[color:var(--text)]">{p.name}</span>
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border ${p.badgeColor}`}>
+                                                    {p.roleLabel}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-[color:var(--muted)] truncate">{p.email}</p>
+                                        </div>
+
+                                        {p.canRemove && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={memberProcessing}
+                                                onClick={() => handleRemoveMember(p.id)}
+                                                className="text-rose-600 border-rose-200 hover:bg-rose-50 text-xs shrink-0"
+                                            >
+                                                Remove
+                                            </Button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Add Member Form (for Overall Chair) */}
+                    {isLeader && (
+                        <div className="pt-4 border-t border-[color:var(--border)] space-y-3">
+                            <h4 className="text-[12px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
+                                Add Participant to Event
+                            </h4>
+
+                            {assignablePersonnel.length === 0 ? (
+                                <p className="text-[12px] text-[color:var(--muted)] italic">
+                                    All available institutional personnel have already been added to this event.
+                                </p>
+                            ) : (
+                                <form onSubmit={handleAddMember} className="space-y-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className="sm:col-span-2 space-y-1">
+                                            <Label htmlFor="add-event-member-select">Select Personnel</Label>
+                                            <select
+                                                id="add-event-member-select"
+                                                value={newMemberUserId}
+                                                onChange={(e) => setNewMemberUserId(e.target.value)}
+                                                className="w-full px-3 py-2 text-xs bg-[color:var(--soft-surface)] border border-[color:var(--border)] rounded-md shadow-xs focus:outline-none focus:border-[color:var(--primary)] text-[color:var(--text)] cursor-pointer"
+                                            >
+                                                <option value="">-- Choose faculty or personnel --</option>
+                                                {assignablePersonnel.map((u) => (
+                                                    <option key={u.id} value={u.id}>
+                                                        {u.name} ({u.email})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <Label htmlFor="add-event-member-role">Event Role</Label>
+                                            <select
+                                                id="add-event-member-role"
+                                                value={newMemberRole}
+                                                onChange={(e) => setNewMemberRole(e.target.value as 'Project Member' | 'Project Staff')}
+                                                className="w-full px-3 py-2 text-xs bg-[color:var(--soft-surface)] border border-[color:var(--border)] rounded-md shadow-xs focus:outline-none focus:border-[color:var(--primary)] text-[color:var(--text)] cursor-pointer"
+                                            >
+                                                <option value="Project Member">Member</option>
+                                                <option value="Project Staff">Staff</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {memberError && <InputError message={memberError} />}
+
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setIsMembersModalOpen(false)}
+                                            disabled={memberProcessing}
+                                        >
+                                            Close
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            variant="primary"
+                                            disabled={!newMemberUserId || memberProcessing}
+                                            isLoading={memberProcessing}
+                                        >
+                                            Add to Event
+                                        </Button>
+                                    </div>
+                                </form>
+                            )}
+                        </div>
+                    )}
                 </div>
             </Modal>
         </AppLayout>

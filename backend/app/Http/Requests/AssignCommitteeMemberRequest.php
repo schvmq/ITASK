@@ -90,30 +90,42 @@ class AssignCommitteeMemberRequest extends FormRequest
             return;
         }
 
-        $memberAssignment = ProjectRoleAssignment::where('project_id', $projectId)
-            ->where('user_id', $id)
-            ->whereIn('role', [
-                ProjectRoleAssignment::ROLE_COMMITTEE_STAFF,
-                ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
-            ])
-            ->first();
-
-        if (! $memberAssignment) {
-            $fail('The selected user must be an assigned Committee Staff or Project Member of this project.');
+        $project = $projectId ? Project::find($projectId) : null;
+        if ($project && (int) $id === (int) $project->created_by) {
+            $fail('The Overall Chair cannot be assigned as a committee member.');
             return;
         }
 
-        $alreadyInCommittee = ProjectRoleAssignment::where('project_id', $projectId)
-            ->where('committee_id', $committeeId)
-            ->where('user_id', $id)
-            ->whereIn('role', [
-                ProjectRoleAssignment::ROLE_COMMITTEE_STAFF,
-                ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
-            ])
-            ->exists();
+        if ($projectId) {
+            $isLeader = ProjectRoleAssignment::where('project_id', $projectId)
+                ->where('user_id', $id)
+                ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                ->exists();
+            if ($isLeader) {
+                $fail('The Overall Chair cannot be assigned as a committee member.');
+                return;
+            }
 
-        if ($alreadyInCommittee) {
-            $fail('The user is already assigned to this committee.');
+            $isParticipant = ProjectRoleAssignment::where('project_id', $projectId)
+                ->where('user_id', $id)
+                ->exists()
+                || \App\Models\CoChairDesignation::where('project_id', $projectId)
+                    ->where('user_id', $id)
+                    ->exists();
+
+            if (! $isParticipant) {
+                $fail('The selected user must be an assigned participant of this event.');
+                return;
+            }
+
+            $alreadyInCommittee = ProjectRoleAssignment::where('project_id', $projectId)
+                ->where('committee_id', $committeeId)
+                ->where('user_id', $id)
+                ->exists();
+
+            if ($alreadyInCommittee) {
+                $fail('The user is already assigned to this committee.');
+            }
         }
     }
 

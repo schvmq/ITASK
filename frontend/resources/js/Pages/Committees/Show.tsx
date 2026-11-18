@@ -56,6 +56,7 @@ interface StaffItem {
     email: string;
     committee_id?: string | null;
     committee_name?: string | null;
+    is_event_co_chair?: boolean;
     tasks_count?: number;
     completed_tasks_count?: number;
     progress?: number;
@@ -1230,6 +1231,8 @@ export default function CommitteeShow({
                                         let label = `${staff.name} (${staff.email})`;
                                         if (isCurrent) {
                                             label += ' — [Currently Assigned]';
+                                        } else if (staff.is_event_co_chair) {
+                                            label += otherCommittee ? ` — [Event Co-Chair • Assigned to ${otherCommittee}]` : ' — [Event Co-Chair]';
                                         } else if (otherCommittee) {
                                             label += ` — [Assigned to ${otherCommittee}]`;
                                         }

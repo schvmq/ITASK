@@ -57,10 +57,85 @@ interface Participant {
     name: string;
     email: string;
     role?: string;
+    role_label?: string;
+    role_type?: string;
+    committee_name?: string | null;
     is_online?: boolean;
     last_read_message_id?: number | null;
     last_read_at?: string | null;
 }
+
+export const getMemberRoleBadge = (role?: string) => {
+    const raw = (role || 'Member').toLowerCase();
+    if (raw.includes('leader') || raw.includes('overall chair')) {
+        return {
+            label: 'Overall Chair',
+            style: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20',
+        };
+    }
+    if (raw.includes('event co-chair') || (raw.includes('co-chair') && !raw.includes('committee'))) {
+        return {
+            label: 'Event Co-Chair',
+            style: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+        };
+    }
+    if (raw.includes('committee co-chair')) {
+        return {
+            label: role || 'Committee Co-Chair',
+            style: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
+        };
+    }
+    if (raw.includes('chairperson') || raw.includes('staff')) {
+        return {
+            label: role?.replace('Project Staff', 'Chairperson') || 'Chairperson',
+            style: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20',
+        };
+    }
+    return {
+        label: role?.replace('Project Member', 'Member') || 'Member',
+        style: 'bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/20',
+    };
+};
+
+export const renderMessageTextWithMentions = (text: string) => {
+    if (!text) return null;
+
+    if (text.includes('Project chat created. Everyone in this project can message here.')) {
+        return 'Group chat created. Everyone in this event can message here.';
+    }
+
+    const mentionRegex = /(@[A-Za-z0-9_.\-]+(?:\s+[A-Za-z0-9_.\-]+)*)/g;
+    const parts = text.split(mentionRegex);
+
+    return parts.map((part, index) => {
+        if (part.startsWith('@')) {
+            const rawTag = part.slice(1).toLowerCase();
+            let badgeClass = 'bg-[color:var(--primary)]/10 text-[color:var(--primary)] font-bold';
+
+            if (rawTag.includes('overall chair')) {
+                badgeClass = 'bg-blue-500/15 text-blue-700 dark:text-blue-400 font-bold border border-blue-500/20';
+            } else if (rawTag.includes('event co-chair') || (rawTag.includes('co-chair') && !rawTag.includes('committee'))) {
+                badgeClass = 'bg-amber-500/15 text-amber-700 dark:text-amber-400 font-bold border border-amber-500/20';
+            } else if (rawTag.includes('committee co-chair')) {
+                badgeClass = 'bg-orange-500/15 text-orange-700 dark:text-orange-400 font-bold border border-orange-500/20';
+            } else if (rawTag.includes('chairperson')) {
+                badgeClass = 'bg-purple-500/15 text-purple-700 dark:text-purple-400 font-bold border border-purple-500/20';
+            } else if (rawTag.includes('member')) {
+                badgeClass = 'bg-slate-500/15 text-slate-700 dark:text-slate-400 font-bold border border-slate-500/20';
+            }
+
+            return (
+                <span
+                    key={index}
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] mx-0.5 ${badgeClass}`}
+                >
+                    {part}
+                </span>
+            );
+        }
+        return part;
+    });
+};
 
 interface MessageSender {
     id: number;
@@ -916,19 +991,24 @@ export default function ChatIndex({
         }
     };
 
-    // Filter project members for @mentions (current project members only)
+    // Filter members and role tags for @mentions (current event participants)
     const mentionSuggestions = useMemo(() => {
         if (mentionFilter === null) return [];
-        return propProjectMembers.filter((m) =>
-            m.name.toLowerCase().includes(mentionFilter)
+        const query = mentionFilter.toLowerCase();
+
+        return (propProjectMembers || []).filter((m: any) =>
+            (m.name && m.name.toLowerCase().includes(query)) ||
+            (m.role && m.role.toLowerCase().includes(query)) ||
+            (m.role_label && m.role_label.toLowerCase().includes(query)) ||
+            (m.committee_name && m.committee_name.toLowerCase().includes(query))
         );
     }, [mentionFilter, propProjectMembers]);
 
-    const handleSelectMention = (memberName: string) => {
+    const handleSelectMention = (tagString: string) => {
         if (mentionCursorIndex === -1) return;
         const before = messageText.slice(0, mentionCursorIndex);
         const after = messageText.slice(mentionCursorIndex + (mentionFilter?.length ?? 0) + 1);
-        const newText = `${before}@${memberName} ${after}`;
+        const newText = `${before}@${tagString} ${after}`;
         setMessageText(newText);
         setMentionFilter(null);
         textareaRef.current?.focus();
@@ -1286,7 +1366,9 @@ export default function ChatIndex({
                                                                 : 'text-[color:var(--muted)] font-normal'
                                                         }`}
                                                     >
-                                                        {chat.preview}
+                                                        {chat.preview?.includes('Project chat created')
+                                                            ? 'Group chat created. Everyone in this event can message here.'
+                                                            : chat.preview?.replace('joined the project', 'joined the event')}
                                                     </p>
 
                                                     <div className="flex items-center gap-1 shrink-0">
@@ -1419,9 +1501,6 @@ export default function ChatIndex({
                                                 <h2 className="text-sm font-extrabold text-[color:var(--text)] truncate">
                                                     {activeChat.title}
                                                 </h2>
-                                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)] shrink-0 select-none">
-                                                    Group Chat
-                                                </span>
                                                 {activeChat.is_archived && (
                                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[color:var(--status-neutral-bg)] text-[color:var(--status-neutral-text)] border border-[color:var(--status-neutral-border)] flex items-center gap-1 shrink-0">
                                                         <Lock className="w-2.5 h-2.5" />
@@ -1567,7 +1646,9 @@ export default function ChatIndex({
                                                 {group.isSystem ? (
                                                     <div className="flex justify-center my-2 animate-modal-in">
                                                         <div className="max-w-md px-3.5 py-1 rounded-full text-xs bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-[color:var(--muted)] text-center font-medium shadow-xs">
-                                                            {group.items[0]?.body}
+                                                            {group.items[0]?.body?.includes('Project chat created')
+                                                                ? 'Group chat created. Everyone in this event can message here.'
+                                                                : group.items[0]?.body?.replace('joined the project', 'joined the event')}
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -1700,7 +1781,7 @@ export default function ChatIndex({
                                                                                         {/* Text Body */}
                                                                                         {msg.body && !msg.task_id && (
                                                                                             <p className="whitespace-pre-wrap">
-                                                                                                {msg.body}
+                                                                                                {renderMessageTextWithMentions(msg.body)}
                                                                                             </p>
                                                                                         )}
 
@@ -2023,27 +2104,42 @@ export default function ChatIndex({
 
                                     {/* @ Mentions suggestions popover (floating cleanly above composer) */}
                                     {mentionFilter !== null && mentionSuggestions.length > 0 && (
-                                        <div className="absolute bottom-full left-3 right-3 sm:left-4 sm:right-4 mb-2 p-1.5 rounded-2xl bg-[color:var(--card)] border border-[color:var(--border)] shadow-2xl max-h-48 overflow-y-auto z-40 space-y-0.5 animate-modal-in">
-                                            <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[color:var(--muted)]">
-                                                Mention event member
+                                        <div className="absolute bottom-full left-3 right-3 sm:left-4 sm:right-4 mb-2 p-1.5 rounded-2xl bg-[color:var(--card)] border border-[color:var(--border)] shadow-2xl max-h-56 overflow-y-auto z-40 space-y-0.5 animate-modal-in">
+                                            <p className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[color:var(--muted)] flex items-center justify-between">
+                                                <span>Mention by name or role</span>
+                                                <span className="text-[9px] font-normal lowercase">{mentionSuggestions.length} found</span>
                                             </p>
-                                            {mentionSuggestions.map((m, idx) => (
-                                                <button
-                                                    key={m.id}
-                                                    type="button"
-                                                    onClick={() => handleSelectMention(m.name)}
-                                                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-left cursor-pointer transition-colors msg-interactive ${
-                                                        idx === selectedMentionIndex
-                                                            ? 'bg-[color:var(--primary)] text-white font-bold'
-                                                            : 'hover:bg-[color:var(--soft-surface)] text-[color:var(--text)]'
-                                                    }`}
-                                                >
-                                                    <Avatar className="w-5 h-5 text-[9px] font-black">
-                                                        <AvatarFallback>{getInitials(m.name)}</AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="truncate">{m.name}</span>
-                                                </button>
-                                            ))}
+                                            {mentionSuggestions.map((m: any, idx) => {
+                                                const roleBadge = getMemberRoleBadge(m.role || m.role_label);
+                                                return (
+                                                    <button
+                                                        key={m.id}
+                                                        type="button"
+                                                        onClick={() => handleSelectMention(m.name)}
+                                                        className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs text-left cursor-pointer transition-colors msg-interactive ${
+                                                            idx === selectedMentionIndex
+                                                                ? 'bg-[color:var(--primary)] text-white font-bold'
+                                                                : 'hover:bg-[color:var(--soft-surface)] text-[color:var(--text)]'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <Avatar className="w-5 h-5 text-[9px] font-black shrink-0">
+                                                                <AvatarFallback>{getInitials(m.name)}</AvatarFallback>
+                                                            </Avatar>
+                                                            <span className="truncate font-semibold">{m.name}</span>
+                                                        </div>
+                                                        <span
+                                                            className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                                                idx === selectedMentionIndex
+                                                                    ? 'bg-white/20 text-white border-white/30'
+                                                                    : roleBadge.style
+                                                            }`}
+                                                        >
+                                                            {roleBadge.label}
+                                                        </span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     )}
 
@@ -2221,31 +2317,36 @@ export default function ChatIndex({
                                     </div>
 
                                     <div className="space-y-2">
-                                        {participants.map((member) => (
-                                            <div
-                                                key={member.id}
-                                                className="flex items-center justify-between gap-2 p-1.5 rounded-xl hover:bg-[color:var(--soft-surface)]/50 transition-colors msg-interactive"
-                                            >
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <div className="w-7 h-7 rounded-lg bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] font-bold flex items-center justify-center text-xs shrink-0">
-                                                        {getInitials(member.name)}
+                                        {participants.map((member) => {
+                                            const roleBadge = getMemberRoleBadge(member.role || member.role_label);
+                                            return (
+                                                <div
+                                                    key={member.id}
+                                                    className="flex items-center justify-between gap-2 p-1.5 rounded-xl hover:bg-[color:var(--soft-surface)]/50 transition-colors msg-interactive"
+                                                >
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <div className="w-7 h-7 rounded-lg bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] font-bold flex items-center justify-center text-xs shrink-0">
+                                                            {getInitials(member.name)}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold text-[color:var(--text)] truncate leading-snug">
+                                                                {member.name}
+                                                            </p>
+                                                            <div className="mt-0.5">
+                                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${roleBadge.style}`}>
+                                                                    {roleBadge.label}
+                                                                </span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <p className="font-bold text-[color:var(--text)] truncate leading-snug">
-                                                            {member.name}
-                                                        </p>
-                                                        <p className="text-[10px] text-[color:var(--muted)] truncate">
-                                                            {member.role || 'Member'}
-                                                        </p>
-                                                    </div>
-                                                </div>
 
-                                                <span
-                                                    className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"
-                                                    title="Active"
-                                                />
-                                            </div>
-                                        ))}
+                                                    <span
+                                                        className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"
+                                                        title="Active"
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 

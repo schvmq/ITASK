@@ -591,7 +591,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                                     {committee.name}
                                                                                 </Link>
                                                                                 <div className="text-[11px] text-[color:var(--muted)] truncate">
-                                                                                    {committee.activities?.length || 0} {committee.activities?.length === 1 ? 'activity' : 'activities'}
+                                                                                    {committee.activities?.length || 0} {committee.activities?.length === 1 ? 'deliverable' : 'deliverables'}
                                                                                 </div>
                                                                             </div>
                                                                         </div>
@@ -689,7 +689,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                             })
                                                                         ) : (
                                                                             <div className="h-[38px] pl-11 pr-3 flex items-center text-[11px] text-[color:var(--muted)] italic">
-                                                                                No activities
+                                                                                No deliverables
                                                                             </div>
                                                                         )
                                                                     )}
@@ -979,7 +979,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                                                                             })
                                                                         ) : (
                                                                             <div className="h-[38px] flex items-center pl-3 text-[11px] text-[color:var(--muted)] italic">
-                                                                                No activities scheduled
+                                                                                No deliverables scheduled
                                                                             </div>
                                                                         )
                                                                     )}

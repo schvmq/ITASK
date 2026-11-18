@@ -42,11 +42,13 @@ class ApiCommitteeController extends Controller
                 $staffUserId = (int) $request->validated('user_id');
                 $staffAssignment = ProjectRoleAssignment::where('project_id', $project->id)
                     ->where('user_id', $staffUserId)
-                    ->where('role', RoleRegistry::ROLE_PROJECT_STAFF)
                     ->first();
 
                 if ($staffAssignment) {
-                    $staffAssignment->update(['committee_id' => $committee->id]);
+                    $staffAssignment->update([
+                        'role' => RoleRegistry::ROLE_PROJECT_STAFF,
+                        'committee_id' => $committee->id,
+                    ]);
                 } else {
                     ProjectRoleAssignment::create([
                         'project_id' => $project->id,
@@ -55,6 +57,33 @@ class ApiCommitteeController extends Controller
                         'role' => RoleRegistry::ROLE_PROJECT_STAFF,
                     ]);
                 }
+            }
+
+            if ($request->filled('co_chair_id')) {
+                $coChairUserId = (int) $request->validated('co_chair_id');
+                $coChairAssignment = ProjectRoleAssignment::where('project_id', $project->id)
+                    ->where('user_id', $coChairUserId)
+                    ->first();
+
+                if ($coChairAssignment) {
+                    $coChairAssignment->update([
+                        'committee_id' => $committee->id,
+                    ]);
+                } else {
+                    ProjectRoleAssignment::create([
+                        'project_id' => $project->id,
+                        'user_id' => $coChairUserId,
+                        'committee_id' => $committee->id,
+                        'role' => RoleRegistry::ROLE_PROJECT_MEMBER,
+                    ]);
+                }
+
+                \App\Models\CoChairDesignation::create([
+                    'project_id' => $project->id,
+                    'committee_id' => $committee->id,
+                    'user_id' => $coChairUserId,
+                    'designated_by' => Auth::id(),
+                ]);
             }
 
             return $committee;
@@ -208,9 +237,9 @@ class ApiCommitteeController extends Controller
             [
                 'project_id' => $project->id,
                 'user_id' => $userId,
-                'committee_id' => $committee->id,
             ],
             [
+                'committee_id' => $committee->id,
                 'role' => RoleRegistry::ROLE_PROJECT_MEMBER,
             ]
         );

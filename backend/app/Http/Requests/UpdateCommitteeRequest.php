@@ -52,16 +52,32 @@ class UpdateCommitteeRequest extends FormRequest
                         return;
                     }
 
-                    $isStaff = ProjectRoleAssignment::where('project_id', $projectId)
-                        ->where('user_id', $value)
-                        ->whereIn('role', [
-                            ProjectRoleAssignment::ROLE_PROJECT_COMMITTEE,
-                            ProjectRoleAssignment::ROLE_PROJECT_STAFF,
-                        ])
-                        ->exists();
+                    $project = $projectId ? Project::find($projectId) : null;
+                    if ($project && (int) $value === (int) $project->created_by) {
+                        $fail('The Overall Chair cannot be assigned as a Committee Chairperson.');
+                        return;
+                    }
 
-                    if (! $isStaff) {
-                        $fail('The selected user must be an assigned Project Committee or Staff member of this project.');
+                    if ($projectId) {
+                        $isLeader = ProjectRoleAssignment::where('project_id', $projectId)
+                            ->where('user_id', $value)
+                            ->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+                            ->exists();
+                        if ($isLeader) {
+                            $fail('The Overall Chair cannot be assigned as a Committee Chairperson.');
+                            return;
+                        }
+
+                        $isParticipant = ProjectRoleAssignment::where('project_id', $projectId)
+                            ->where('user_id', $value)
+                            ->exists()
+                            || \App\Models\CoChairDesignation::where('project_id', $projectId)
+                                ->where('user_id', $value)
+                                ->exists();
+
+                        if (! $isParticipant) {
+                            $fail('The selected user must be an assigned participant of this event.');
+                        }
                     }
                 },
             ],

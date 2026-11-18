@@ -284,7 +284,7 @@ class AuthorizationService
 
         $project = $committee->project;
 
-        if ($this->isProjectLeader($user, $project)) {
+        if ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project)) {
             return true;
         }
 
@@ -401,7 +401,7 @@ class AuthorizationService
 
         $project = $activity->committee?->project;
 
-        if ($project && $this->isProjectLeader($user, $project)) {
+        if ($project && ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project))) {
             return true;
         }
 
@@ -445,7 +445,7 @@ class AuthorizationService
 
         $project = $task->activity?->committee?->project;
 
-        if ($project && $this->isProjectLeader($user, $project)) {
+        if ($project && ($this->isProjectLeader($user, $project) || $this->isEventCoChair($user, $project))) {
             return true;
         }
 

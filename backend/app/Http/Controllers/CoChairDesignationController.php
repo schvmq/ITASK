@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Gate;
 class CoChairDesignationController extends Controller
 {
     /**
-     * Designate an existing Event participant as an Event-level Co-Chair.
+     * Designate an existing Event participant as an Event-level Co-Chair to support the Overall Chair.
      * Exclusive to the Overall Chair (Project Leader).
      */
     public function storeEvent(Request $request, Project $project): JsonResponse|RedirectResponse

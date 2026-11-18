@@ -59,7 +59,7 @@ class ProjectPersonnelController extends Controller
                 $msg = $project->chat->messages()->create([
                     'sender_id' => null,
                     'type' => Message::TYPE_SYSTEM,
-                    'body' => "{$assignedUser->name} joined the project",
+                    'body' => "{$assignedUser->name} joined the event",
                 ]);
 
                 try {
@@ -99,7 +99,7 @@ class ProjectPersonnelController extends Controller
             $msg = $project->chat->messages()->create([
                 'sender_id' => null,
                 'type' => Message::TYPE_SYSTEM,
-                'body' => "{$user->name} left the project",
+                'body' => "{$user->name} left the event",
             ]);
 
             try {

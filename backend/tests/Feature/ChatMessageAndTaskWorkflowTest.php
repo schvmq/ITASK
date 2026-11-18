@@ -68,7 +68,7 @@ class ChatMessageAndTaskWorkflowTest extends TestCase
         $this->chat->messages()->create([
             'sender_id' => null,
             'type' => Message::TYPE_SYSTEM,
-            'body' => 'Project chat created. Everyone in this project can message here.',
+            'body' => 'Group chat created. Everyone in this event can message here.',
         ]);
     }
 
@@ -84,7 +84,7 @@ class ChatMessageAndTaskWorkflowTest extends TestCase
         $this->assertDatabaseHas('messages', [
             'chat_id' => $this->chat->id,
             'type' => Message::TYPE_SYSTEM,
-            'body' => 'Project chat created. Everyone in this project can message here.',
+            'body' => 'Group chat created. Everyone in this event can message here.',
             'sender_id' => null,
         ]);
 
@@ -135,7 +135,7 @@ class ChatMessageAndTaskWorkflowTest extends TestCase
         $this->assertDatabaseHas('messages', [
             'chat_id' => $this->chat->id,
             'type' => Message::TYPE_SYSTEM,
-            'body' => 'Maria Santos joined the project',
+            'body' => 'Maria Santos joined the event',
         ]);
 
         // New member now has chat access
@@ -150,7 +150,7 @@ class ChatMessageAndTaskWorkflowTest extends TestCase
         $this->assertDatabaseHas('messages', [
             'chat_id' => $this->chat->id,
             'type' => Message::TYPE_SYSTEM,
-            'body' => 'Maria Santos left the project',
+            'body' => 'Maria Santos left the event',
         ]);
 
         // Removed member access is cut immediately

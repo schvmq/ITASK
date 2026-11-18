@@ -71,7 +71,7 @@ class ChatController extends Controller
                 $chat->messages()->create([
                     'sender_id' => null,
                     'type' => Message::TYPE_SYSTEM,
-                    'body' => 'Project chat created. Everyone in this project can message here.',
+                    'body' => 'Group chat created. Everyone in this event can message here.',
                 ]);
 
                 $chat->load('latestMessage');
@@ -125,7 +125,11 @@ class ChatController extends Controller
                 if ($isDeleted) {
                     $preview = 'This message was deleted';
                 } elseif ($latestMsg->type === Message::TYPE_SYSTEM || ! $latestMsg->sender_id) {
-                    $preview = $latestMsg->body;
+                    $body = $latestMsg->body;
+                    if (str_starts_with($body, 'Project chat created')) {
+                        $body = 'Group chat created. Everyone in this event can message here.';
+                    }
+                    $preview = $body;
                 } elseif ($latestMsg->type === Message::TYPE_TASK || $latestMsg->task_id) {
                     $taskTitle = $latestMsg->task?->title ?? 'New Task';
                     $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
@@ -307,15 +311,66 @@ class ChatController extends Controller
             $allActiveMembers = $selectedChat->getActiveMembers();
             $readStates = ChatReadState::where('chat_id', $selectedChat->id)->get()->keyBy('user_id');
 
+            // Load relations to compute accurate Chapter 1 roles
+            $project->loadMissing([
+                'committees',
+                'coChairDesignations.committee',
+                'roleAssignments.committee',
+            ]);
+
             $participants = $allActiveMembers->map(function (User $u) use ($project, $readStates) {
-                $role = 'Member';
-                if ((int) $project->created_by === (int) $u->id) {
-                    $role = 'Project Leader';
+                $isOverallChair = (int) $project->created_by === (int) $u->id
+                    || $project->roleAssignments->contains(fn ($a) => (int) $a->user_id === (int) $u->id && $a->isLeader());
+
+                $eventCoChair = $project->coChairDesignations->first(
+                    fn ($d) => (int) $d->user_id === (int) $u->id && $d->committee_id === null
+                );
+
+                $committeeCoChair = $project->coChairDesignations->first(
+                    fn ($d) => (int) $d->user_id === (int) $u->id && $d->committee_id !== null
+                );
+
+                $staffAssignment = $project->roleAssignments->first(
+                    fn ($a) => (int) $a->user_id === (int) $u->id && $a->isStaff()
+                );
+
+                $memberAssignment = $project->roleAssignments->first(
+                    fn ($a) => (int) $a->user_id === (int) $u->id && $a->isMember()
+                );
+
+                if ($isOverallChair) {
+                    $role = 'Overall Chair';
+                    $roleLabel = 'Overall Chair';
+                    $roleType = 'overall_chair';
+                    $committeeName = null;
+                } elseif ($eventCoChair) {
+                    $role = 'Event Co-Chair';
+                    $roleLabel = 'Event Co-Chair';
+                    $roleType = 'event_co_chair';
+                    $committeeName = null;
+                } elseif ($committeeCoChair) {
+                    $commName = $committeeCoChair->committee?->name;
+                    $role = $commName ? "Committee Co-Chair · {$commName}" : 'Committee Co-Chair';
+                    $roleLabel = 'Committee Co-Chair';
+                    $roleType = 'committee_co_chair';
+                    $committeeName = $commName;
+                } elseif ($staffAssignment) {
+                    $commName = $staffAssignment->committee?->name;
+                    $role = $commName ? "Chairperson · {$commName}" : 'Chairperson';
+                    $roleLabel = 'Chairperson';
+                    $roleType = 'chairperson';
+                    $committeeName = $commName;
+                } elseif ($memberAssignment) {
+                    $commName = $memberAssignment->committee?->name;
+                    $role = $commName ? "Member · {$commName}" : 'Member';
+                    $roleLabel = 'Member';
+                    $roleType = 'member';
+                    $committeeName = $commName;
                 } else {
-                    $assignment = $project->roleAssignments->firstWhere('user_id', $u->id);
-                    if ($assignment) {
-                        $role = $assignment->role;
-                    }
+                    $role = 'Member';
+                    $roleLabel = 'Member';
+                    $roleType = 'member';
+                    $committeeName = null;
                 }
 
                 $userReadState = $readStates->get($u->id);
@@ -325,6 +380,9 @@ class ChatController extends Controller
                     'name' => $u->name,
                     'email' => $u->email,
                     'role' => $role,
+                    'role_label' => $roleLabel,
+                    'role_type' => $roleType,
+                    'committee_name' => $committeeName,
                     'is_online' => true,
                     'last_read_message_id' => $userReadState?->last_read_message_id,
                     'last_read_at' => $userReadState?->read_at?->toISOString(),
@@ -401,12 +459,8 @@ class ChatController extends Controller
         // Total unread count for sidebar
         $totalUnreadMessages = $chatItems->sum('unread_count');
 
-        // Current project members for @mentions and task assignment
-        $projectMembers = $selectedChat ? $selectedChat->getActiveMembers()->map(fn ($u) => [
-            'id' => $u->id,
-            'name' => $u->name,
-            'email' => $u->email,
-        ]) : [];
+        // Current event members for @mentions and task assignment (with roles)
+        $projectMembers = $participants ?? [];
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
             return response()->json([

@@ -42,12 +42,12 @@ class CoChairDesignation extends Model
 
     public function isEventLevel(): bool
     {
-        return $this->committee_id === null;
+        return is_null($this->committee_id);
     }
 
     public function isCommitteeLevel(): bool
     {
-        return $this->committee_id !== null;
+        return ! is_null($this->committee_id);
     }
 
     public function scopeEventLevel(Builder $query): Builder

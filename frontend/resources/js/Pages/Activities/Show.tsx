@@ -1765,7 +1765,7 @@ export default function ActivityShow({
                         setChecklistError(null);
                     }}
                     title={viewingTask?.title ?? 'Task Details'}
-                    description={`Activity: ${activity.title} • Committee: ${committee.name}`}
+                    description={`Deliverable: ${activity.title} • Committee: ${committee.name}`}
                     maxWidth="lg"
                 >
                     {viewingTask && (
@@ -1850,11 +1850,11 @@ export default function ActivityShow({
                                     <div className="flex items-start gap-2.5">
                                         <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                         <div className="space-y-0.5">
-                                            <p className="text-xs font-bold text-amber-900">Task is Under Staff Review</p>
+                                            <p className="text-xs font-bold text-amber-900">Task is Under Chairperson Review</p>
                                             <p className="text-[11px] text-amber-700">
                                                 {viewingTask.can.review
                                                     ? 'The assignee has submitted this task for verification.'
-                                                    : 'Awaiting review and approval by Project Staff.'}
+                                                    : 'Awaiting review and approval by Chairperson.'}
                                             </p>
                                         </div>
                                     </div>
@@ -2051,7 +2051,7 @@ export default function ActivityShow({
                                                                         ? item.is_completed
                                                                             ? 'Mark incomplete'
                                                                             : 'Mark complete'
-                                                                        : 'Only assigned personnel, Project Staff, or Leader can toggle checklist items'
+                                                                        : 'Only assigned personnel, Chairperson, or Overall Chair can toggle checklist items'
                                                                 }
                                                             >
                                                                 {item.is_completed && (
@@ -2395,8 +2395,8 @@ export default function ActivityShow({
                 <Modal
                     isOpen={isSubmitModalOpen}
                     onClose={() => !submitProcessing && setIsSubmitModalOpen(false)}
-                    title={activity.status === 'Returned for Revision' || activity.status === 'Returned' ? 'Resubmit Activity for Review' : 'Submit Activity for Review'}
-                    description={`Submit "${activity.title}" to Project Staff for verification and approval.`}
+                    title={activity.status === 'Returned for Revision' || activity.status === 'Returned' ? 'Resubmit Deliverable for Review' : 'Submit Deliverable for Review'}
+                    description={`Submit "${activity.title}" to Chairperson for verification and approval.`}
                     maxWidth="md"
                 >
                     <form onSubmit={handleSubmitActivity} className="space-y-4 pt-1">
@@ -2416,7 +2416,7 @@ export default function ActivityShow({
 
                         <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
                             <p>
-                                Submitting will change the activity status to <span className="font-semibold text-amber-700">Under Review</span>. Your committee head will be notified to review the completed tasks.
+                                Submitting will change the deliverable status to <span className="font-semibold text-amber-700">Under Review</span>. Your committee chairperson will be notified to review the completed tasks.
                             </p>
                         </div>
 
@@ -2446,15 +2446,15 @@ export default function ActivityShow({
                 <Modal
                     isOpen={isReviewCompleteModalOpen}
                     onClose={() => !reviewProcessing && setIsReviewCompleteModalOpen(false)}
-                    title="Mark Activity Completed"
+                    title="Mark Deliverable Completed"
                     description={`Approve and complete "${activity.title}".`}
                     maxWidth="md"
                 >
                     <form onSubmit={handleReviewSubmit} className="space-y-4 pt-1">
                         <div className="p-3.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-800 space-y-1">
-                            <p className="font-semibold">Confirm Activity Completion</p>
+                            <p className="font-semibold">Confirm Deliverable Completion</p>
                             <p>
-                                Marking this activity as Completed verifies that all required tasks and deliverables have been reviewed. Task completion states will remain preserved.
+                                Marking this deliverable as Completed verifies that all required tasks have been reviewed. Task completion states will remain preserved.
                             </p>
                         </div>
 
@@ -2485,7 +2485,7 @@ export default function ActivityShow({
                 <Modal
                     isOpen={isReviewReturnModalOpen}
                     onClose={() => !reviewProcessing && setIsReviewReturnModalOpen(false)}
-                    title="Return Activity for Revision"
+                    title="Return Deliverable for Revision"
                     description={`Provide feedback to committee members for revising "${activity.title}".`}
                     maxWidth="md"
                 >
@@ -2635,10 +2635,10 @@ export default function ActivityShow({
                             />
                             <div className="space-y-0.5">
                                 <Label htmlFor="create-task-requires-review" className="cursor-pointer font-medium text-slate-800">
-                                    Requires Staff Review
+                                    Requires Chairperson Review
                                 </Label>
                                 <p className="text-[11px] text-slate-500 leading-normal">
-                                    When enabled, this task must be submitted to Project Staff for review before it can be completed.
+                                    When enabled, this task must be submitted to Chairperson for review before it can be completed.
                                 </p>
                             </div>
                         </div>
@@ -2762,10 +2762,10 @@ export default function ActivityShow({
                                 />
                                 <div className="space-y-0.5">
                                     <Label htmlFor="edit-task-requires-review" className="cursor-pointer font-medium text-slate-800">
-                                        Requires Staff Review
+                                        Requires Chairperson Review
                                     </Label>
                                     <p className="text-[11px] text-slate-500 leading-normal">
-                                        When enabled, this task must be submitted to Project Staff for review before it can be completed.
+                                        When enabled, this task must be submitted to Chairperson for review before it can be completed.
                                     </p>
                                 </div>
                             </div>
@@ -2830,13 +2830,13 @@ export default function ActivityShow({
                 <Modal
                     isOpen={isEditActivityModalOpen}
                     onClose={() => !editActivityProcessing && setIsEditActivityModalOpen(false)}
-                    title="Edit Activity"
+                    title="Edit Deliverable"
                     description={`Update details for "${activity.title}".`}
                     maxWidth="md"
                 >
                     <form onSubmit={handleEditActivitySubmit} className="space-y-4 pt-1">
                         <FormField
-                            label="Activity Title"
+                            label="Deliverable Title"
                             id="edit-activity-title"
                             name="title"
                             value={editActivityData.title}
@@ -2926,7 +2926,7 @@ export default function ActivityShow({
                 <Modal
                     isOpen={isDeleteActivityModalOpen}
                     onClose={() => !actionProcessing && setIsDeleteActivityModalOpen(false)}
-                    title="Delete Activity"
+                    title="Delete Deliverable"
                     description={`Are you sure you want to remove "${activity.title}"?`}
                     maxWidth="md"
                 >
@@ -2934,7 +2934,7 @@ export default function ActivityShow({
                         <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
                             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                             <p>
-                                Deleting this activity will permanently remove all associated tasks ({activity.tasks.length}). This action cannot be undone.
+                                Deleting this deliverable will permanently remove all associated tasks ({activity.tasks.length}). This action cannot be undone.
                             </p>
                         </div>
                         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
@@ -2964,7 +2964,7 @@ export default function ActivityShow({
                     isOpen={submittingTask !== null}
                     onClose={() => !taskActionProcessing && setSubmittingTask(null)}
                     title="Submit Task for Review"
-                    description={`Submit "${submittingTask?.title}" to Project Staff for verification and approval.`}
+                    description={`Submit "${submittingTask?.title}" to Chairperson for verification and approval.`}
                     maxWidth="md"
                 >
                     <form onSubmit={handleSubmitTaskReview} className="space-y-4 pt-1">
@@ -2977,7 +2977,7 @@ export default function ActivityShow({
                                 value={submittingTaskNotes}
                                 onChange={(e) => setSubmittingTaskNotes(e.target.value)}
                                 className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
-                                placeholder="Explain completed work, deliverables, or notes for the staff reviewer..."
+                                placeholder="Explain completed work, deliverables, or notes for the reviewer..."
                             />
                             {taskActionError && (
                                 <p className="text-xs text-rose-600 mt-1 font-medium">{taskActionError}</p>
@@ -2986,7 +2986,7 @@ export default function ActivityShow({
 
                         <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-xs text-purple-800">
                             <p>
-                                Submitting will transition this task to <span className="font-semibold text-purple-900">Under Review</span>. Project Staff will review your submission and either approve it or return it for revision.
+                                Submitting will transition this task to <span className="font-semibold text-purple-900">Under Review</span>. The Chairperson will review your submission and either approve it or return it for revision.
                             </p>
                         </div>
 
