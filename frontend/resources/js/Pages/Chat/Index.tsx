@@ -396,6 +396,35 @@ export default function ChatIndex({
     const lastTypingWhisperRef = useRef<number>(0);
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Online presence tracking state (tracks real-time online members)
+    const [onlineUserIds, setOnlineUserIds] = useState<Set<number>>(() => {
+        const ids = new Set<number>();
+        if (currentUserId) {
+            ids.add(Number(currentUserId));
+        }
+        (activeChat?.participants || []).forEach((p) => {
+            if (p.is_online) {
+                ids.add(Number(p.id));
+            }
+        });
+        return ids;
+    });
+
+    useEffect(() => {
+        setOnlineUserIds((prev) => {
+            const next = new Set<number>();
+            if (currentUserId) {
+                next.add(Number(currentUserId));
+            }
+            (activeChat?.participants || []).forEach((p) => {
+                if (p.is_online || prev.has(Number(p.id))) {
+                    next.add(Number(p.id));
+                }
+            });
+            return next;
+        });
+    }, [activeChat?.id, activeChat?.participants, currentUserId]);
+
     const currentUserName = page.props.auth?.user?.name ?? 'Someone';
 
     // Broadcast typing whisper + server broadcast fallback
@@ -644,6 +673,43 @@ export default function ChatIndex({
         if (!activeChat) return;
 
         const ch = echo().private(`chat.${activeChat.id}`);
+
+        // 0. Presence Channel (Track real-time online/offline members)
+        try {
+            const presenceCh = echo().join(`chat.${activeChat.id}`);
+            if (presenceCh && typeof presenceCh.here === 'function') {
+                presenceCh
+                    .here((users: Array<{ id: number; name: string }>) => {
+                        setOnlineUserIds(() => {
+                            const next = new Set<number>();
+                            if (currentUserId) next.add(Number(currentUserId));
+                            if (Array.isArray(users)) {
+                                users.forEach((u) => {
+                                    if (u && u.id) next.add(Number(u.id));
+                                });
+                            }
+                            return next;
+                        });
+                    })
+                    .joining((user: { id: number; name: string }) => {
+                        if (user && user.id) {
+                            setOnlineUserIds((prev) => new Set([...prev, Number(user.id)]));
+                        }
+                    })
+                    .leaving((user: { id: number; name: string }) => {
+                        if (user && user.id) {
+                            setOnlineUserIds((prev) => {
+                                const next = new Set(prev);
+                                const leavingId = Number(user.id);
+                                if (leavingId !== Number(currentUserId)) {
+                                    next.delete(leavingId);
+                                }
+                                return next;
+                            });
+                        }
+                    });
+            }
+        } catch {}
 
         // 1. Message Sent
         ch.listen('.MessageSent', (data: any) => {
@@ -977,6 +1043,10 @@ export default function ChatIndex({
 
         // Reset conversation-specific drafts & transient UI states
         setMessageText('');
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '36px';
+            textareaRef.current.style.overflowY = 'hidden';
+        }
         setSelectedFile(null);
         setSendError(null);
         setMentionFilter(null);
@@ -1053,6 +1123,10 @@ export default function ChatIndex({
 
         // 3. Instantly clear composer inputs and anchor scroll to bottom
         setMessageText('');
+        if (textareaRef.current) {
+            textareaRef.current.style.height = '36px';
+            textareaRef.current.style.overflowY = 'hidden';
+        }
         setSelectedFile(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
         setTimeout(() => scrollToBottom('smooth'), 10);
@@ -1112,10 +1186,50 @@ export default function ChatIndex({
         }
     };
 
+    // Auto-adjust composer textarea height to fit content (expanding dynamically like Messenger)
+    const adjustTextareaHeight = useCallback(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        // Reset to auto first so scrollHeight accurately recalculates when text shrinks
+        textarea.style.height = 'auto';
+
+        const minHeight = 36;
+        const maxHeight = 180;
+        const scrollHeight = textarea.scrollHeight;
+
+        if (scrollHeight > maxHeight) {
+            textarea.style.height = `${maxHeight}px`;
+            textarea.style.overflowY = 'auto';
+        } else {
+            textarea.style.height = `${Math.max(scrollHeight, minHeight)}px`;
+            textarea.style.overflowY = 'hidden';
+        }
+    }, []);
+
+    // Sync textarea height whenever messageText changes
+    useEffect(() => {
+        adjustTextareaHeight();
+    }, [messageText, adjustTextareaHeight]);
+
     // Typing whisper trigger
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
         setMessageText(val);
+
+        // Immediate synchronous resize on every keystroke
+        const textarea = e.target;
+        textarea.style.height = 'auto';
+        const minHeight = 36;
+        const maxHeight = 180;
+        const scrollHeight = textarea.scrollHeight;
+        if (scrollHeight > maxHeight) {
+            textarea.style.height = `${maxHeight}px`;
+            textarea.style.overflowY = 'auto';
+        } else {
+            textarea.style.height = `${Math.max(scrollHeight, minHeight)}px`;
+            textarea.style.overflowY = 'hidden';
+        }
 
         // Check for @ mention trigger
         const cursorPos = e.target.selectionStart;
@@ -2405,8 +2519,8 @@ export default function ChatIndex({
                                                         ? 'This event is archived. Messages are read-only.'
                                                         : 'Write a message. Use @ to mention someone'
                                                 }
-                                                className="w-full px-3.5 py-2.5 text-xs bg-transparent text-[color:var(--text)] outline-none resize-none leading-relaxed placeholder:text-[color:var(--muted)] disabled:opacity-50"
-                                                style={{ maxHeight: '120px' }}
+                                                className="w-full px-3.5 py-2 text-xs bg-transparent text-[color:var(--text)] outline-none resize-none leading-relaxed placeholder:text-[color:var(--muted)] disabled:opacity-50 block"
+                                                style={{ minHeight: '36px', maxHeight: '180px', height: '36px', overflowY: 'hidden' }}
                                                 aria-label="Message input"
                                             />
                                         </div>
@@ -2534,6 +2648,7 @@ export default function ChatIndex({
                                     <div className="space-y-2">
                                         {participants.map((member) => {
                                             const roleBadge = getMemberRoleBadge(member.role || member.role_label);
+                                            const isOnline = onlineUserIds.has(Number(member.id));
                                             return (
                                                 <div
                                                     key={member.id}
@@ -2556,8 +2671,10 @@ export default function ChatIndex({
                                                     </div>
 
                                                     <span
-                                                        className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"
-                                                        title="Active"
+                                                        className={`w-2 h-2 rounded-full shrink-0 transition-colors ${
+                                                            isOnline ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-500'
+                                                        }`}
+                                                        title={isOnline ? 'Online' : 'Offline'}
                                                     />
                                                 </div>
                                             );

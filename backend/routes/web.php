@@ -14,6 +14,7 @@ use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -172,6 +173,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // Logout
 Route::match(['get', 'post'], '/logout', function (Request $request) {
+    if ($user = Auth::user()) {
+        Cache::forget("user_online_{$user->id}");
+    }
     Auth::logout();
 
     $request->session()->invalidate();
