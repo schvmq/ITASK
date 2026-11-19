@@ -35,6 +35,7 @@ import {
     Lock,
     UserCheck,
     Plus,
+    Loader2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/Components/ui/avatar';
 import { Button } from '@/Components/Button';
@@ -130,7 +131,7 @@ export const renderMessageTextWithMentions = (text: string) => {
             return (
                 <span
                     key={index}
-                    className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] mx-0.5 ${badgeClass}`}
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[11px] mx-0.5 select-text ${badgeClass}`}
                 >
                     {part}
                 </span>
@@ -288,9 +289,9 @@ function getCsrfHeader(): Record<string, string> {
 // ─── Main Chat Component ────────────────────────────────────────────────────
 
 export default function ChatIndex({
-    chats: propChats = [],
-    archivedChats: propArchivedChats = [],
-    conversations: propConversations = [],
+    chats: propChats,
+    archivedChats: propArchivedChats,
+    conversations: propConversations,
     activeChat: propActiveChat,
     activeConversation: propActiveConversation,
     messages: initialMessages = [],
@@ -300,15 +301,22 @@ export default function ChatIndex({
 }: ChatPageProps) {
     const page = usePage<any>();
     const currentUserId = authUserId ?? page.props.auth?.user?.id;
+    const currentUserIdNum = currentUserId !== undefined && currentUserId !== null ? Number(currentUserId) : null;
 
     // Normalize active chat and chat lists
     const activeChat = propActiveChat ?? propActiveConversation ?? null;
-    const initialChats = propChats.length > 0 ? propChats : propConversations;
+    const initialChats = (propChats && propChats.length > 0)
+        ? propChats
+        : ((propConversations && propConversations.length > 0) ? propConversations : (propChats ?? propConversations ?? []));
 
     const [chats, setChats] = useState<ChatItem[]>(initialChats);
-    const [archivedChats, setArchivedChats] = useState<ChatItem[]>(propArchivedChats);
+    const [archivedChats, setArchivedChats] = useState<ChatItem[]>(propArchivedChats ?? []);
     const [messages, setMessages] = useState<MessageItem[]>(initialMessages);
     const [participants, setParticipants] = useState<Participant[]>(activeChat?.participants ?? []);
+
+    // Conversation switching in progress (prevents flickering and preserves UI)
+    const [isSwitchingChat, setIsSwitchingChat] = useState(false);
+    const switchingProjectIdRef = useRef<number | null>(null);
 
     // Composer State
     const [messageText, setMessageText] = useState('');
@@ -377,8 +385,11 @@ export default function ChatIndex({
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-    // Track latest message ID marked as read
-    const lastMarkedReadIdRef = useRef<number | null>(null);
+    // Track read receipts per conversation to prevent duplicate / concurrent requests
+    const inFlightChatIdsRef = useRef<Set<number>>(new Set());
+    const lastConfirmedReadMapRef = useRef<Map<number, number>>(new Map());
+    const pendingReadMapRef = useRef<Map<number, number>>(new Map());
+    const activeChatIdRef = useRef<number | null>(activeChat?.id ?? null);
 
     // Real-time typing indicators state
     const [typingUsers, setTypingUsers] = useState<Record<number, { name: string; timeout: ReturnType<typeof setTimeout> }>>({});
@@ -416,14 +427,21 @@ export default function ChatIndex({
     );
 
     const connectionStatus = useConnectionStatus();
+    const isWsConnected = connectionStatus === 'connected';
 
-    // Sync incoming props
+    // Sync incoming props (only update lists when server explicitly delivers them)
     useEffect(() => {
-        setChats(initialChats);
-    }, [initialChats]);
+        if (propChats !== undefined) {
+            setChats(propChats);
+        } else if (propConversations !== undefined) {
+            setChats(propConversations);
+        }
+    }, [propChats, propConversations]);
 
     useEffect(() => {
-        setArchivedChats(propArchivedChats);
+        if (propArchivedChats !== undefined) {
+            setArchivedChats(propArchivedChats);
+        }
     }, [propArchivedChats]);
 
     useEffect(() => {
@@ -499,16 +517,29 @@ export default function ChatIndex({
         setHasUnreadBelow(false);
     };
 
-    // Mark messages as read in real-time
+    // Mark messages as read in real-time with per-conversation coordination
     const markMessageAsRead = useCallback(
-        (messageId: number) => {
-            if (!activeChat) return;
+        (messageId: number, targetChatIdParam?: number) => {
+            const targetChatId = targetChatIdParam ?? activeChat?.id;
+            if (!targetChatId) return;
             if (document.visibilityState !== 'visible') return;
-            if (lastMarkedReadIdRef.current !== null && lastMarkedReadIdRef.current >= messageId) return;
 
-            lastMarkedReadIdRef.current = messageId;
+            // Value tracking: do not dispatch if already confirmed as read
+            const lastConfirmed = lastConfirmedReadMapRef.current.get(targetChatId);
+            if (lastConfirmed !== undefined && lastConfirmed >= messageId) return;
 
-            axios.post(`/chat/${activeChat.id}/read`, {
+            // In-flight request tracking: do not dispatch duplicate concurrent request for this conversation
+            if (inFlightChatIdsRef.current.has(targetChatId)) {
+                const currentPending = pendingReadMapRef.current.get(targetChatId) ?? 0;
+                if (messageId > currentPending) {
+                    pendingReadMapRef.current.set(targetChatId, messageId);
+                }
+                return;
+            }
+
+            inFlightChatIdsRef.current.add(targetChatId);
+
+            axios.post(`/chat/${targetChatId}/read`, {
                 last_read_message_id: messageId,
             }, {
                 headers: getCsrfHeader(),
@@ -516,34 +547,67 @@ export default function ChatIndex({
                 .then((res) => {
                     const data = res.data;
                     if (data?.success) {
-                        setParticipants((prev) =>
-                            prev.map((p) =>
-                                p.id === currentUserId
-                                    ? {
-                                          ...p,
-                                          last_read_message_id: data.last_read_message_id,
-                                          last_read_at: data.read_at,
-                                      }
-                                    : p
-                            )
-                        );
-                        // Decrement unread count locally for this chat
+                        const savedId = (typeof data.last_read_message_id === 'number')
+                            ? data.last_read_message_id
+                            : messageId;
+                        lastConfirmedReadMapRef.current.set(targetChatId, savedId);
+
+                        // Decrement unread count locally for this specific chat
                         setChats((prev) =>
                             prev.map((c) =>
-                                c.id === activeChat.id ? { ...c, unread_count: 0 } : c
+                                c.id === targetChatId ? { ...c, unread_count: 0 } : c
                             )
                         );
+
+                        // Only update active participants if this chat is STILL the active chat
+                        if (activeChatIdRef.current === targetChatId) {
+                            setParticipants((prev) =>
+                                prev.map((p) =>
+                                    p.id === currentUserId
+                                        ? {
+                                              ...p,
+                                              last_read_message_id: savedId,
+                                              last_read_at: data.read_at,
+                                          }
+                                        : p
+                                )
+                            );
+                        }
                     }
                 })
-                .catch(() => {});
+                .catch(() => {
+                    // Do not mark as confirmed on failure so subsequent interactions can retry
+                })
+                .finally(() => {
+                    inFlightChatIdsRef.current.delete(targetChatId);
+
+                    // If a newer message arrived while this request was in flight, dispatch it
+                    const pendingId = pendingReadMapRef.current.get(targetChatId);
+                    if (pendingId !== undefined) {
+                        pendingReadMapRef.current.delete(targetChatId);
+                        const confirmed = lastConfirmedReadMapRef.current.get(targetChatId) ?? 0;
+                        if (pendingId > confirmed && activeChatIdRef.current === targetChatId) {
+                            markMessageAsRead(pendingId, targetChatId);
+                        }
+                    }
+                });
         },
         [activeChat?.id, currentUserId]
     );
 
-    // Reset read marker tracker when switching active chats
+    // Synchronize active chat ID ref and seed confirmed read map from active chat participants
     useEffect(() => {
-        lastMarkedReadIdRef.current = null;
-    }, [activeChat?.id]);
+        activeChatIdRef.current = activeChat?.id ?? null;
+        if (activeChat?.id && activeChat.participants) {
+            const currentUserPart = activeChat.participants.find((p) => p.id === currentUserId);
+            if (currentUserPart?.last_read_message_id != null) {
+                const prev = lastConfirmedReadMapRef.current.get(activeChat.id) ?? 0;
+                if (currentUserPart.last_read_message_id > prev) {
+                    lastConfirmedReadMapRef.current.set(activeChat.id, currentUserPart.last_read_message_id);
+                }
+            }
+        }
+    }, [activeChat?.id, activeChat?.participants, currentUserId]);
 
     // Auto-mark latest message as read when active chat is mounted or updated
     useEffect(() => {
@@ -774,11 +838,12 @@ export default function ChatIndex({
 
     // Resilient fallback sync if websocket disconnected or reconnecting
     useEffect(() => {
-        if (!activeChat || connectionStatus === 'connected') {
+        if (!activeChat || isWsConnected) {
             return;
         }
 
         const activeChatId = activeChat.id;
+        const targetProjectId = activeChat.project_id || activeChat.id;
         let isMounted = true;
         let timeoutId: ReturnType<typeof setTimeout> | null = null;
         let abortController: AbortController | null = null;
@@ -802,7 +867,7 @@ export default function ChatIndex({
             abortController = new AbortController();
 
             try {
-                const res = await axios.get(`/chat/${activeChatId}`, {
+                const res = await axios.get(`/chat/${targetProjectId}`, {
                     signal: abortController.signal,
                     headers: {
                         Accept: 'application/json',
@@ -816,13 +881,8 @@ export default function ChatIndex({
                 }
 
                 const data = res.data;
-                if (data?.messages) {
-                    setMessages((prev) => {
-                        const existingIds = new Set(prev.map((m) => m.id));
-                        const toAdd = data.messages.filter((m: any) => !existingIds.has(m.id));
-                        if (toAdd.length === 0) return prev;
-                        return [...prev, ...toAdd];
-                    });
+                if (data?.messages && Array.isArray(data.messages)) {
+                    setMessages(data.messages);
                 }
                 if (data?.active_chat?.participants) {
                     setParticipants(data.active_chat.participants);
@@ -842,7 +902,7 @@ export default function ChatIndex({
                 abortController = null;
 
                 // Schedule next poll strictly after this one settles, if conditions still hold
-                if (isMounted && activeChat.id === activeChatId && connectionStatus !== 'connected') {
+                if (isMounted && activeChat.id === activeChatId && !isWsConnected) {
                     if (typeof document === 'undefined' || document.visibilityState === 'visible') {
                         scheduleNextPoll(CHAT_FALLBACK_POLL_INTERVAL_MS);
                     }
@@ -852,7 +912,7 @@ export default function ChatIndex({
 
         // Visibility listener: pause polling when tab is hidden, resume when visible
         const handleVisibilityChange = () => {
-            if (!isMounted || connectionStatus === 'connected') return;
+            if (!isMounted || isWsConnected) return;
 
             if (document.visibilityState === 'visible') {
                 if (!isPolling && timeoutId === null) {
@@ -868,8 +928,8 @@ export default function ChatIndex({
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // Schedule initial fallback request after the configured interval
-        scheduleNextPoll(CHAT_FALLBACK_POLL_INTERVAL_MS);
+        // Schedule initial fallback request (1.5s initial check if disconnected, then regular interval)
+        scheduleNextPoll(1500);
 
         return () => {
             isMounted = false;
@@ -883,7 +943,7 @@ export default function ChatIndex({
             }
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [activeChat?.id, connectionStatus]);
+    }, [activeChat?.id, activeChat?.project_id, isWsConnected]);
 
     // Total unread count across all project chats
     const totalUnreadCount = useMemo(() => {
@@ -905,13 +965,40 @@ export default function ChatIndex({
         });
     }, [chats, searchQuery, filterTab]);
 
-    // Switch chat
+    // Switch chat (fast partial reload preserving layout, sidebar, filters, and drafts)
     const handleSelectChat = (projectId: number) => {
+        if (activeChat?.project_id === projectId) {
+            setShowMobileThread(true);
+            return;
+        }
+
+        switchingProjectIdRef.current = projectId;
+        setIsSwitchingChat(true);
+
+        // Reset conversation-specific drafts & transient UI states
+        setMessageText('');
+        setSelectedFile(null);
+        setSendError(null);
+        setMentionFilter(null);
+        setMentionCursorIndex(-1);
+        setUndoMessageId(null);
+        setOpenMenuMessageId(null);
+        setIsAccessRevoked(false);
+
         router.visit(`/messages/${projectId}`, {
-            preserveState: false,
+            only: ['activeChat', 'activeConversation', 'messages', 'projectMembers'],
+            preserveState: true,
             preserveScroll: true,
+            onSuccess: () => {
+                setShowMobileThread(true);
+            },
+            onFinish: () => {
+                if (switchingProjectIdRef.current === projectId) {
+                    setIsSwitchingChat(false);
+                    switchingProjectIdRef.current = null;
+                }
+            },
         });
-        setShowMobileThread(true);
     };
 
     // Send message (Instant optimistic dispatch without loading screen)
@@ -1243,7 +1330,9 @@ export default function ChatIndex({
             const canGroup =
                 prevGroup &&
                 !prevGroup.isSystem &&
-                prevGroup.senderId === msg.sender_id &&
+                prevGroup.senderId !== null &&
+                msg.sender_id !== null &&
+                Number(prevGroup.senderId) === Number(msg.sender_id) &&
                 !dateDivider;
 
             if (canGroup) {
@@ -1272,20 +1361,21 @@ export default function ChatIndex({
 
     // Find the very latest message sent by current user to display read receipts
     const myLatestMessageId = useMemo(() => {
+        if (currentUserIdNum === null) return null;
         for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].sender_id === currentUserId && !messages[i].is_deleted) {
+            if (messages[i].sender_id !== null && Number(messages[i].sender_id) === currentUserIdNum && !messages[i].is_deleted) {
                 return messages[i].id;
             }
         }
         return null;
-    }, [messages, currentUserId]);
+    }, [messages, currentUserIdNum]);
 
     return (
-        <AppLayout hidePageHeadingBanner={true}>
+        <AppLayout hidePageHeadingBanner={true} pageKey="messages">
             <Head title={activeChat ? `${activeChat.title} — Chat` : 'Messages — ITASK'} />
 
             {/* ══ Full-Width Unified Messages Layout (Scoped under .messaging-root) ════ */}
-            <div className="messaging-root messaging-shell w-full h-full min-h-0 flex overflow-hidden bg-[color:var(--card)] select-none">
+            <div className="messaging-root messaging-shell w-full h-full min-h-0 flex overflow-hidden bg-[color:var(--card)]">
 
                 {/* ─────────────────────────────────────────────────────────────
                    PANE 1: CONVERSATION LIST (320px fixed, hidden on mobile thread)
@@ -1392,7 +1482,9 @@ export default function ChatIndex({
                                 </div>
                             ) : (
                                 filteredChats.map((chat) => {
-                                    const isSelected = activeChat?.id === chat.id;
+                                    const isSelected = switchingProjectIdRef.current !== null
+                                        ? (chat.project_id === switchingProjectIdRef.current || chat.id === switchingProjectIdRef.current)
+                                        : (activeChat?.id === chat.id || activeChat?.project_id === chat.project_id);
                                     const hasUnread = chat.unread_count > 0;
 
                                     return (
@@ -1491,7 +1583,9 @@ export default function ChatIndex({
                                     {isArchivedSectionOpen && (
                                         <div className="space-y-1 pt-1 pl-1">
                                             {archivedChats.map((archived) => {
-                                                const isSelected = activeChat?.id === archived.id;
+                                                const isSelected = switchingProjectIdRef.current !== null
+                                                    ? (archived.project_id === switchingProjectIdRef.current || archived.id === switchingProjectIdRef.current)
+                                                    : (activeChat?.id === archived.id || activeChat?.project_id === archived.project_id);
                                                 return (
                                                     <button
                                                         key={archived.id}
@@ -1533,6 +1627,15 @@ export default function ChatIndex({
                         }`}
                         aria-label="Chat thread"
                     >
+                        {/* Conversation Switching Loading Overlay */}
+                        {isSwitchingChat && (
+                            <div className="absolute inset-0 bg-[color:var(--card)]/60 backdrop-blur-[1px] flex items-center justify-center z-30 pointer-events-none transition-opacity duration-150">
+                                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-[color:var(--surface)] border border-[color:var(--border)] shadow-md text-xs font-semibold text-[color:var(--text)]">
+                                    <Loader2 className="w-4 h-4 animate-spin text-[color:var(--primary)]" />
+                                    <span>Loading conversation...</span>
+                                </div>
+                            </div>
+                        )}
                         {/* Access Revoked Overlay State (Requirement 1.2) */}
                         {isAccessRevoked ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4 bg-[color:var(--card)] animate-backdrop-in">
@@ -1732,13 +1835,16 @@ export default function ChatIndex({
                                                     </div>
                                                 ) : (
                                                     /* User Message Group (Grouped consecutive bubbles) */
+                                                    (() => {
+                                                        const isGroupMine = group.senderId !== null && Number(group.senderId) === currentUserIdNum;
+                                                        return (
                                                     <div
-                                                        className={`flex gap-2.5 ${
-                                                            group.senderId === currentUserId ? 'justify-end' : 'justify-start'
+                                                        className={`flex w-full gap-2.5 ${
+                                                            isGroupMine ? 'justify-end' : 'justify-start'
                                                         }`}
                                                     >
                                                         {/* Avatar for other senders (Aligned to first bubble) */}
-                                                        {group.senderId !== currentUserId && (
+                                                        {!isGroupMine && (
                                                             <div className="w-8 h-8 rounded-xl bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] font-extrabold flex items-center justify-center text-xs shrink-0 select-none shadow-xs mt-1">
                                                                 {getInitials(group.sender?.name ?? 'Member')}
                                                             </div>
@@ -1746,11 +1852,11 @@ export default function ChatIndex({
 
                                                         <div
                                                             className={`flex flex-col space-y-1 max-w-[70%] max-[640px]:max-w-[88%] ${
-                                                                group.senderId === currentUserId ? 'items-end' : 'items-start'
+                                                                isGroupMine ? 'items-end' : 'items-start'
                                                             }`}
                                                         >
                                                             {/* Sender Name on first bubble for others */}
-                                                            {group.senderId !== currentUserId && (
+                                                            {!isGroupMine && (
                                                                 <span className="text-[11px] font-bold text-[color:var(--muted)] px-1">
                                                                     {group.sender?.name ?? 'Teammate'}
                                                                 </span>
@@ -1758,7 +1864,7 @@ export default function ChatIndex({
 
                                                             {/* Message Bubbles (4px spacing scale) */}
                                                             {group.items.map((msg, itemIdx) => {
-                                                                const isMine = msg.sender_id === currentUserId;
+                                                                const isMine = msg.sender_id !== null && Number(msg.sender_id) === currentUserIdNum;
                                                                 const isLastInGroup = itemIdx === group.items.length - 1;
                                                                 const isFirstInGroup = itemIdx === 0;
 
@@ -1768,13 +1874,25 @@ export default function ChatIndex({
                                                                 return (
                                                                     <div
                                                                         key={msg.id}
-                                                                        className="relative group/msg flex flex-col msg-bubble-anim"
+                                                                        className={`relative group/msg flex flex-col msg-bubble-anim ${
+                                                                            isMine ? 'items-end self-end' : 'items-start self-start'
+                                                                        }`}
                                                                         style={{ marginTop: isFirstInGroup ? 0 : '4px' }}
                                                                     >
-                                                                        <div className="flex items-center gap-1.5">
-                                                                            {/* Message action buttons for current user (left of bubble) */}
-                                                                            {!msg.is_deleted && (
-                                                                                <div className="msg-action-menu-container relative flex items-center gap-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                                                                        <div
+                                                                            className={`relative flex items-center ${
+                                                                                isMine ? 'justify-end flex-row' : 'justify-start flex-row'
+                                                                            }`}
+                                                                        >
+                                                                            {/* Message action buttons for current user (left of bubble, absolute, 0 reserved space) */}
+                                                                            {isMine && !msg.is_deleted && (
+                                                                                <div
+                                                                                    className={`msg-action-menu-container absolute right-full mr-1.5 flex items-center gap-1 transition-opacity shrink-0 select-none z-10 ${
+                                                                                        openMenuMessageId === msg.id
+                                                                                            ? 'opacity-100 pointer-events-auto'
+                                                                                            : 'opacity-0 group-hover/msg:opacity-100 pointer-events-none group-hover/msg:pointer-events-auto'
+                                                                                    }`}
+                                                                                >
                                                                                     {/* Quick direct create task button */}
                                                                                     {msg.body && !msg.task_id && (
                                                                                         <button
@@ -1808,7 +1926,7 @@ export default function ChatIndex({
                                                                                             </button>
 
                                                                                             {openMenuMessageId === msg.id && (
-                                                                                                <div className="absolute left-0 bottom-full mb-1 w-44 bg-[color:var(--card)] border border-[color:var(--border)] rounded-xl shadow-xl p-1 z-30 animate-modal-in select-none">
+                                                                                                <div className="absolute right-0 bottom-full mb-1 w-44 bg-[color:var(--card)] border border-[color:var(--border)] rounded-xl shadow-xl p-1 z-30 animate-modal-in select-none">
                                                                                                     {msg.body && !msg.task_id && (
                                                                                                         <button
                                                                                                             type="button"
@@ -1845,12 +1963,12 @@ export default function ChatIndex({
 
                                                                             {/* Message Bubble */}
                                                                             <div
-                                                                                className={`px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-2xs break-words [overflow-wrap:anywhere] msg-interactive ${
+                                                                                className={`px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-2xs break-words [overflow-wrap:anywhere] select-text ${
                                                                                     msg.is_deleted
                                                                                         ? 'italic bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)]'
                                                                                         : isMine
-                                                                                        ? 'bg-[color:var(--primary)] text-white font-normal rounded-tr-xs shadow-xs'
-                                                                                        : 'bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-tl-xs'
+                                                                                        ? 'msg-bubble-sent bg-[color:var(--primary)] text-white font-normal rounded-tr-xs shadow-xs'
+                                                                                        : 'msg-bubble-received bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-tl-xs'
                                                                                 }`}
                                                                             >
                                                                                 {msg.is_deleted ? (
@@ -1859,7 +1977,7 @@ export default function ChatIndex({
                                                                                     <>
                                                                                         {/* Text Body */}
                                                                                         {msg.body && !msg.task_id && (
-                                                                                            <p className="whitespace-pre-wrap">
+                                                                                            <p className="whitespace-pre-wrap select-text cursor-text">
                                                                                                 {renderMessageTextWithMentions(msg.body)}
                                                                                             </p>
                                                                                         )}
@@ -1949,9 +2067,15 @@ export default function ChatIndex({
                                                                                 )}
                                                                             </div>
 
-                                                                            {/* Message action buttons for other senders (right of bubble) */}
-                                                                            {!msg.is_deleted && (
-                                                                                <div className="msg-action-menu-container relative flex items-center gap-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                                                                            {/* Message action buttons for other senders (right of bubble, absolute, 0 reserved space) */}
+                                                                            {!isMine && !msg.is_deleted && (
+                                                                                <div
+                                                                                    className={`msg-action-menu-container absolute left-full ml-1.5 flex items-center gap-1 transition-opacity shrink-0 select-none z-10 ${
+                                                                                        openMenuMessageId === msg.id
+                                                                                            ? 'opacity-100 pointer-events-auto'
+                                                                                            : 'opacity-0 group-hover/msg:opacity-100 pointer-events-none group-hover/msg:pointer-events-auto'
+                                                                                    }`}
+                                                                                >
                                                                                     {/* Quick direct create task button */}
                                                                                     {msg.body && !msg.task_id && (
                                                                                         <button
@@ -1985,7 +2109,7 @@ export default function ChatIndex({
                                                                                             </button>
 
                                                                                             {openMenuMessageId === msg.id && (
-                                                                                                <div className="absolute right-0 bottom-full mb-1 w-44 bg-[color:var(--card)] border border-[color:var(--border)] rounded-xl shadow-xl p-1 z-30 animate-modal-in select-none">
+                                                                                                <div className="absolute left-0 bottom-full mb-1 w-44 bg-[color:var(--card)] border border-[color:var(--border)] rounded-xl shadow-xl p-1 z-30 animate-modal-in select-none">
                                                                                                     {msg.body && !msg.task_id && (
                                                                                                         <button
                                                                                                             type="button"
@@ -2043,7 +2167,7 @@ export default function ChatIndex({
                                                                                         isMine={isMine}
                                                                                         isDirect={participants.length <= 2}
                                                                                         participants={participants}
-                                                                                        currentUserId={currentUserId}
+                                                                                        currentUserId={currentUserIdNum ?? 0}
                                                                                     />
                                                                                 )}
                                                                             </div>
@@ -2053,6 +2177,8 @@ export default function ChatIndex({
                                                             })}
                                                         </div>
                                                     </div>
+                                                        );
+                                                    })()
                                                 )}
                                             </React.Fragment>
                                         ))
@@ -2341,9 +2467,19 @@ export default function ChatIndex({
                        ───────────────────────────────────────────────────────────── */}
                     {activeChat && (
                         <div
-                            className="msg-pane-details shrink-0 border-l border-[color:var(--border)] flex-col h-full bg-[color:var(--card)] overflow-hidden select-none"
+                            className="msg-pane-details shrink-0 border-l border-[color:var(--border)] flex flex-col h-full bg-[color:var(--card)] overflow-hidden select-none relative"
                             aria-label="Event details"
                         >
+                            {/* Details Switching Loading Overlay */}
+                            {isSwitchingChat && (
+                                <div className="absolute inset-0 bg-[color:var(--card)]/60 backdrop-blur-[1px] flex items-center justify-center z-30 pointer-events-none transition-opacity duration-150">
+                                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[color:var(--surface)] border border-[color:var(--border)] shadow-sm text-xs font-semibold text-[color:var(--muted)]">
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[color:var(--primary)]" />
+                                        <span>Updating...</span>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Panel Header */}
                             <div className="p-4 border-b border-[color:var(--border)] shrink-0 space-y-2">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--muted)]">

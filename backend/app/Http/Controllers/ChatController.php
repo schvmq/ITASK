@@ -43,140 +43,158 @@ class ChatController extends Controller
     {
         $user = $request->user();
 
-        // 1. Fetch all active projects where the user is a member
-        $projects = Project::query()
-            ->whereNull('deleted_at')
-            ->where(function ($q) use ($user) {
-                $q->where('created_by', $user->id)
-                    ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $user->id));
-            })
-            ->with([
-                'chat.latestMessage.sender:id,name,email',
-                'chat.latestMessage.task',
-                'roleAssignments.user:id,name,email',
-                'creator:id,name,email',
-            ])
-            ->get();
-
-        // 2. Map and ensure each project has exactly one group chat (idempotent)
-        $chatItems = $projects->map(function (Project $project) use ($user) {
-            $chat = $project->chat;
-
-            if (! $chat) {
-                $chat = Chat::create([
-                    'project_id' => $project->id,
-                    'archived_at' => $project->status === Project::STATUS_ARCHIVED ? now() : null,
-                ]);
-
-                $chat->messages()->create([
-                    'sender_id' => null,
-                    'type' => Message::TYPE_SYSTEM,
-                    'body' => 'Group chat created. Everyone in this event can message here.',
-                ]);
-
-                $chat->load('latestMessage');
+        // Lazy-loaded sidebar data closure (evaluated only when sidebar props are requested)
+        $sidebarData = null;
+        $getSidebarData = function () use (&$sidebarData, $user) {
+            if ($sidebarData !== null) {
+                return $sidebarData;
             }
 
-            // Read state for this user in this chat
-            $readState = ChatReadState::where('chat_id', $chat->id)
-                ->where('user_id', $user->id)
-                ->first();
-
-            $lastReadMsgId = $readState?->last_read_message_id;
-            $lastReadAt = $readState?->read_at;
-
-            // Unread count: only messages from other users or system messages after last read
-            $unreadCount = $chat->messages()
-                ->where(function ($mq) use ($user) {
-                    $mq->where('sender_id', '!=', $user->id)
-                       ->orWhereNull('sender_id');
+            // 1. Fetch all active projects where the user is a member
+            $projects = Project::query()
+                ->whereNull('deleted_at')
+                ->where(function ($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                        ->orWhereHas('roleAssignments', fn ($rq) => $rq->where('user_id', $user->id));
                 })
-                ->when($lastReadMsgId, function ($query, $lastReadMsgId) {
-                    return $query->where('id', '>', $lastReadMsgId);
-                }, function ($query) use ($lastReadAt) {
-                    return $query->when($lastReadAt, fn ($q) => $q->where('created_at', '>', $lastReadAt));
-                })
-                ->count();
+                ->with([
+                    'chat.latestMessage.sender:id,name,email',
+                    'chat.latestMessage.task',
+                    'roleAssignments.user:id,name,email',
+                    'creator:id,name,email',
+                ])
+                ->get();
 
-            // Preferences: is_pinned, is_muted
-            $pref = ChatUserPreference::where('chat_id', $chat->id)
-                ->where('user_id', $user->id)
-                ->first();
+            // 2. Map and ensure each project has exactly one group chat (idempotent)
+            $chatItems = $projects->map(function (Project $project) use ($user) {
+                $chat = $project->chat;
 
-            $isPinned = $pref?->is_pinned ?? false;
-            $isMuted = $pref?->is_muted ?? false;
+                if (! $chat) {
+                    $chat = Chat::create([
+                        'project_id' => $project->id,
+                        'archived_at' => $project->status === Project::STATUS_ARCHIVED ? now() : null,
+                    ]);
 
-            // Active members count
-            $memberCount = $project->roleAssignments->pluck('user_id')
-                ->push($project->created_by)
-                ->unique()
-                ->count();
+                    $chat->messages()->create([
+                        'sender_id' => null,
+                        'type' => Message::TYPE_SYSTEM,
+                        'body' => 'Group chat created. Everyone in this event can message here.',
+                    ]);
 
-            // Format preview text
-            $latestMsg = $chat->latestMessage;
-            $preview = 'No messages yet';
-            $previewTime = null;
-            $isDeleted = false;
+                    $chat->load('latestMessage');
+                }
 
-            if ($latestMsg) {
-                $isDeleted = $latestMsg->trashed();
-                $previewTime = $latestMsg->created_at->toISOString();
+                // Read state for this user in this chat
+                $readState = ChatReadState::where('chat_id', $chat->id)
+                    ->where('user_id', $user->id)
+                    ->first();
 
-                if ($isDeleted) {
-                    $preview = 'This message was deleted';
-                } elseif ($latestMsg->type === Message::TYPE_SYSTEM || ! $latestMsg->sender_id) {
-                    $body = $latestMsg->body;
-                    if (str_starts_with($body, 'Project chat created')) {
-                        $body = 'Group chat created. Everyone in this event can message here.';
+                $lastReadMsgId = $readState?->last_read_message_id;
+                $lastReadAt = $readState?->read_at;
+
+                // Unread count: only messages from other users or system messages after last read
+                $unreadCount = $chat->messages()
+                    ->where(function ($mq) use ($user) {
+                        $mq->where('sender_id', '!=', $user->id)
+                           ->orWhereNull('sender_id');
+                    })
+                    ->when($lastReadMsgId, function ($query, $lastReadMsgId) {
+                        return $query->where('id', '>', $lastReadMsgId);
+                    }, function ($query) use ($lastReadAt) {
+                        return $query->when($lastReadAt, fn ($q) => $q->where('created_at', '>', $lastReadAt));
+                    })
+                    ->count();
+
+                // Preferences: is_pinned, is_muted
+                $pref = ChatUserPreference::where('chat_id', $chat->id)
+                    ->where('user_id', $user->id)
+                    ->first();
+
+                $isPinned = $pref?->is_pinned ?? false;
+                $isMuted = $pref?->is_muted ?? false;
+
+                // Active members count
+                $memberCount = $project->roleAssignments->pluck('user_id')
+                    ->push($project->created_by)
+                    ->unique()
+                    ->count();
+
+                // Format preview text
+                $latestMsg = $chat->latestMessage;
+                $preview = 'No messages yet';
+                $previewTime = null;
+                $isDeleted = false;
+
+                if ($latestMsg) {
+                    $isDeleted = $latestMsg->trashed();
+                    $previewTime = $latestMsg->created_at->toISOString();
+
+                    if ($isDeleted) {
+                        $preview = 'This message was deleted';
+                    } elseif ($latestMsg->type === Message::TYPE_SYSTEM || ! $latestMsg->sender_id) {
+                        $body = $latestMsg->body;
+                        if (str_starts_with($body, 'Project chat created')) {
+                            $body = 'Group chat created. Everyone in this event can message here.';
+                        }
+                        $preview = $body;
+                    } elseif ($latestMsg->type === Message::TYPE_TASK || $latestMsg->task_id) {
+                        $taskTitle = $latestMsg->task?->title ?? 'New Task';
+                        $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
+                        $preview = "{$senderName} assigned task: {$taskTitle}";
+                    } elseif ($latestMsg->attachment_name) {
+                        $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
+                        $preview = "{$senderName} shared a file: {$latestMsg->attachment_name}";
+                    } else {
+                        $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
+                        $preview = "{$senderName}: {$latestMsg->body}";
                     }
-                    $preview = $body;
-                } elseif ($latestMsg->type === Message::TYPE_TASK || $latestMsg->task_id) {
-                    $taskTitle = $latestMsg->task?->title ?? 'New Task';
-                    $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
-                    $preview = "{$senderName} assigned task: {$taskTitle}";
-                } elseif ($latestMsg->attachment_name) {
-                    $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
-                    $preview = "{$senderName} shared a file: {$latestMsg->attachment_name}";
-                } else {
-                    $senderName = (int) $latestMsg->sender_id === (int) $user->id ? 'You' : ($latestMsg->sender?->name ?? 'Teammate');
-                    $preview = "{$senderName}: {$latestMsg->body}";
                 }
-            }
 
-            $isArchived = $project->status === Project::STATUS_ARCHIVED || $chat->archived_at !== null;
+                $isArchived = $project->status === Project::STATUS_ARCHIVED || $chat->archived_at !== null;
 
-            return [
-                'id' => $chat->id,
-                'chat_id' => $chat->id,
-                'conversation_id' => $chat->id,
-                'project_id' => $project->id,
-                'title' => $project->title,
-                'name' => $project->title,
-                'type' => 'project',
-                'is_archived' => $isArchived,
-                'is_pinned' => $isPinned,
-                'is_muted' => $isMuted,
-                'member_count' => $memberCount,
-                'unread_count' => max(0, $unreadCount),
-                'preview' => $preview,
-                'preview_time' => $previewTime,
-                'updated_at' => $latestMsg?->created_at?->toISOString() ?? $project->updated_at->toISOString(),
+                return [
+                    'id' => $chat->id,
+                    'chat_id' => $chat->id,
+                    'conversation_id' => $chat->id,
+                    'project_id' => $project->id,
+                    'title' => $project->title,
+                    'name' => $project->title,
+                    'type' => 'project',
+                    'is_archived' => $isArchived,
+                    'is_pinned' => $isPinned,
+                    'is_muted' => $isMuted,
+                    'member_count' => $memberCount,
+                    'unread_count' => max(0, $unreadCount),
+                    'preview' => $preview,
+                    'preview_time' => $previewTime,
+                    'updated_at' => $latestMsg?->created_at?->toISOString() ?? $project->updated_at->toISOString(),
+                ];
+            });
+
+            // Split into active and archived chats
+            $activeChats = $chatItems->filter(fn ($c) => ! $c['is_archived'])
+                ->sort(function ($a, $b) {
+                    if ($a['is_pinned'] !== $b['is_pinned']) {
+                        return $b['is_pinned'] ? 1 : -1;
+                    }
+                    return strcmp($b['updated_at'], $a['updated_at']);
+                })
+                ->values();
+
+            $archivedChats = $chatItems->filter(fn ($c) => $c['is_archived'])
+                ->sortByDesc('updated_at')
+                ->values();
+
+            $totalUnreadMessages = $chatItems->sum('unread_count');
+
+            $sidebarData = [
+                'activeChats' => $activeChats,
+                'archivedChats' => $archivedChats,
+                'totalUnreadCount' => $totalUnreadMessages,
             ];
-        });
 
-        // Split into active and archived chats
-        $activeChats = $chatItems->filter(fn ($c) => ! $c['is_archived'])
-            ->sort(function ($a, $b) {
-                if ($a['is_pinned'] !== $b['is_pinned']) {
-                    return $b['is_pinned'] ? 1 : -1;
-                }
-                return strcmp($b['updated_at'], $a['updated_at']);
-            })
-            ->values();
-
-        $archivedChats = $chatItems->filter(fn ($c) => $c['is_archived'])
-            ->sortByDesc('updated_at')
-            ->values();
+            return $sidebarData;
+        };
 
         // 3. Determine Selected / Active Chat
         $targetProjectId = $projectId ?? $request->query('project') ?? $request->query('conversation');
@@ -221,12 +239,15 @@ class ChatController extends Controller
             }
 
             $selectedChat = $candidateChat;
-        } elseif ($activeChats->isNotEmpty()) {
-            $firstChatId = $activeChats->first()['id'];
-            $selectedChat = Chat::with(['project.creator', 'project.roleAssignments.user'])->find($firstChatId);
-        } elseif ($archivedChats->isNotEmpty()) {
-            $firstChatId = $archivedChats->first()['id'];
-            $selectedChat = Chat::with(['project.creator', 'project.roleAssignments.user'])->find($firstChatId);
+        } else {
+            $sidebar = $getSidebarData();
+            if ($sidebar['activeChats']->isNotEmpty()) {
+                $firstChatId = $sidebar['activeChats']->first()['id'];
+                $selectedChat = Chat::with(['project.creator', 'project.roleAssignments.user'])->find($firstChatId);
+            } elseif ($sidebar['archivedChats']->isNotEmpty()) {
+                $firstChatId = $sidebar['archivedChats']->first()['id'];
+                $selectedChat = Chat::with(['project.creator', 'project.roleAssignments.user'])->find($firstChatId);
+            }
         }
 
         // 4. Load Active Chat Messages, Receipts, and Details
@@ -456,34 +477,32 @@ class ChatController extends Controller
             ];
         }
 
-        // Total unread count for sidebar
-        $totalUnreadMessages = $chatItems->sum('unread_count');
-
         // Current event members for @mentions and task assignment (with roles)
         $projectMembers = $participants ?? [];
 
         if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            $sidebar = $getSidebarData();
             return response()->json([
-                'chats' => $activeChats,
-                'archived_chats' => $archivedChats,
+                'chats' => $sidebar['activeChats'],
+                'archived_chats' => $sidebar['archivedChats'],
                 'active_chat' => $activeChatData,
                 'messages' => $messages,
                 'project_members' => $projectMembers,
                 'auth_user_id' => $user->id,
-                'total_unread_count' => $totalUnreadMessages,
+                'total_unread_count' => $sidebar['totalUnreadCount'],
             ]);
         }
 
         return Inertia::render('Chat/Index', [
-            'chats' => $activeChats,
-            'archivedChats' => $archivedChats,
-            'conversations' => $activeChats, // backward-compat prop alias
+            'chats' => fn () => $getSidebarData()['activeChats'],
+            'archivedChats' => fn () => $getSidebarData()['archivedChats'],
+            'conversations' => fn () => $getSidebarData()['activeChats'], // backward-compat prop alias
             'activeChat' => $activeChatData,
             'activeConversation' => $activeChatData, // backward-compat prop alias
             'messages' => $messages,
             'projectMembers' => $projectMembers,
             'authUserId' => $user->id,
-            'totalUnreadCount' => $totalUnreadMessages,
+            'totalUnreadCount' => fn () => $getSidebarData()['totalUnreadCount'],
         ]);
     }
 

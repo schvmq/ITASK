@@ -117,9 +117,9 @@ class DashboardController extends Controller
                 'activities.tasks',
             ])
             ->get()
-            ->map(function (Committee $committee) use ($userId) {
+            ->map(function (Committee $committee) use ($userId, $leaderProjectIds) {
                 $committeeRole = $committee->roleAssignments->firstWhere('user_id', $userId)?->role;
-                if (! $committeeRole && ($committee->project->created_by === $userId || $committee->project->roleAssignments()->where('user_id', $userId)->where('role', ProjectRoleAssignment::ROLE_PROJECT_LEADER)->exists())) {
+                if (! $committeeRole && $leaderProjectIds->contains($committee->project_id)) {
                     $committeeRole = ProjectRoleAssignment::ROLE_PROJECT_LEADER;
                 }
 

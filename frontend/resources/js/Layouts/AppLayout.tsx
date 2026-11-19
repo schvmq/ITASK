@@ -94,6 +94,7 @@ export interface AppLayoutProps {
     currentProject?: CurrentProjectInfo | null;
     hidePageHeadingBanner?: boolean;
     breadcrumbs?: BreadcrumbItem[];
+    pageKey?: string;
     children: React.ReactNode;
 }
 
@@ -449,6 +450,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     currentProject,
     hidePageHeadingBanner = false,
     breadcrumbs,
+    pageKey,
     children,
 }) => {
     const pageProps = usePage<PageProps & {
@@ -546,6 +548,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     const currentPath = typeof window !== 'undefined'
         ? window.location.pathname + window.location.search
         : url || '/dashboard';
+    const transitionKey = pageKey ?? currentPath;
 
     const handleLogout = () => {
         router.post('/logout');
@@ -846,7 +849,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                     {/* Top-Level Page Transition */}
                     <AnimatePresence mode="wait">
                         <motion.div
-                            key={currentPath}
+                            key={transitionKey}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}

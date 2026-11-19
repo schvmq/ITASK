@@ -59,6 +59,9 @@ const appName = import.meta.env.VITE_APP_NAME || 'ITASK';
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
+    progress: {
+        color: 'var(--primary)',
+    },
     resolve: (name) =>
         resolvePageComponent(
             `./Pages/${name}.tsx`,

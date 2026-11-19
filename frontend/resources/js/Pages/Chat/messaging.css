@@ -149,6 +149,41 @@ div.messaging-root.messaging-shell {
     animation: msgBubbleEnter var(--msg-transition-fast);
 }
 
+/* ── Text Selection in Message Thread ── */
+.messaging-root .msg-pane-thread {
+    user-select: text;
+}
+
+.messaging-root .msg-pane-thread button,
+.messaging-root .msg-pane-thread .msg-touch-target,
+.messaging-root .msg-pane-thread .msg-action-menu-container {
+    user-select: none;
+}
+
+/* High-contrast selection for outgoing sent bubbles (white highlight on primary orange) */
+.messaging-root .msg-bubble-sent,
+.messaging-root .msg-bubble-sent * {
+    user-select: text;
+}
+
+.messaging-root .msg-bubble-sent::selection,
+.messaging-root .msg-bubble-sent *::selection {
+    background-color: #ffffff !important;
+    color: var(--primary, #ea580c) !important;
+}
+
+/* High-contrast selection for incoming received bubbles (primary orange on card surface) */
+.messaging-root .msg-bubble-received,
+.messaging-root .msg-bubble-received * {
+    user-select: text;
+}
+
+.messaging-root .msg-bubble-received::selection,
+.messaging-root .msg-bubble-received *::selection {
+    background-color: var(--primary, #ea580c) !important;
+    color: #ffffff !important;
+}
+
 /* ── Typing Indicator Dots ── */
 @keyframes msgTypingBounce {
     0%, 80%, 100% {
