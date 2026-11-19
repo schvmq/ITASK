@@ -65,3 +65,18 @@ export function getProgressBarGradient(
         label: `${val}%`,
     };
 }
+
+/**
+ * Safely calculates progress percentage bounded between 0 and 100:
+ * - If total <= 0, returns 0.
+ * - Otherwise (completed / total) * 100 rounded and clamped to [0, 100].
+ */
+export function calculateProgressPercentage(
+    completed: number,
+    total: number
+): number {
+    if (!total || total <= 0) return 0;
+    const safeCompleted = Math.max(0, Math.min(total, Number(completed) || 0));
+    const percentage = Math.round((safeCompleted / total) * 100);
+    return Math.max(0, Math.min(100, percentage));
+}
