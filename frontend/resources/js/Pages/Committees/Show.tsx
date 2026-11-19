@@ -141,16 +141,16 @@ export default function CommitteeShow({
             <AppLayout title="Committee Not Found" subtitle="Committee Workspace">
                 <Head title="Committee Not Found — ITASK" />
                 <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-                    <div className="w-14 h-14 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-4">
+                    <div className="w-14 h-14 rounded-full bg-rose-100 dark:bg-rose-950/40 flex items-center justify-center text-rose-600 dark:text-rose-400 mb-4">
                         <AlertTriangle className="w-7 h-7" />
                     </div>
-                    <h2 className="text-lg font-bold text-[color:var(--color-text-main)]">Committee Not Found</h2>
-                    <p className="text-xs text-[color:var(--color-text-muted)] max-w-sm mt-2 mb-6 leading-relaxed">
+                    <h2 className="text-lg font-bold text-[color:var(--text)]">Committee Not Found</h2>
+                    <p className="text-xs text-[color:var(--muted)] max-w-sm mt-2 mb-6 leading-relaxed">
                         This committee could not be found or you do not have permission to view it.
                     </p>
                     <Link
                         href={`/projects/${project?.id ?? ''}`}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white shadow-xs transition-colors bg-[color:var(--color-brand-action-orange)]"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white shadow-xs transition-colors bg-[color:var(--primary)] hover:opacity-90"
                     >
                         <ArrowLeft className="w-3.5 h-3.5" />
                         Back to Event
@@ -520,17 +520,17 @@ export default function CommitteeShow({
     const getActivityStatusBadge = (status: string) => {
         switch (status) {
             case 'Completed':
-                return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                return 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40';
             case 'In Progress':
-                return 'bg-blue-50 text-blue-700 border-blue-200';
+                return 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40';
             case 'Under Review':
-                return 'bg-amber-50 text-amber-700 border-amber-200';
+                return 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40';
             case 'Returned':
             case 'Returned for Revision':
-                return 'bg-rose-50 text-rose-700 border-rose-200';
+                return 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/40';
             case 'To Do':
             default:
-                return 'bg-slate-100 text-slate-700 border-slate-200';
+                return 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
         }
     };
 
@@ -563,26 +563,26 @@ export default function CommitteeShow({
             <Head title={`${committee.name} — ${project.title} — ITASK`} />
 
             <div className="-mx-4 sm:-mx-6 -mt-6">
-                {/* ── Committee Header (Full-width crisp white background with clear separation border) ── */}
-                <div className="bg-white border-b border-[color:var(--color-border-light)] shadow-[0_1px_3px_0_rgb(0,0,0,0.02)]">
+                {/* ── Committee Header ── */}
+                <div className="bg-[color:var(--card)] border-b border-[color:var(--border)] shadow-[0_1px_3px_0_rgb(0,0,0,0.02)]">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 pb-6 space-y-4">
                         {/* ── Breadcrumb Navigation ── */}
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
                             <Link
                                 href="/projects"
-                                className="hover:text-[color:var(--color-brand-action-orange)] transition-colors"
+                                className="hover:text-[color:var(--primary)] transition-colors"
                             >
                                 Events
                             </Link>
-                            <span className="text-slate-300">/</span>
+                            <span className="text-slate-400 dark:text-slate-500">/</span>
                             <Link
                                 href={`/projects/${project.id}`}
-                                className="hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate max-w-xs"
+                                className="hover:text-[color:var(--primary)] transition-colors truncate max-w-xs"
                             >
                                 {project.title}
                             </Link>
-                            <span className="text-slate-300">/</span>
-                            <span className="font-semibold text-slate-800 truncate max-w-xs">
+                            <span className="text-slate-400 dark:text-slate-500">/</span>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-xs">
                                 {committee.name}
                             </span>
                         </div>
@@ -591,24 +591,24 @@ export default function CommitteeShow({
                         <div className="space-y-4">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                 <div className="space-y-1.5">
-                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                                         {committee.name}
                                     </h1>
-                                    <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+                                    <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                                         {committee.head ? (
-                                            <div className="flex items-center gap-1.5 font-medium text-slate-700">
-                                                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                            <div className="flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-200">
+                                                <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-bold text-[10px] flex items-center justify-center shrink-0">
                                                     {getInitials(committee.head.name)}
                                                 </span>
                                                 <span>{committee.head.name}</span>
-                                                <span className="text-slate-400 font-normal">(Chairperson)</span>
+                                                <span className="text-slate-500 dark:text-slate-400 font-normal">(Chairperson)</span>
                                             </div>
                                         ) : (
-                                            <span className="text-slate-400 italic">No Chairperson Assigned</span>
+                                            <span className="text-slate-400 dark:text-slate-500 italic">No Chairperson Assigned</span>
                                         )}
-                                        <span className="text-slate-300">•</span>
+                                        <span className="text-slate-300 dark:text-slate-600">•</span>
                                         <span>{committee.members.length} member{committee.members.length === 1 ? '' : 's'}</span>
-                                        <span className="text-slate-300">•</span>
+                                        <span className="text-slate-300 dark:text-slate-600">•</span>
                                         <span>{(committee.activities || []).length} deliverable{(committee.activities || []).length === 1 ? '' : 's'}</span>
                                     </div>
                                 </div>
@@ -621,7 +621,7 @@ export default function CommitteeShow({
                                             variant="outline"
                                             size="sm"
                                             onClick={handleOpenAssignModal}
-                                            className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
+                                            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold shadow-2xs"
                                         >
                                             Manage Members
                                         </Button>
@@ -646,40 +646,40 @@ export default function CommitteeShow({
                                     {/* 3-dots dropdown menu for Committee Options */}
                                     {(committee.can.update || committee.can.delete) && (
                                         <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
+                                             <DropdownMenuTrigger asChild>
                                                 <button
                                                     type="button"
-                                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
+                                                    className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
                                                     title="Committee Options"
                                                 >
                                                     <MoreHorizontal className="w-4 h-4" />
                                                 </button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-lg rounded-xl p-1 z-50">
+                                            <DropdownMenuContent align="end" className="w-48 bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] shadow-lg rounded-xl p-1 z-50">
                                                 {committee.can.update && (
                                                     <>
                                                         <DropdownMenuItem
                                                             onClick={handleOpenEditModal}
-                                                            className="cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg px-2.5 py-2 flex items-center gap-2"
+                                                            className="cursor-pointer text-xs font-medium text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] rounded-lg px-2.5 py-2 flex items-center gap-2"
                                                         >
-                                                            <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                                                            <Edit3 className="w-3.5 h-3.5 text-[color:var(--muted)]" />
                                                             <span>Edit Committee</span>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={handleOpenStaffModal}
-                                                            className="cursor-pointer text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg px-2.5 py-2 flex items-center gap-2"
+                                                            className="cursor-pointer text-xs font-medium text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] rounded-lg px-2.5 py-2 flex items-center gap-2"
                                                         >
-                                                            <UserPlus className="w-3.5 h-3.5 text-slate-500" />
+                                                            <UserPlus className="w-3.5 h-3.5 text-[color:var(--muted)]" />
                                                             <span>{committee.head ? 'Change Chairperson' : 'Assign Chairperson'}</span>
                                                         </DropdownMenuItem>
                                                     </>
                                                 )}
                                                 {committee.can.delete && (
                                                     <>
-                                                        <DropdownMenuSeparator className="my-1 border-t border-slate-100" />
+                                                        <DropdownMenuSeparator className="my-1 border-t border-[color:var(--border)]" />
                                                         <DropdownMenuItem
                                                             onClick={() => setIsDeleteModalOpen(true)}
-                                                            className="cursor-pointer text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg px-2.5 py-2 flex items-center gap-2"
+                                                            className="cursor-pointer text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg px-2.5 py-2 flex items-center gap-2"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                                                             <span>Remove Committee</span>
@@ -700,7 +700,7 @@ export default function CommitteeShow({
                                 return (
                                     <div className="space-y-1.5 pt-1">
                                         <div className="flex items-center justify-between text-xs">
-                                            <span className="font-semibold text-slate-500">Committee Progress</span>
+                                            <span className="font-semibold text-slate-500 dark:text-slate-400">Committee Progress</span>
                                             <span className={`px-2 py-0.5 rounded-full font-bold tabular-nums text-[10px] border shadow-2xs ${cStyles.badgeBg} ${cStyles.badgeText} ${cStyles.badgeBorder}`}>
                                                 {isDone ? 'Complete (100%)' : `${cVal}%`}
                                             </span>
@@ -723,7 +723,7 @@ export default function CommitteeShow({
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                         {/* Left Column: Activities (~65-68%) */}
                         <div className="lg:col-span-8 space-y-4">
-                            <h2 className="text-base font-bold text-slate-900">Deliverables</h2>
+                            <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Deliverables</h2>
 
                             {committee.activities && committee.activities.length > 0 ? (
                                 <div className="space-y-3.5">
@@ -736,18 +736,18 @@ export default function CommitteeShow({
                                         return (
                                             <div
                                                 key={act.id}
-                                                className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:border-slate-300 transition-colors"
+                                                className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:border-slate-400 dark:hover:border-slate-600 transition-colors"
                                             >
                                                 <div className="flex items-start justify-between gap-4">
                                                     <Link
                                                         href={`/projects/${project.id}/committees/${committee.id}/activities/${act.id}`}
-                                                        className="font-bold text-slate-900 text-sm hover:text-[color:var(--color-brand-action-orange)] hover:underline transition-colors leading-snug"
+                                                        className="font-bold text-slate-900 dark:text-slate-100 text-sm hover:text-[color:var(--primary)] hover:underline transition-colors leading-snug"
                                                     >
                                                         {act.title}
                                                     </Link>
                                                     <span
                                                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0 border ${getActivityStatusBadge(
-                                                            act.status
+                                                             act.status
                                                         )}`}
                                                     >
                                                         <span className={`w-1.5 h-1.5 rounded-full ${getActivityStatusDot(act.status)}`} />
@@ -756,7 +756,7 @@ export default function CommitteeShow({
                                                 </div>
 
                                                 {act.description && (
-                                                    <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2 leading-relaxed">
                                                         {act.description}
                                                     </p>
                                                 )}
@@ -782,19 +782,19 @@ export default function CommitteeShow({
                                                 })()}
 
                                                 {/* Footer info: Assigned, Tasks count, Due date */}
-                                                <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                                                <div className="mt-3 pt-2.5 border-t border-[color:var(--border)] flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
                                                     <div className="flex items-center gap-2.5 flex-wrap">
                                                         <span>
-                                                            <strong className="font-semibold text-slate-700">Assigned:</strong>{' '}
-                                                            <span className="font-medium text-slate-800">{assignedName}</span>
+                                                            <strong className="font-semibold text-slate-700 dark:text-slate-200">Assigned:</strong>{' '}
+                                                            <span className="font-medium text-slate-900 dark:text-slate-100">{assignedName}</span>
                                                         </span>
-                                                        <span className="text-slate-300">•</span>
+                                                        <span className="text-slate-300 dark:text-slate-600">•</span>
                                                         <span>
                                                             {act.completed_tasks_count}/{act.tasks_count} tasks done
                                                         </span>
                                                     </div>
-                                                    <div className="text-slate-600 font-medium shrink-0">
-                                                        {act.due_date ? `Due ${act.due_date}` : <span className="text-slate-400 italic font-normal">No deadline</span>}
+                                                    <div className="text-slate-700 dark:text-slate-200 font-medium shrink-0">
+                                                         {act.due_date ? `Due ${act.due_date}` : <span className="text-slate-400 dark:text-slate-500 italic font-normal">No deadline</span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -802,10 +802,10 @@ export default function CommitteeShow({
                                     })}
                                 </div>
                             ) : (
-                                <div className="py-12 px-4 text-center rounded-xl border border-dashed border-slate-300 bg-slate-50/50">
-                                    <ListTodo className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                                    <h4 className="text-xs font-bold text-slate-800">No Deliverables Established Yet</h4>
-                                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                                <div className="py-12 px-4 text-center rounded-xl border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)]">
+                                    <ListTodo className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
+                                    <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">No Deliverables Established Yet</h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
                                         Form functional deliverables under this committee to begin structuring tasks and work assignments.
                                     </p>
                                     {committee.can?.createActivity && (
@@ -816,7 +816,7 @@ export default function CommitteeShow({
                                                 clearActivityErrors();
                                                 setIsCreateActivityModalOpen(true);
                                             }}
-                                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--primary)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
                                             <span>+ Add Deliverable</span>
@@ -829,7 +829,7 @@ export default function CommitteeShow({
                         {/* Right Column: Committee Members (~32-35%) */}
                         <div className="lg:col-span-4 space-y-4">
                             <div className="flex items-center justify-between gap-2">
-                                <h2 className="text-base font-bold text-slate-900">Committee Members</h2>
+                                <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Committee Members</h2>
                                 {committee.can?.designateCoChair && (
                                     <button
                                         type="button"
@@ -838,9 +838,9 @@ export default function CommitteeShow({
                                             setSelectedCoChairUserId('');
                                             setIsCoChairModalOpen(true);
                                         }}
-                                        className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md text-amber-800 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                                        className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors cursor-pointer"
                                     >
-                                        <UserCheck className="w-3 h-3 text-amber-600" />
+                                        <UserCheck className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                                         <span>Co-Chairs ({committee.coChairs?.length || 0})</span>
                                     </button>
                                 )}
@@ -849,19 +849,19 @@ export default function CommitteeShow({
                             <div className="space-y-3">
                                 {/* Project Staff (Head) Card */}
                                 {committee.head && (
-                                    <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-3.5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:border-slate-300 transition-colors">
+                                    <div className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-3.5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:border-slate-400 dark:hover:border-slate-600 transition-colors">
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center shrink-0">
+                                                <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 font-bold text-xs flex items-center justify-center shrink-0">
                                                     {getInitials(committee.head.name)}
                                                 </div>
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5">
-                                                        <p className="text-xs font-bold text-slate-900 truncate">
+                                                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                                                             {committee.head.name}
                                                         </p>
                                                         {currentUserId && committee.head.id === currentUserId && (
-                                                            <span className="text-[9px] px-1 py-0.2 rounded font-semibold bg-orange-100 text-[color:var(--color-brand-action-orange)] border border-orange-200">
+                                                            <span className="text-[9px] px-1 py-0.2 rounded font-semibold bg-orange-100 dark:bg-orange-950/40 text-[color:var(--primary)] border border-orange-200 dark:border-orange-800/50">
                                                                 You
                                                             </span>
                                                         )}
@@ -874,10 +874,10 @@ export default function CommitteeShow({
 
                                             {(committee.head.tasks_count !== undefined && committee.head.tasks_count > 0) && (
                                                 <div className="text-right shrink-0">
-                                                    <span className="text-xs font-bold text-slate-700 tabular-nums">
+                                                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                                                         {committee.head.progress ?? 0}%
                                                     </span>
-                                                    <p className="text-[10px] text-slate-400">
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
                                                         {committee.head.tasks_count} tasks
                                                     </p>
                                                 </div>
@@ -899,7 +899,7 @@ export default function CommitteeShow({
                                 {committee.members.map((member) => (
                                     <div
                                         key={member.id}
-                                        className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-3.5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:border-slate-300 transition-colors group"
+                                        className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-3.5 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] hover:border-slate-400 dark:hover:border-slate-600 transition-colors group"
                                     >
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-3 min-w-0">
@@ -908,22 +908,22 @@ export default function CommitteeShow({
                                                 </div>
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <p className="text-xs font-bold text-slate-900 truncate">
+                                                        <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                                                             {member.name}
                                                         </p>
                                                         {member.is_co_chair && (
-                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-amber-50 text-amber-800 border border-amber-300 inline-flex items-center gap-0.5">
-                                                                <UserCheck className="w-2.5 h-2.5 text-amber-600" />
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/40 inline-flex items-center gap-0.5">
+                                                                <UserCheck className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
                                                                 Co-Chair
                                                             </span>
                                                         )}
                                                         {currentUserId && member.id === currentUserId && (
-                                                            <span className="text-[9px] px-1 py-0.2 rounded font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            <span className="text-[9px] px-1 py-0.2 rounded font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
                                                                 You
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <p className="text-[11px] font-medium text-slate-500">
+                                                    <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                                         {member.is_co_chair ? 'Member · Committee Co-Chair' : 'Member'}
                                                     </p>
                                                 </div>
@@ -931,10 +931,10 @@ export default function CommitteeShow({
 
                                             <div className="text-right shrink-0 flex items-center gap-2">
                                                 <div>
-                                                    <span className="text-xs font-bold text-slate-700 tabular-nums">
+                                                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 tabular-nums">
                                                         {member.progress ?? 0}%
                                                     </span>
-                                                    <p className="text-[10px] text-slate-400">
+                                                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
                                                         {member.tasks_count ?? 0} task{(member.tasks_count ?? 0) === 1 ? '' : 's'}
                                                     </p>
                                                 </div>
@@ -945,8 +945,8 @@ export default function CommitteeShow({
                                                         disabled={coChairProcessing}
                                                         className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded cursor-pointer ${
                                                             member.is_co_chair
-                                                                ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
-                                                                : 'text-slate-400 hover:text-amber-600 hover:bg-slate-50'
+                                                                ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                                                                : 'text-slate-400 dark:text-slate-500 hover:text-amber-600 hover:bg-[color:var(--soft-surface)]'
                                                         }`}
                                                         title={member.is_co_chair ? 'Remove Co-Chair designation' : 'Designate as Committee Co-Chair'}
                                                         aria-label={member.is_co_chair ? 'Remove Co-Chair designation' : 'Designate as Committee Co-Chair'}
@@ -958,7 +958,7 @@ export default function CommitteeShow({
                                                     <button
                                                         type="button"
                                                         onClick={() => handleOpenRemoveMemberModal(member)}
-                                                        className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-600 transition-opacity p-0.5 rounded cursor-pointer"
+                                                        className="opacity-0 group-hover:opacity-100 text-slate-300 dark:text-slate-600 hover:text-rose-600 transition-opacity p-0.5 rounded cursor-pointer"
                                                         title={`Remove ${member.name} from committee`}
                                                         aria-label={`Remove ${member.name} from committee`}
                                                     >
@@ -978,17 +978,17 @@ export default function CommitteeShow({
                                 ))}
 
                                 {committee.members.length === 0 && !committee.head && (
-                                    <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-300 bg-slate-50/50">
-                                        <Users className="w-7 h-7 text-slate-400 mx-auto mb-2" />
-                                        <h4 className="text-xs font-bold text-slate-800">No Members Assigned</h4>
-                                        <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1 leading-relaxed">
+                                    <div className="py-8 px-4 text-center rounded-xl border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)]">
+                                        <Users className="w-7 h-7 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
+                                        <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100">No Members Assigned</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-1 leading-relaxed">
                                             No personnel have been assigned to this committee yet.
                                         </p>
                                         {committee.can.manageMembers && (
                                             <button
                                                 type="button"
                                                 onClick={handleOpenAssignModal}
-                                                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+                                                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[color:var(--primary)] hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
                                             >
                                                 <UserPlus className="w-3.5 h-3.5" />
                                                 <span>Assign Members</span>
@@ -1021,13 +1021,13 @@ export default function CommitteeShow({
                                             placeholder="Search members by name or email..."
                                             value={memberSearchQuery}
                                             onChange={(e) => setMemberSearchQuery(e.target.value)}
-                                            className="w-full pl-3 pr-8 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors"
+                                            className="w-full pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                         />
                                         {memberSearchQuery && (
                                             <button
                                                 type="button"
                                                 onClick={() => setMemberSearchQuery('')}
-                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                                             >
                                                 <X className="w-3.5 h-3.5" />
                                             </button>
@@ -1043,11 +1043,11 @@ export default function CommitteeShow({
                                         </button>
                                         {assignData.user_ids.length > 0 && (
                                             <>
-                                                <span className="text-slate-300">|</span>
+                                                <span className="text-slate-300 dark:text-slate-600">|</span>
                                                 <button
                                                     type="button"
                                                     onClick={handleDeselectAll}
-                                                    className="text-slate-500 hover:text-slate-700 hover:underline cursor-pointer"
+                                                    className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:underline cursor-pointer"
                                                 >
                                                     Deselect All
                                                 </button>
@@ -1057,7 +1057,7 @@ export default function CommitteeShow({
                                 </div>
 
                                 {/* Member List */}
-                                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                                <div className="max-h-72 overflow-y-auto divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-xl">
                                     {filteredEligibleMembers.map((member) => {
                                         const isSelected = assignData.user_ids.includes(member.id);
                                         return (
@@ -1065,7 +1065,7 @@ export default function CommitteeShow({
                                                 key={member.id}
                                                 onClick={() => toggleMemberSelection(member.id)}
                                                 className={`p-3 flex items-center justify-between gap-3 transition-colors cursor-pointer select-none ${
-                                                    isSelected ? 'bg-orange-50/50' : 'bg-white hover:bg-slate-50'
+                                                    isSelected ? 'bg-orange-50/50 dark:bg-orange-950/20' : 'bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)]'
                                                 }`}
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
@@ -1073,13 +1073,13 @@ export default function CommitteeShow({
                                                         type="checkbox"
                                                         checked={isSelected}
                                                         onChange={() => {}} // parent onClick handles toggle
-                                                        className="w-4 h-4 rounded text-[color:var(--color-brand-action-orange)] border-slate-300 focus:ring-orange-500/20 cursor-pointer shrink-0"
+                                                        className="w-4 h-4 rounded text-[color:var(--color-brand-action-orange)] border-[color:var(--border)] bg-[color:var(--card)] focus:ring-orange-500/20 cursor-pointer shrink-0"
                                                     />
                                                     <div className="min-w-0">
-                                                        <p className="text-xs font-semibold text-[color:var(--color-text-main)] truncate">
+                                                        <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
                                                             {member.name}
                                                         </p>
-                                                        <p className="text-[11px] text-[color:var(--color-text-muted)] truncate">
+                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                                                             {member.email}
                                                         </p>
                                                     </div>
@@ -1087,8 +1087,8 @@ export default function CommitteeShow({
 
                                                 {/* Contextual indicator for multi-committee */}
                                                 {member.context && (
-                                                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                                        <Info className="w-3 h-3 text-amber-600 shrink-0" />
+                                                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
+                                                        <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
                                                         <span>{member.context}</span>
                                                     </span>
                                                 )}
@@ -1097,7 +1097,7 @@ export default function CommitteeShow({
                                     })}
 
                                     {filteredEligibleMembers.length === 0 && (
-                                        <div className="p-6 text-center text-xs text-slate-500">
+                                        <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
                                             No members match "{memberSearchQuery}".
                                         </div>
                                     )}
@@ -1106,9 +1106,9 @@ export default function CommitteeShow({
                                 <InputError message={assignErrors.user_id || assignErrors.user_ids} />
                             </div>
                         ) : (
-                            <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
-                                <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                                    <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                            <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
+                                    <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                                     <span>No Eligible Members Available</span>
                                 </div>
                                 <p className="leading-relaxed">
@@ -1117,8 +1117,8 @@ export default function CommitteeShow({
                             </div>
                         )}
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2.5">
-                            <span className="text-xs text-slate-500">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between gap-2.5">
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
                                 {assignData.user_ids.length > 0
                                     ? `${assignData.user_ids.length} member${assignData.user_ids.length === 1 ? '' : 's'} selected`
                                     : 'No members selected'}
@@ -1158,8 +1158,8 @@ export default function CommitteeShow({
                     maxWidth="md"
                 >
                     <div className="space-y-4 pt-1">
-                        <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-2">
-                            <div className="font-bold text-rose-900">
+                        <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 space-y-2">
+                            <div className="font-bold text-rose-900 dark:text-rose-200">
                                 {memberToRemove?.name} ({memberToRemove?.email})
                             </div>
                             <p className="leading-relaxed">
@@ -1167,7 +1167,7 @@ export default function CommitteeShow({
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1199,14 +1199,14 @@ export default function CommitteeShow({
                 >
                     <form onSubmit={handleAssignStaffSubmit} className="space-y-4 pt-1">
                         {committee.head && (
-                            <div className="p-3 rounded-lg bg-orange-50/70 border border-orange-200 text-xs text-orange-950 space-y-1">
+                            <div className="p-3 rounded-lg bg-orange-50/70 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/40 text-xs text-orange-950 dark:text-orange-200 space-y-1">
                                 <span className="font-bold text-[11px] uppercase tracking-wider text-[color:var(--color-brand-action-orange)]">
                                     Current Chairperson
                                 </span>
-                                <div className="font-semibold text-slate-900">
+                                <div className="font-semibold text-slate-900 dark:text-slate-100">
                                     {committee.head.name} ({committee.head.email})
                                 </div>
-                                <div className="text-[11px] text-slate-600">
+                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
                                     Role: Chairperson
                                 </div>
                             </div>
@@ -1221,7 +1221,7 @@ export default function CommitteeShow({
                                     id="assign-staff-select"
                                     value={staffData.user_id}
                                     onChange={(e) => setStaffData('user_id', e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                    className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
                                     required
                                 >
                                     <option value="">-- Choose an eligible Chairperson --</option>
@@ -1249,8 +1249,8 @@ export default function CommitteeShow({
                                     const selectedStaff = availableStaff.find(s => String(s.id) === staffData.user_id);
                                     if (selectedStaff?.committee_id && selectedStaff.committee_id !== committee.id) {
                                         return (
-                                            <div className="p-2.5 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-800 flex items-start gap-2">
-                                                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                                            <div className="p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2">
+                                                <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                                                 <span>
                                                     <strong>Notice:</strong> {selectedStaff.name} is currently assigned to <strong>{selectedStaff.committee_name}</strong>. Assigning them here will reassign them to this committee.
                                                 </span>
@@ -1261,9 +1261,9 @@ export default function CommitteeShow({
                                 })()}
                             </div>
                         ) : (
-                            <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
-                                <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                                    <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                            <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
+                                    <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                                     <span>No Eligible Chairperson Available</span>
                                 </div>
                                 <p className="leading-relaxed">
@@ -1272,7 +1272,7 @@ export default function CommitteeShow({
                             </div>
                         )}
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between gap-2.5">
                             {committee.head ? (
                                 <button
                                     type="button"
@@ -1321,9 +1321,9 @@ export default function CommitteeShow({
                     maxWidth="md"
                 >
                     <div className="space-y-4 pt-1">
-                        <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-2">
+                        <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-2">
                             {committee.head && (
-                                <div className="font-bold text-amber-900">
+                                <div className="font-bold text-amber-900 dark:text-amber-200">
                                     {committee.head.name} ({committee.head.email})
                                 </div>
                             )}
@@ -1332,7 +1332,7 @@ export default function CommitteeShow({
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1380,7 +1380,7 @@ export default function CommitteeShow({
                                 rows={3}
                                 value={editData.description}
                                 onChange={(e) => setEditData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="Functional scope of this committee..."
                             />
                             <InputError message={editErrors.description} />
@@ -1395,7 +1395,7 @@ export default function CommitteeShow({
                                     id="edit-committee-staff"
                                     value={editData.user_id}
                                     onChange={(e) => setEditData('user_id', e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
                                 >
                                     <option value="">-- Unassigned (No Chairperson) --</option>
                                     {staffOptions.map((staff) => (
@@ -1405,14 +1405,14 @@ export default function CommitteeShow({
                                     ))}
                                 </select>
                             ) : (
-                                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                                <div className="p-3 rounded-lg bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-xs text-slate-500 dark:text-slate-400">
                                     <p>No eligible Chairperson assigned to this event yet.</p>
                                 </div>
                             )}
                             <InputError message={editErrors.user_id} />
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1442,8 +1442,8 @@ export default function CommitteeShow({
                     maxWidth="md"
                 >
                     <div className="space-y-4 pt-1">
-                        <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1">
-                            <p className="font-bold text-rose-900">
+                        <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 space-y-1">
+                            <p className="font-bold text-rose-900 dark:text-rose-200">
                                 This will remove the committee from {project.title}.
                             </p>
                             <p className="leading-relaxed">
@@ -1451,7 +1451,7 @@ export default function CommitteeShow({
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1502,7 +1502,7 @@ export default function CommitteeShow({
                                 rows={3}
                                 value={activityData.description}
                                 onChange={(e) => setActivityData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="Scope, deliverables, or objectives..."
                             />
                             <InputError message={activityErrors.description} />
@@ -1527,7 +1527,7 @@ export default function CommitteeShow({
                             />
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1556,17 +1556,17 @@ export default function CommitteeShow({
                     maxWidth="md"
                 >
                     <div className="space-y-5">
-                        <p className="text-xs text-slate-600 leading-relaxed">
+                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
                             Designate committee members as Committee-level Co-Chairs to assist with coordinating tasks, managing deadlines, and preliminary evidence review.
                         </p>
 
                         {/* Current Co-Chairs */}
                         <div className="space-y-2">
-                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                 Current Committee Co-Chairs ({(committee.coChairs || []).length})
                             </h4>
                             {(committee.coChairs || []).length === 0 ? (
-                                <div className="p-3.5 rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-center text-xs text-slate-500">
+                                <div className="p-3.5 rounded-lg border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)] text-center text-xs text-slate-500 dark:text-slate-400">
                                     No Committee Co-Chairs currently designated.
                                 </div>
                             ) : (
@@ -1574,16 +1574,16 @@ export default function CommitteeShow({
                                     {(committee.coChairs || []).map((cc) => (
                                         <div
                                             key={cc.id}
-                                            className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-white text-xs"
+                                            className="flex items-center justify-between p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] text-xs"
                                         >
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="font-bold text-slate-900">{cc.name}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                                    <span className="font-bold text-slate-900 dark:text-slate-100">{cc.name}</span>
+                                                    <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
                                                         Committee Co-Chair
                                                     </span>
                                                 </div>
-                                                <span className="text-[11px] text-slate-500">{cc.email}</span>
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400">{cc.email}</span>
                                             </div>
                                             <Button
                                                 type="button"
@@ -1591,7 +1591,7 @@ export default function CommitteeShow({
                                                 size="sm"
                                                 disabled={coChairProcessing}
                                                 onClick={() => handleRemoveCoChair(cc.id)}
-                                                className="text-rose-600 border-rose-200 hover:bg-rose-50 text-xs"
+                                                className="text-rose-600 border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs"
                                             >
                                                 Remove
                                             </Button>
@@ -1602,13 +1602,13 @@ export default function CommitteeShow({
                         </div>
 
                         {/* Form to designate new Co-Chair */}
-                        <div className="pt-4 border-t border-slate-100 space-y-3">
-                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        <div className="pt-4 border-t border-[color:var(--border)] space-y-3">
+                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                                 Designate New Committee Co-Chair
                             </h4>
 
                             {(committee.eligibleCoChairs || []).length === 0 ? (
-                                <p className="text-xs text-slate-500 italic">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 italic">
                                     No eligible members available to designate. All committee members are already designated as Co-Chairs.
                                 </p>
                             ) : (
@@ -1619,7 +1619,7 @@ export default function CommitteeShow({
                                             id="designate-comm-cochair-select"
                                             value={selectedCoChairUserId}
                                             onChange={(e) => setSelectedCoChairUserId(e.target.value)}
-                                            className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900 cursor-pointer"
+                                            className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
                                         >
                                             <option value="">-- Choose an existing committee member --</option>
                                             {(committee.eligibleCoChairs || []).map((m) => (

@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../views';
@@ -68,6 +70,12 @@
     --color-ink: var(--text);
     --color-ink-muted: var(--muted);
     --color-border-token: var(--border);
+    --color-border-light: var(--border);
+    --color-text-main: var(--text);
+    --color-text-subtle: var(--muted);
+    --color-text-muted: var(--muted);
+    --color-brand-action-orange: var(--primary);
+    --color-brand-dark-green: var(--status-success);
 }
 
 :root[data-theme="dark"],
@@ -126,6 +134,12 @@ html.dark {
     --color-ink: var(--text);
     --color-ink-muted: var(--muted);
     --color-border-token: var(--border);
+    --color-border-light: var(--border);
+    --color-text-main: var(--text);
+    --color-text-subtle: var(--muted);
+    --color-text-muted: var(--muted);
+    --color-brand-action-orange: var(--primary);
+    --color-brand-dark-green: var(--status-success);
 }
 
 /* ==========================================================================

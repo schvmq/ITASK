@@ -271,14 +271,9 @@ function SidebarContent({
                             <div className="w-8 h-8 rounded-[8px] bg-[color:var(--primary)] flex items-center justify-center shrink-0 text-white shadow-2xs">
                                 <CheckSquare className="w-4 h-4 stroke-[2px]" />
                             </div>
-                            <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-[16px] tracking-tight text-[color:var(--text)] block leading-none">
-                                    ITASK
-                                </span>
-                                <span className="text-[11px] text-[color:var(--muted)] font-normal mt-0.5 truncate">
-                                    {isAdmin ? 'System Admin' : formatRole(userRole)}
-                                </span>
-                            </div>
+                            <span className="font-bold text-[16px] tracking-tight text-[color:var(--text)] block leading-none">
+                                ITASK
+                            </span>
                         </Link>
                         {onToggleCollapse && (
                             <motion.button

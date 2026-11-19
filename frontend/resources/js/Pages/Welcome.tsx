@@ -409,8 +409,8 @@ export default function Welcome({
     const totalProjects = filteredProjects.length;
     const totalPages = Math.max(1, Math.ceil(totalProjects / pageSize));
 
-    // Handle shrinking last page after deletions/filter changes, allowing navigation across tabs 1..5
-    const safePage = Math.min(currentPage, Math.max(5, totalPages));
+    // Handle shrinking last page after deletions/filter changes, bounded by actual total pages with data
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
     const paginatedProjects = useMemo(() => {
         const startIndex = (safePage - 1) * pageSize;
         return filteredProjects.slice(startIndex, startIndex + pageSize);
