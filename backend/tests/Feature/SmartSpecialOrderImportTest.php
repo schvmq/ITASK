@@ -194,3 +194,4 @@ class SmartSpecialOrderImportTest extends TestCase
         $this->assertNull($unselectedActivity);
     }
 }
+

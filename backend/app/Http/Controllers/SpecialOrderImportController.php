@@ -312,3 +312,4 @@ class SpecialOrderImportController extends Controller
             ->with('status', "Event structure successfully created from {$validated['so_number']} with " . count($validated['committees']) . " committees!");
     }
 }
+
