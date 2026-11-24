@@ -8,6 +8,7 @@ use App\Http\Controllers\CommitteeController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPersonnelController;
+use App\Http\Controllers\SpecialOrderImportController;
 use App\Http\Controllers\TimelineIndexController;
 use App\Models\User;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
@@ -93,6 +94,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/chat/{chat}/pin', [ChatController::class, 'togglePin'])->name('chat.pin');
     Route::post('/chat/{chat}/mute', [ChatController::class, 'toggleMute'])->name('chat.mute');
     Route::get('/chat/attachments/{message}', [ChatController::class, 'downloadAttachment'])->name('chat.attachments.download');
+
+    // Smart S.O. Import (Special Order Document Parsing & Event Structure Generator)
+    Route::get('/projects/smart-import', [SpecialOrderImportController::class, 'create'])->name('projects.smart-import.create');
+    Route::post('/projects/smart-import/parse', [SpecialOrderImportController::class, 'parse'])->name('projects.smart-import.parse');
+    Route::post('/projects/smart-import/confirm', [SpecialOrderImportController::class, 'confirm'])->name('projects.smart-import.confirm');
 
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');

@@ -1,0 +1,38 @@
+# Authoritative session RAM / cold-start handoff. AI-owned. See AGENTS.md → Ownership.
+# Execution state only. Milestone definitions live in 50_ROADMAP.md — do not duplicate them here.
+# Do not mirror working_on into the Backlog.
+
+schema_version: 2
+
+# ISO date of last SHUTDOWN update (YYYY-MM-DD)
+last_updated: "2026-11-24"
+
+# Who last wrote this file (e.g. cursor-agent, agy-agent, agency:unity-specialist)
+last_agent: "agy-agent"
+
+# Host that last wrote this file (e.g. cursor, antigravity, other)
+last_ide: "antigravity"
+
+# ID only — resolve objective/criteria in 50_ROADMAP.md
+current_milestone: "M5"
+
+# Active scene or primary file in focus, if any
+current_scene: null
+
+# System file basenames under brain/systems/ (without .md) to load on BOOT
+systems_in_scope:
+  - TaskAndChecklistEngine
+  - EvaluationMethodology
+  - ProjectAndCommitteeManagement
+
+# Sole in-progress list (do not duplicate into Backlog)
+working_on: []
+
+# Known bugs or risks
+known_issues: []
+
+# Blockers requiring human decision or external input
+blocked: []
+
+# Self-contained SHUTDOWN summary: what completed, what remains, what next agent should do
+session_summary: "Implemented the Smart S.O. Import (Special Order Document Parsing & Event Structure Generator) feature strictly adhering to research partner's 9-page specification (OCR_Prompt_Instructions.pdf). Created SpecialOrderParserService (extracts S.O. metadata, recognizes 8 groups including 6 criteria + 2 preparation groups, 6 Event Co-Chairs, 4 deliverables indicators, and token/fuzzy matches against registered accounts). Built SpecialOrderImportController with /projects/smart-import endpoints and atomic DB transaction. Developed React Review Screen (SmartSOImport.tsx) enforcing mandatory human verification, preserving dual roles (e.g. Co-Chair + Committee Chair), preventing unverified account creation, and saving S.O. as ProjectApprovalDocument. Added navigation button in Projects/Index.tsx. Automated tests (SmartSpecialOrderImportTest: 4 tests, 29 assertions) and frontend Vite build passed with zero errors."

@@ -23,6 +23,7 @@ import {
     Users,
     CheckCircle2,
     Calendar,
+    Sparkles,
 } from 'lucide-react';
 
 export interface ProjectItem {
@@ -180,6 +181,16 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                 leftIcon={<Calendar className="w-4 h-4 text-[color:var(--primary)]" />}
                             >
                                 <span>View in Timeline</span>
+                            </Button>
+                        </Link>
+                        <Link href="/projects/smart-import">
+                            <Button
+                                variant="secondary"
+                                size="md"
+                                className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/30 flex items-center gap-1.5"
+                                leftIcon={<Sparkles className="w-4 h-4 text-emerald-500" />}
+                            >
+                                <span>Smart S.O. Import</span>
                             </Button>
                         </Link>
                         {!isAdmin && (
