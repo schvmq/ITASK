@@ -86,6 +86,49 @@ class DevTestDataSeeder extends Seeder
             ]
         );
 
+        // Seed Sample Member Resumes / CVs for AI Screening Demo
+        \App\Models\MemberResume::updateOrCreate(
+            ['user_id' => $member1->id],
+            [
+                'original_name' => 'Member01_Documentation_CV.pdf',
+                'file_path' => 'resumes/samples/member01_cv.pdf',
+                'file_size' => 145020,
+                'mime_type' => 'application/pdf',
+                'extracted_skills' => ['Documentation', 'Secretariat', 'Technical Writing', 'Minutes of Meeting', 'Accreditation'],
+                'certifications' => ['PACUCOA Accreditation Secretariat Training 2026', 'CarSU Student Leadership Seminar'],
+                'experience_summary' => '3 years serving as College Student Council head secretariat and lead documentation specialist.',
+                'eligibility_status' => 'Highly Recommended',
+            ]
+        );
+
+        \App\Models\MemberResume::updateOrCreate(
+            ['user_id' => $member2->id],
+            [
+                'original_name' => 'Member02_Logistics_CV.pdf',
+                'file_path' => 'resumes/samples/member02_cv.pdf',
+                'file_size' => 162100,
+                'mime_type' => 'application/pdf',
+                'extracted_skills' => ['Logistics', 'Event Planning', 'Inventory Management', 'Audio Visual', 'Venue Preparation'],
+                'certifications' => ['Safety & Event Management Protocol Certificate'],
+                'experience_summary' => 'Experienced in campus event operations, stage sound management, and logistics inventory.',
+                'eligibility_status' => 'Highly Recommended',
+            ]
+        );
+
+        \App\Models\MemberResume::updateOrCreate(
+            ['user_id' => $member3->id],
+            [
+                'original_name' => 'Member03_Creative_CV.pdf',
+                'file_path' => 'resumes/samples/member03_cv.pdf',
+                'file_size' => 189400,
+                'mime_type' => 'application/pdf',
+                'extracted_skills' => ['Graphic Design', 'Public Relations', 'Canva', 'Social Media Management', 'Media & Marketing'],
+                'certifications' => ['Adobe Photoshop Certified Associate', 'Social Media Strategy Workshop'],
+                'experience_summary' => 'Lead public information officer for departmental organization; handles branding, poster design, and announcements.',
+                'eligibility_status' => 'Eligible',
+            ]
+        );
+
         // ---------------------------------------------------------------------
         // 2. TEST PROJECT
         // ---------------------------------------------------------------------

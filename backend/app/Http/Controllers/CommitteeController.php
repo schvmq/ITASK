@@ -137,7 +137,7 @@ class CommitteeController extends Controller
                     ->whereHas('user', function ($q) {
                         $q->whereNotNull('email_verified_at');
                     })
-                    ->with('user')
+                    ->with(['user.resume'])
                     ->get()
                     ->unique('user_id');
 
@@ -177,6 +177,13 @@ class CommitteeController extends Controller
                         'context'                => $context,
                         'is_event_co_chair'      => $isEventCoChair,
                         'other_committees_count' => $otherCommittees->count(),
+                        'has_resume'             => (bool) $assignment->user->resume,
+                        'resume'                 => $assignment->user->resume ? [
+                            'original_name'      => $assignment->user->resume->original_name,
+                            'skills'             => $assignment->user->resume->extracted_skills ?? [],
+                            'certifications'     => $assignment->user->resume->certifications ?? [],
+                            'eligibility_status' => $assignment->user->resume->eligibility_status,
+                        ] : null,
                     ];
                 })->values()->all();
             })()
@@ -498,5 +505,44 @@ class CommitteeController extends Controller
             'project' => $project->id,
             'committee' => $committee->id,
         ])->with('status', 'Member removed from committee.');
+    }
+
+    /**
+     * AI-Powered Candidate Ranking and Recommendation using Ollama.
+     */
+    public function recommendMembers(
+        Project $project,
+        Committee $committee,
+        \App\Services\AI\OllamaResumeScreeningService $screeningService
+    ): \Illuminate\Http\JsonResponse {
+        if ((int) $committee->project_id !== (int) $project->id) {
+            abort(404, 'Committee not found in this project.');
+        }
+
+        Gate::authorize('manageMembers', $committee);
+
+        $alreadyInCommitteeUserIds = ProjectRoleAssignment::where('project_id', $project->id)
+            ->where('committee_id', $committee->id)
+            ->pluck('user_id');
+
+        $candidateAssignments = ProjectRoleAssignment::where('project_id', $project->id)
+            ->where('role', '!=', ProjectRoleAssignment::ROLE_PROJECT_LEADER)
+            ->where('user_id', '!=', $project->created_by)
+            ->whereNotIn('user_id', $alreadyInCommitteeUserIds)
+            ->whereHas('user', function ($q) {
+                $q->whereNotNull('email_verified_at');
+            })
+            ->with(['user.resume'])
+            ->get()
+            ->unique('user_id');
+
+        $candidates = $candidateAssignments->map(fn ($assignment) => $assignment->user);
+        $recommendations = $screeningService->rankCandidatesForCommittee($committee, $candidates);
+
+        return response()->json([
+            'success' => true,
+            'ollama_active' => $screeningService->isAvailable(),
+            'recommendations' => $recommendations,
+        ]);
     }
 }

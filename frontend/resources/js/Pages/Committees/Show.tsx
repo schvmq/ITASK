@@ -35,7 +35,32 @@ import {
     Calendar,
     Clock,
     MoreHorizontal,
+    Sparkles,
+    UploadCloud,
+    FileText,
+    CheckCircle2,
+    Award,
 } from 'lucide-react';
+
+interface MemberResumeData {
+    original_name: string;
+    skills: string[];
+    certifications: string[];
+    eligibility_status: string;
+}
+
+interface MemberRecommendation {
+    user_id: number;
+    name: string;
+    email: string;
+    has_resume: boolean;
+    resume_name?: string;
+    suitability_score: number;
+    eligibility_status: string;
+    recommendation_reason: string;
+    extracted_skills: string[];
+    certifications?: string[];
+}
 
 interface MemberItem {
     id: number;
@@ -48,6 +73,8 @@ interface MemberItem {
     completed_tasks_count?: number;
     progress?: number;
     is_co_chair?: boolean;
+    has_resume?: boolean;
+    resume?: MemberResumeData | null;
 }
 
 interface StaffItem {
@@ -212,6 +239,101 @@ export default function CommitteeShow({
         );
     };
 
+    // AI Screening & Recommendation state
+    const [recommendations, setRecommendations] = useState<MemberRecommendation[] | null>(null);
+    const [isRecommending, setIsRecommending] = useState(false);
+    const [recommendationError, setRecommendationError] = useState<string | null>(null);
+    const [ollamaActive, setOllamaActive] = useState<boolean | null>(null);
+
+    // Resume Upload Modal state
+    const [isResumeModalOpen, setIsResumeModalOpen] = useState(false);
+    const [userForResume, setUserForResume] = useState<MemberItem | null>(null);
+    const [resumeFile, setResumeFile] = useState<File | null>(null);
+    const [resumeUploadProcessing, setResumeUploadProcessing] = useState(false);
+    const [resumeUploadError, setResumeUploadError] = useState<string | null>(null);
+    const [resumeUploadSuccess, setResumeUploadSuccess] = useState<string | null>(null);
+
+    const handleFetchRecommendations = async () => {
+        setIsRecommending(true);
+        setRecommendationError(null);
+        try {
+            const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
+            const res = await fetch(`/projects/${project.id}/committees/${committee.id}/recommend-members`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken || '',
+                    'Accept': 'application/json',
+                },
+            });
+            const data = await res.json();
+            if (data.success) {
+                setRecommendations(data.recommendations);
+                setOllamaActive(data.ollama_active);
+            } else {
+                setRecommendationError('Unable to generate AI recommendations.');
+            }
+        } catch (err: any) {
+            setRecommendationError(err.message || 'Error communicating with screening service.');
+        } finally {
+            setIsRecommending(false);
+        }
+    };
+
+    const handleSelectTopMatch = () => {
+        if (!recommendations || recommendations.length === 0) return;
+        const top = recommendations[0];
+        if (!assignData.user_ids.includes(top.user_id)) {
+            setAssignData('user_ids', [...assignData.user_ids, top.user_id]);
+        }
+    };
+
+    const handleOpenUploadResume = (member: MemberItem, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setUserForResume(member);
+        setResumeFile(null);
+        setResumeUploadError(null);
+        setResumeUploadSuccess(null);
+        setIsResumeModalOpen(true);
+    };
+
+    const handleUploadResumeSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userForResume || !resumeFile) return;
+        setResumeUploadProcessing(true);
+        setResumeUploadError(null);
+        setResumeUploadSuccess(null);
+
+        const formData = new FormData();
+        formData.append('resume', resumeFile);
+
+        try {
+            const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
+            const res = await fetch(`/users/${userForResume.id}/resume`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken || '',
+                    'Accept': 'application/json',
+                },
+                body: formData,
+            });
+            const data = await res.json();
+            if (data.success) {
+                setResumeUploadSuccess(`CV for ${userForResume.name} uploaded and analyzed!`);
+                setTimeout(() => {
+                    setIsResumeModalOpen(false);
+                    handleFetchRecommendations();
+                }, 1200);
+            } else {
+                setResumeUploadError(data.message || 'Failed to upload and analyze CV.');
+            }
+        } catch (err: any) {
+            setResumeUploadError(err.message || 'Error uploading file.');
+        } finally {
+            setResumeUploadProcessing(false);
+        }
+    };
+
     // Assign / Change Staff form
     const {
         data: staffData,
@@ -333,6 +455,7 @@ export default function CommitteeShow({
         clearAssignErrors();
         setMemberSearchQuery('');
         setIsAssignModalOpen(true);
+        handleFetchRecommendations();
     };
 
     const toggleMemberSelection = (id: number) => {
@@ -1013,6 +1136,64 @@ export default function CommitteeShow({
                     <form onSubmit={handleAssignMemberSubmit} className="space-y-4 pt-1">
                         {eligibleMembers.length > 0 ? (
                             <div className="space-y-3">
+                                {/* AI Screening & Recommendation Banner */}
+                                <div className="p-3 rounded-xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-transparent border border-orange-200 dark:border-orange-900/40 space-y-2">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 rounded-lg bg-orange-500/20 text-[color:var(--color-brand-action-orange)] shrink-0">
+                                                <Sparkles className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                                                    <span>Ollama AI Resume & Eligibility Screening</span>
+                                                    {ollamaActive !== null && (
+                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                                            ollamaActive
+                                                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                                        }`}>
+                                                            {ollamaActive ? '● Ollama Active' : '● Heuristic Mode'}
+                                                        </span>
+                                                    )}
+                                                </h4>
+                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                                    Ranks candidates against <strong>{committee.name}</strong> deliverables by scanning CV skills.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleFetchRecommendations}
+                                            disabled={isRecommending}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-[color:var(--color-brand-action-orange)] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+                                        >
+                                            <Sparkles className={`w-3.5 h-3.5 ${isRecommending ? 'animate-spin' : ''}`} />
+                                            <span>{isRecommending ? 'Screening CVs...' : 'Rank by Suitability'}</span>
+                                        </button>
+                                    </div>
+
+                                    {recommendationError && (
+                                        <p className="text-[11px] text-rose-600 dark:text-rose-400">
+                                            {recommendationError}
+                                        </p>
+                                    )}
+
+                                    {recommendations && recommendations.length > 0 && (
+                                        <div className="pt-2 border-t border-orange-200/60 dark:border-orange-900/40 flex items-center justify-between text-[11px]">
+                                            <span className="text-slate-700 dark:text-slate-300 truncate">
+                                                Top match: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{recommendations[0].name}</strong> ({recommendations[0].suitability_score}% Match)
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={handleSelectTopMatch}
+                                                className="text-xs font-bold text-[color:var(--color-brand-action-orange)] hover:underline cursor-pointer shrink-0 ml-2"
+                                            >
+                                                + Select Top Match
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
                                 {/* Search input and Quick actions */}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                     <div className="relative flex-1">
@@ -1057,40 +1238,100 @@ export default function CommitteeShow({
                                 </div>
 
                                 {/* Member List */}
-                                <div className="max-h-72 overflow-y-auto divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-xl">
+                                <div className="max-h-80 overflow-y-auto divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-xl">
                                     {filteredEligibleMembers.map((member) => {
                                         const isSelected = assignData.user_ids.includes(member.id);
+                                        const rec = recommendations?.find((r) => r.user_id === member.id);
+                                        const hasResume = rec ? rec.has_resume : member.has_resume;
+                                        const skills = rec?.extracted_skills || member.resume?.skills || [];
+                                        const score = rec?.suitability_score;
+                                        const status = rec?.eligibility_status || member.resume?.eligibility_status;
+
                                         return (
                                             <div
                                                 key={member.id}
                                                 onClick={() => toggleMemberSelection(member.id)}
-                                                className={`p-3 flex items-center justify-between gap-3 transition-colors cursor-pointer select-none ${
+                                                className={`p-3 flex flex-col gap-2 transition-colors cursor-pointer select-none ${
                                                     isSelected ? 'bg-orange-50/50 dark:bg-orange-950/20' : 'bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)]'
                                                 }`}
                                             >
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => {}} // parent onClick handles toggle
-                                                        className="w-4 h-4 rounded text-[color:var(--color-brand-action-orange)] border-[color:var(--border)] bg-[color:var(--card)] focus:ring-orange-500/20 cursor-pointer shrink-0"
-                                                    />
-                                                    <div className="min-w-0">
-                                                        <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
-                                                            {member.name}
-                                                        </p>
-                                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                                                            {member.email}
-                                                        </p>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={() => {}} // parent onClick handles toggle
+                                                            className="w-4 h-4 rounded text-[color:var(--color-brand-action-orange)] border-[color:var(--border)] bg-[color:var(--card)] focus:ring-orange-500/20 cursor-pointer shrink-0"
+                                                        />
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                                                                    {member.name}
+                                                                </p>
+                                                                {score !== undefined && (
+                                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                        score >= 85
+                                                                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                                                            : score >= 75
+                                                                            ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300 border border-teal-300 dark:border-teal-800'
+                                                                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                                                                    }`}>
+                                                                        {score}% Match • {status || 'Eligible'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                                {member.email}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        {member.context && (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
+                                                                <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                                                <span>{member.context}</span>
+                                                            </span>
+                                                        )}
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => handleOpenUploadResume(member, e)}
+                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border transition-colors cursor-pointer ${
+                                                                hasResume
+                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                                                    : 'bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-orange-300'
+                                                            }`}
+                                                            title={hasResume ? 'Update candidate resume / CV' : 'Attach resume / CV for AI screening'}
+                                                        >
+                                                            <FileText className="w-3 h-3 shrink-0" />
+                                                            <span>{hasResume ? 'CV Attached' : 'Attach CV'}</span>
+                                                        </button>
                                                     </div>
                                                 </div>
 
-                                                {/* Contextual indicator for multi-committee */}
-                                                {member.context && (
-                                                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
-                                                        <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                                                        <span>{member.context}</span>
-                                                    </span>
+                                                {/* Candidate Extracted Skills & Justification */}
+                                                {(skills.length > 0 || rec?.recommendation_reason) && (
+                                                    <div className="pl-7 pt-1 flex flex-col gap-1">
+                                                        {skills.length > 0 && (
+                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Skills:</span>
+                                                                {skills.map((s, idx) => (
+                                                                    <span
+                                                                        key={idx}
+                                                                        className="px-1.5 py-0.2 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                                                                    >
+                                                                        {s}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        {rec?.recommendation_reason && (
+                                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
+                                                                "{rec.recommendation_reason}"
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         );
@@ -1145,6 +1386,67 @@ export default function CommitteeShow({
                                     </Button>
                                 )}
                             </div>
+                        </div>
+                    </form>
+                </Modal>
+
+                {/* ── Upload & Scan Candidate Resume Modal ── */}
+                <Modal
+                    isOpen={isResumeModalOpen}
+                    onClose={() => !resumeUploadProcessing && setIsResumeModalOpen(false)}
+                    title="Attach Candidate Resume / CV"
+                    description={`Upload resume or CV document for ${userForResume?.name ?? 'candidate'} for Ollama AI eligibility analysis.`}
+                    maxWidth="md"
+                >
+                    <form onSubmit={handleUploadResumeSubmit} className="space-y-4 pt-1">
+                        <div className="space-y-2">
+                            <Label htmlFor="resume-file" required>
+                                Select Resume / CV Document (PDF, Image, or Word)
+                            </Label>
+                            <input
+                                id="resume-file"
+                                type="file"
+                                accept=".pdf,.png,.jpg,.jpeg,.docx,.txt"
+                                onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                                className="w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[color:var(--color-brand-action-orange)] file:text-white hover:file:opacity-95 cursor-pointer border border-slate-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-[#14181F]"
+                                required
+                            />
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Supports PDF resumes or scanned image CVs (PNG/JPG). Ollama will extract skills, certifications, and evaluate role eligibility.
+                            </p>
+                        </div>
+
+                        {resumeUploadError && (
+                            <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-700 dark:text-rose-300">
+                                {resumeUploadError}
+                            </div>
+                        )}
+
+                        {resumeUploadSuccess && (
+                            <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 font-medium">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>{resumeUploadSuccess}</span>
+                            </div>
+                        )}
+
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsResumeModalOpen(false)}
+                                disabled={resumeUploadProcessing}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                variant="primary"
+                                isLoading={resumeUploadProcessing}
+                                disabled={resumeUploadProcessing || !resumeFile}
+                            >
+                                <UploadCloud className="w-3.5 h-3.5 mr-1.5" />
+                                <span>Upload & Scan with Ollama</span>
+                            </Button>
                         </div>
                     </form>
                 </Modal>

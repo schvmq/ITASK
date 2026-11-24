@@ -124,6 +124,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/projects/{project}/committees/{committee}/members/{user}', [CommitteeController::class, 'removeMember'])->name('projects.committees.members.destroy');
     Route::post('/projects/{project}/committees/{committee}/co-chairs', [\App\Http\Controllers\CoChairDesignationController::class, 'storeCommittee'])->name('projects.committees.co-chairs.store');
     Route::delete('/projects/{project}/committees/{committee}/co-chairs/{user}', [\App\Http\Controllers\CoChairDesignationController::class, 'destroyCommittee'])->name('projects.committees.co-chairs.destroy');
+    Route::post('/projects/{project}/committees/{committee}/recommend-members', [CommitteeController::class, 'recommendMembers'])->name('projects.committees.members.recommend');
+    Route::post('/users/{user}/resume', [\App\Http\Controllers\MemberResumeController::class, 'upload'])->name('users.resume.upload');
+    Route::get('/users/{user}/resume', [\App\Http\Controllers\MemberResumeController::class, 'show'])->name('users.resume.show');
 
     // Activities
     Route::post('/projects/{project}/committees/{committee}/activities', [\App\Http\Controllers\ActivityController::class, 'store'])->name('projects.committees.activities.store');
