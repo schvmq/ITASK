@@ -77,6 +77,11 @@ class Activity extends Model
         return $this->hasMany(Task::class);
     }
 
+    public function skillRequirements(): HasMany
+    {
+        return $this->hasMany(DeliverableSkillRequirement::class, 'activity_id');
+    }
+
     protected static function booted(): void
     {
         static::saved(function (Activity $activity) {

@@ -49,6 +49,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'skill_onboarding_acknowledged_at' => 'datetime',
+            'skill_assessment_completed_at' => 'datetime',
         ];
     }
 
@@ -127,5 +129,27 @@ class User extends Authenticatable implements MustVerifyEmail
     public function resume(): HasOne
     {
         return $this->hasOne(MemberResume::class);
+    }
+
+    public function skillRatings(): HasMany
+    {
+        return $this->hasMany(UserSkillRating::class);
+    }
+
+    public function skills(): BelongsToMany
+    {
+        return $this->belongsToMany(Skill::class, 'user_skill_ratings')
+            ->withPivot('rating')
+            ->withTimestamps();
+    }
+
+    public function hasAcknowledgedSkillOnboarding(): bool
+    {
+        return $this->skill_onboarding_acknowledged_at !== null;
+    }
+
+    public function hasCompletedSkillAssessment(): bool
+    {
+        return $this->skill_assessment_completed_at !== null;
     }
 }
