@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Head, router } from '@inertiajs/react';
+import axios from 'axios';
 import { SkillProfileData } from '@/types/skills';
 import { SkillRatingCard } from '@/Components/Skills/SkillRatingCard';
 import { SelfAssessmentNotice } from '@/Components/Skills/SelfAssessmentNotice';
@@ -79,19 +80,8 @@ export default function SkillAssessmentOnboarding({
             : buildCategoryPayload(currentCategoryIndex);
 
         try {
-            const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
-            const res = await fetch('/profile/skills', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken || '',
-                },
-                body: JSON.stringify({ ratings: payload }),
-            });
-
-            const data = await res.json();
-            if (res.ok && data.success) {
+            const res = await axios.post('/profile/skills', { ratings: payload });
+            if (res.data && res.data.success) {
                 if (!isLastCategory) {
                     setCurrentCategoryIndex((prev) => prev + 1);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -100,10 +90,15 @@ export default function SkillAssessmentOnboarding({
                     router.visit('/dashboard');
                 }
             } else {
-                setErrorMessage(data.message || 'Failed to save skills. Please check your selections.');
+                setErrorMessage(res.data?.message || 'Failed to save skills. Please check your selections.');
             }
         } catch (err: any) {
-            setErrorMessage(err.message || 'Network error communicating with the server.');
+            setErrorMessage(
+                err.response?.data?.message ||
+                (err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(' ') : null) ||
+                err.message ||
+                'Network error communicating with the server.'
+            );
         } finally {
             setIsSaving(false);
         }
@@ -119,25 +114,18 @@ export default function SkillAssessmentOnboarding({
         const payload = hasAnyRated ? buildAllRatingsPayload() : [];
 
         try {
-            const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
-            const res = await fetch('/onboarding/skills/complete-later', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken || '',
-                },
-                body: JSON.stringify({ ratings: payload }),
-            });
-
-            const data = await res.json();
-            if (res.ok && data.success) {
-                router.visit(data.redirect_url || '/dashboard');
+            const res = await axios.post('/onboarding/skills/complete-later', { ratings: payload });
+            if (res.data && res.data.success) {
+                router.visit(res.data.redirect_url || '/dashboard');
             } else {
-                setErrorMessage(data.message || 'Unable to skip onboarding.');
+                setErrorMessage(res.data?.message || 'Unable to skip onboarding.');
             }
         } catch (err: any) {
-            setErrorMessage(err.message || 'Error processing request.');
+            setErrorMessage(
+                err.response?.data?.message ||
+                err.message ||
+                'Error processing request.'
+            );
         } finally {
             setIsSaving(false);
         }
@@ -151,7 +139,7 @@ export default function SkillAssessmentOnboarding({
             <header className="border-b border-[color:var(--border)] bg-[color:var(--card)] py-4 px-6 sticky top-0 z-20 backdrop-blur-md">
                 <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-[color:var(--color-brand-action-orange)]/10 text-[color:var(--color-brand-action-orange)] flex items-center justify-center font-bold">
+                        <div className="w-8 h-8 rounded-lg bg-[color:var(--primary)]/10 text-[color:var(--primary)] flex items-center justify-center font-bold">
                             <Sparkles className="w-4 h-4" />
                         </div>
                         <div>
@@ -166,7 +154,7 @@ export default function SkillAssessmentOnboarding({
                         type="button"
                         onClick={handleCompleteLater}
                         disabled={isSaving}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] text-xs font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                         title="Skip assessment and proceed to dashboard"
                     >
                         <Clock className="w-3.5 h-3.5" />
@@ -191,7 +179,7 @@ export default function SkillAssessmentOnboarding({
 
                     <div className="w-full h-2 rounded-full bg-[color:var(--soft-surface)] overflow-hidden">
                         <div
-                            className="h-full bg-[color:var(--color-brand-action-orange)] transition-all duration-300 rounded-full"
+                            className="h-full bg-[color:var(--primary)] transition-all duration-300 rounded-full"
                             style={{ width: `${progressPercentage}%` }}
                         />
                     </div>
@@ -208,7 +196,7 @@ export default function SkillAssessmentOnboarding({
                                     onClick={() => setCurrentCategoryIndex(idx)}
                                     className={`px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors border cursor-pointer ${
                                         isCurrent
-                                            ? 'bg-[color:var(--soft-surface)] border-[color:var(--color-brand-action-orange)] font-semibold text-[color:var(--text)]'
+                                            ? 'bg-[color:var(--soft-surface)] border-[color:var(--primary)] font-semibold text-[color:var(--text)]'
                                             : isDone
                                               ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5'
                                               : 'border-[color:var(--border)] text-[color:var(--muted)] hover:bg-[color:var(--soft-surface)]'
@@ -298,7 +286,7 @@ export default function SkillAssessmentOnboarding({
                             type="button"
                             onClick={handleCompleteLater}
                             disabled={isSaving}
-                            className="px-3.5 py-2 text-xs font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors cursor-pointer disabled:opacity-50"
+                            className="px-3.5 py-2 min-h-[44px] text-xs font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] transition-colors cursor-pointer disabled:opacity-50"
                         >
                             Complete Later
                         </button>
@@ -307,7 +295,7 @@ export default function SkillAssessmentOnboarding({
                             type="button"
                             onClick={handleSaveAndContinue}
                             disabled={isSaving}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[color:var(--color-brand-action-orange)] text-white hover:bg-orange-600 rounded-lg cursor-pointer transition-colors shadow-xs"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[44px] text-xs font-semibold bg-[color:var(--primary)] text-white hover:opacity-90 rounded-lg cursor-pointer transition-colors shadow-xs"
                         >
                             {isSaving ? (
                                 <>

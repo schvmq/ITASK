@@ -772,7 +772,7 @@ export default function CommitteeShow({
                                     {/* 3-dots dropdown menu for Committee Options */}
                                     {(committee.can.update || committee.can.delete) && (
                                         <DropdownMenu>
-                                             <DropdownMenuTrigger asChild>
+                                            <DropdownMenuTrigger asChild>
                                                 <button
                                                     type="button"
                                                     className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-2xs cursor-pointer"
@@ -873,7 +873,7 @@ export default function CommitteeShow({
                                                     </Link>
                                                     <span
                                                         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold shrink-0 border ${getActivityStatusBadge(
-                                                             act.status
+                                                            act.status
                                                         )}`}
                                                     >
                                                         <span className={`w-1.5 h-1.5 rounded-full ${getActivityStatusDot(act.status)}`} />
@@ -920,7 +920,7 @@ export default function CommitteeShow({
                                                         </span>
                                                     </div>
                                                     <div className="text-slate-700 dark:text-slate-200 font-medium shrink-0">
-                                                         {act.due_date ? `Due ${act.due_date}` : <span className="text-slate-400 dark:text-slate-500 italic font-normal">No deadline</span>}
+                                                        {act.due_date ? `Due ${act.due_date}` : <span className="text-slate-400 dark:text-slate-500 italic font-normal">No deadline</span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -1069,11 +1069,10 @@ export default function CommitteeShow({
                                                         type="button"
                                                         onClick={() => member.is_co_chair ? handleRemoveCoChair(member.id) : handleDesignateCoChair(member.id)}
                                                         disabled={coChairProcessing}
-                                                        className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded cursor-pointer ${
-                                                            member.is_co_chair
-                                                                ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30'
-                                                                : 'text-slate-400 dark:text-slate-500 hover:text-amber-600 hover:bg-[color:var(--soft-surface)]'
-                                                        }`}
+                                                        className={`opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded cursor-pointer ${member.is_co_chair
+                                                            ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                                                            : 'text-slate-400 dark:text-slate-500 hover:text-amber-600 hover:bg-[color:var(--soft-surface)]'
+                                                            }`}
                                                         title={member.is_co_chair ? 'Remove Co-Chair designation' : 'Designate as Committee Co-Chair'}
                                                         aria-label={member.is_co_chair ? 'Remove Co-Chair designation' : 'Designate as Committee Co-Chair'}
                                                     >
@@ -1129,857 +1128,854 @@ export default function CommitteeShow({
             </div>
 
             {/* ── Assign Member Modal ── */}
-                <Modal
-                    isOpen={isAssignModalOpen}
-                    onClose={() => !assignProcessing && setIsAssignModalOpen(false)}
-                    title="Assign Committee Members"
-                    description={`Select eligible Members from ${project.title} to assign to ${committee.name}.`}
-                    maxWidth="lg"
-                >
-                    <form onSubmit={handleAssignMemberSubmit} className="space-y-4 pt-1">
-                        {eligibleMembers.length > 0 ? (
-                            <div className="space-y-3">
-                                {/* AI Screening & Recommendation Banner */}
-                                <div className="p-3.5 rounded-xl bg-[color:var(--soft-surface)]/60 border border-[color:var(--border)] space-y-2.5">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-1.5 rounded-lg bg-[color:var(--primary)]/15 text-[color:var(--primary)] shrink-0">
-                                                <Sparkles className="w-4 h-4 stroke-[2]" />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-xs font-bold text-[color:var(--text)] flex items-center gap-1.5 flex-wrap">
-                                                    <span>Ollama AI Resume & Eligibility Screening</span>
-                                                    {ollamaActive !== null && (
-                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--muted)]">
-                                                            {ollamaActive ? '● Ollama Active' : '● Heuristic Mode'}
+            <Modal
+                isOpen={isAssignModalOpen}
+                onClose={() => !assignProcessing && setIsAssignModalOpen(false)}
+                title="Assign Committee Members"
+                description={`Select eligible Members from ${project.title} to assign to ${committee.name}.`}
+                maxWidth="lg"
+            >
+                <form onSubmit={handleAssignMemberSubmit} className="space-y-4 pt-1">
+                    {eligibleMembers.length > 0 ? (
+                        <div className="space-y-3">
+                            {/* AI Screening & Recommendation Banner */}
+                            <div className="p-3.5 rounded-xl bg-[color:var(--soft-surface)]/60 border border-[color:var(--border)] space-y-2.5">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 rounded-lg bg-[color:var(--primary)]/15 text-[color:var(--primary)] shrink-0">
+                                            <Sparkles className="w-4 h-4 stroke-[2]" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-bold text-[color:var(--text)] flex items-center gap-1.5 flex-wrap">
+                                                <span>Ollama AI Resume & Eligibility Screening</span>
+                                                {ollamaActive !== null && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--muted)]">
+                                                        {ollamaActive ? '● Ollama Active' : '● Heuristic Mode'}
+                                                    </span>
+                                                )}
+                                            </h4>
+                                            <p className="text-[11px] text-[color:var(--muted)]">
+                                                Ranks candidates against <strong>{committee.name}</strong> deliverables by combining questionnaire strengths and CV credentials.{' '}
+                                                <Link
+                                                    href="/eligibility-profile"
+                                                    className="text-[color:var(--primary)] underline hover:no-underline font-medium"
+                                                >
+                                                    Update questionnaire &rarr;
+                                                </Link>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleFetchRecommendations}
+                                        disabled={isRecommending}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] sm:min-h-0 text-xs font-semibold rounded-lg bg-[color:var(--primary)] text-white hover:opacity-90 disabled:opacity-50 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+                                    >
+                                        <Sparkles className={`w-3.5 h-3.5 ${isRecommending ? 'animate-spin' : ''}`} />
+                                        <span>{isRecommending ? 'Screening CVs...' : 'Rank by Suitability'}</span>
+                                    </button>
+                                </div>
+
+                                {recommendationError && (
+                                    <p className="text-[11px] text-[color:var(--status-danger-text)]">
+                                        {recommendationError}
+                                    </p>
+                                )}
+
+                                {recommendations && recommendations.length > 0 && (
+                                    <div className="pt-2 border-t border-[color:var(--border)] flex items-center justify-between text-[11px]">
+                                        <span className="text-[color:var(--text)] truncate">
+                                            Top match: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{recommendations[0].name}</strong> ({recommendations[0].suitability_score}% Match)
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleSelectTopMatch}
+                                            className="text-xs font-bold text-[color:var(--primary)] hover:underline cursor-pointer shrink-0 ml-2"
+                                        >
+                                            + Select Top Match
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Search input and Quick actions */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="text"
+                                        placeholder="Search members by name or email..."
+                                        value={memberSearchQuery}
+                                        onChange={(e) => setMemberSearchQuery(e.target.value)}
+                                        className="w-full pl-3 pr-8 py-1.5 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-lg shadow-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-[color:var(--muted)]"
+                                    />
+                                    {memberSearchQuery && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setMemberSearchQuery('')}
+                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelectAll(filteredEligibleMembers)}
+                                        className="text-[color:var(--color-brand-action-orange)] hover:underline font-semibold cursor-pointer"
+                                    >
+                                        Select All ({filteredEligibleMembers.length})
+                                    </button>
+                                    {assignData.user_ids.length > 0 && (
+                                        <>
+                                            <span className="text-slate-300 dark:text-slate-600">|</span>
+                                            <button
+                                                type="button"
+                                                onClick={handleDeselectAll}
+                                                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:underline cursor-pointer"
+                                            >
+                                                Deselect All
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Member List */}
+                            <div className="max-h-80 overflow-y-auto divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-xl">
+                                {filteredEligibleMembers.map((member) => {
+                                    const isSelected = assignData.user_ids.includes(member.id);
+                                    const rec = recommendations?.find((r) => r.user_id === member.id);
+                                    const hasResume = rec ? rec.has_resume : member.has_resume;
+                                    const skills = rec?.extracted_skills || member.resume?.skills || [];
+                                    const score = rec?.suitability_score;
+                                    const status = rec?.eligibility_status || member.resume?.eligibility_status;
+
+                                    return (
+                                        <div
+                                            key={member.id}
+                                            onClick={() => toggleMemberSelection(member.id)}
+                                            className={`p-3 flex flex-col gap-2 transition-colors cursor-pointer select-none ${isSelected ? 'bg-orange-50/50 dark:bg-orange-950/20' : 'bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)]'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => { }} // parent onClick handles toggle
+                                                        className="w-4 h-4 rounded text-[color:var(--primary)] border-[color:var(--border)] bg-[color:var(--card)] focus:ring-[color:var(--primary)]/20 cursor-pointer shrink-0"
+                                                    />
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className="text-xs font-semibold text-[color:var(--text)] truncate">
+                                                                {member.name}
+                                                            </p>
+                                                            {score !== undefined && (
+                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${score >= 85
+                                                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                                                    : score >= 75
+                                                                        ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300 border border-teal-300 dark:border-teal-800'
+                                                                        : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                                                                    }`}>
+                                                                    {score}% Match • {status || 'Eligible'}
+                                                                </span>
+                                                            )}
+                                                            {rec?.has_questionnaire && (
+                                                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+                                                                    Questionnaire
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[11px] text-[color:var(--muted)] truncate">
+                                                            {member.email}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {member.context && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
+                                                            <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                                            <span>{member.context}</span>
                                                         </span>
                                                     )}
-                                                </h4>
-                                                <p className="text-[11px] text-[color:var(--muted)]">
-                                                    Ranks candidates against <strong>{committee.name}</strong> deliverables by combining questionnaire strengths and CV credentials.{' '}
-                                                    <Link
-                                                        href="/eligibility-profile"
-                                                        className="text-[color:var(--primary)] underline hover:no-underline font-medium"
-                                                    >
-                                                        Update questionnaire &rarr;
-                                                    </Link>
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleFetchRecommendations}
-                                            disabled={isRecommending}
-                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] sm:min-h-0 text-xs font-semibold rounded-lg bg-[color:var(--primary)] text-white hover:opacity-90 disabled:opacity-50 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
-                                        >
-                                            <Sparkles className={`w-3.5 h-3.5 ${isRecommending ? 'animate-spin' : ''}`} />
-                                            <span>{isRecommending ? 'Screening CVs...' : 'Rank by Suitability'}</span>
-                                        </button>
-                                    </div>
 
-                                    {recommendationError && (
-                                        <p className="text-[11px] text-[color:var(--status-danger-text)]">
-                                            {recommendationError}
-                                        </p>
-                                    )}
-
-                                    {recommendations && recommendations.length > 0 && (
-                                        <div className="pt-2 border-t border-[color:var(--border)] flex items-center justify-between text-[11px]">
-                                            <span className="text-[color:var(--text)] truncate">
-                                                Top match: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{recommendations[0].name}</strong> ({recommendations[0].suitability_score}% Match)
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={handleSelectTopMatch}
-                                                className="text-xs font-bold text-[color:var(--primary)] hover:underline cursor-pointer shrink-0 ml-2"
-                                            >
-                                                + Select Top Match
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Search input and Quick actions */}
-                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                    <div className="relative flex-1">
-                                        <input
-                                            type="text"
-                                            placeholder="Search members by name or email..."
-                                            value={memberSearchQuery}
-                                            onChange={(e) => setMemberSearchQuery(e.target.value)}
-                                            className="w-full pl-3 pr-8 py-1.5 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-lg shadow-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-[color:var(--muted)]"
-                                        />
-                                        {memberSearchQuery && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setMemberSearchQuery('')}
-                                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                                            >
-                                                <X className="w-3.5 h-3.5" />
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSelectAll(filteredEligibleMembers)}
-                                            className="text-[color:var(--color-brand-action-orange)] hover:underline font-semibold cursor-pointer"
-                                        >
-                                            Select All ({filteredEligibleMembers.length})
-                                        </button>
-                                        {assignData.user_ids.length > 0 && (
-                                            <>
-                                                <span className="text-slate-300 dark:text-slate-600">|</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleDeselectAll}
-                                                    className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:underline cursor-pointer"
-                                                >
-                                                    Deselect All
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Member List */}
-                                <div className="max-h-80 overflow-y-auto divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-xl">
-                                    {filteredEligibleMembers.map((member) => {
-                                        const isSelected = assignData.user_ids.includes(member.id);
-                                        const rec = recommendations?.find((r) => r.user_id === member.id);
-                                        const hasResume = rec ? rec.has_resume : member.has_resume;
-                                        const skills = rec?.extracted_skills || member.resume?.skills || [];
-                                        const score = rec?.suitability_score;
-                                        const status = rec?.eligibility_status || member.resume?.eligibility_status;
-
-                                        return (
-                                            <div
-                                                key={member.id}
-                                                onClick={() => toggleMemberSelection(member.id)}
-                                                className={`p-3 flex flex-col gap-2 transition-colors cursor-pointer select-none ${
-                                                    isSelected ? 'bg-orange-50/50 dark:bg-orange-950/20' : 'bg-[color:var(--card)] hover:bg-[color:var(--soft-surface)]'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={() => {}} // parent onClick handles toggle
-                                                            className="w-4 h-4 rounded text-[color:var(--primary)] border-[color:var(--border)] bg-[color:var(--card)] focus:ring-[color:var(--primary)]/20 cursor-pointer shrink-0"
-                                                        />
-                                                        <div className="min-w-0">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                <p className="text-xs font-semibold text-[color:var(--text)] truncate">
-                                                                    {member.name}
-                                                                </p>
-                                                                {score !== undefined && (
-                                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                                        score >= 85
-                                                                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
-                                                                            : score >= 75
-                                                                            ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300 border border-teal-300 dark:border-teal-800'
-                                                                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                                                                    }`}>
-                                                                        {score}% Match • {status || 'Eligible'}
-                                                                    </span>
-                                                                )}
-                                                                {rec?.has_questionnaire && (
-                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-                                                                        Questionnaire
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-[11px] text-[color:var(--muted)] truncate">
-                                                                {member.email}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        {member.context && (
-                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
-                                                                <Info className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                                                                <span>{member.context}</span>
-                                                            </span>
-                                                        )}
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => handleOpenUploadResume(member, e)}
-                                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border transition-colors cursor-pointer ${
-                                                                hasResume
-                                                                    ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                                                    : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border-[color:var(--border)] hover:border-[color:var(--primary)]/50'
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleOpenUploadResume(member, e)}
+                                                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border transition-colors cursor-pointer ${hasResume
+                                                            ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                                            : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border-[color:var(--border)] hover:border-[color:var(--primary)]/50'
                                                             }`}
-                                                            title={hasResume ? 'Update candidate resume / CV' : 'Attach resume / CV for AI screening'}
-                                                        >
-                                                            <FileText className="w-3 h-3 shrink-0" />
-                                                            <span>{hasResume ? 'CV Attached' : 'Attach CV'}</span>
-                                                        </button>
-                                                    </div>
+                                                        title={hasResume ? 'Update candidate resume / CV' : 'Attach resume / CV for AI screening'}
+                                                    >
+                                                        <FileText className="w-3 h-3 shrink-0" />
+                                                        <span>{hasResume ? 'CV Attached' : 'Attach CV'}</span>
+                                                    </button>
                                                 </div>
-
-                                                {/* Candidate Extracted Skills, Questionnaire Strengths & Justification */}
-                                                {(skills.length > 0 || (rec?.top_strengths && rec.top_strengths.length > 0) || rec?.recommendation_reason) && (
-                                                    <div className="pl-7 pt-1 flex flex-col gap-1">
-                                                        {skills.length > 0 && (
-                                                            <div className="flex items-center gap-1 flex-wrap">
-                                                                <span className="text-[10px] text-[color:var(--muted)] font-medium">CV Skills:</span>
-                                                                {skills.map((s, idx) => (
-                                                                    <span
-                                                                        key={idx}
-                                                                        className="px-1.5 py-0.2 rounded text-[10px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)]"
-                                                                    >
-                                                                        {s}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {rec?.top_strengths && rec.top_strengths.length > 0 && (
-                                                            <div className="flex items-center gap-1 flex-wrap">
-                                                                <span className="text-[10px] text-[color:var(--muted)] font-medium">Strengths:</span>
-                                                                {rec.top_strengths.map((st, sIdx) => (
-                                                                    <span
-                                                                        key={sIdx}
-                                                                        className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium"
-                                                                    >
-                                                                        {st}
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {rec?.recommendation_reason && (
-                                                            <p className="text-[10px] text-[color:var(--muted)] italic">
-                                                                "{rec.recommendation_reason}"
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
                                             </div>
-                                        );
-                                    })}
 
-                                    {filteredEligibleMembers.length === 0 && (
-                                        <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
-                                            No members match "{memberSearchQuery}".
+                                            {/* Candidate Extracted Skills, Questionnaire Strengths & Justification */}
+                                            {(skills.length > 0 || (rec?.top_strengths && rec.top_strengths.length > 0) || rec?.recommendation_reason) && (
+                                                <div className="pl-7 pt-1 flex flex-col gap-1">
+                                                    {skills.length > 0 && (
+                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                            <span className="text-[10px] text-[color:var(--muted)] font-medium">CV Skills:</span>
+                                                            {skills.map((s, idx) => (
+                                                                <span
+                                                                    key={idx}
+                                                                    className="px-1.5 py-0.2 rounded text-[10px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)]"
+                                                                >
+                                                                    {s}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {rec?.top_strengths && rec.top_strengths.length > 0 && (
+                                                        <div className="flex items-center gap-1 flex-wrap">
+                                                            <span className="text-[10px] text-[color:var(--muted)] font-medium">Strengths:</span>
+                                                            {rec.top_strengths.map((st, sIdx) => (
+                                                                <span
+                                                                    key={sIdx}
+                                                                    className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium"
+                                                                >
+                                                                    {st}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {rec?.recommendation_reason && (
+                                                        <p className="text-[10px] text-[color:var(--muted)] italic">
+                                                            "{rec.recommendation_reason}"
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
+                                    );
+                                })}
 
-                                <InputError message={assignErrors.user_id || assignErrors.user_ids} />
-                            </div>
-                        ) : (
-                            <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-1">
-                                <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
-                                    <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                                    <span>No Eligible Members Available</span>
-                                </div>
-                                <p className="leading-relaxed">
-                                    All Members in this event are already assigned to this committee, or no Members have been added to {project.title} yet.
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between gap-2.5">
-                            <span className="text-xs text-[color:var(--muted)]">
-                                {assignData.user_ids.length > 0
-                                    ? `${assignData.user_ids.length} member${assignData.user_ids.length === 1 ? '' : 's'} selected`
-                                    : 'No members selected'}
-                            </span>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setIsAssignModalOpen(false)}
-                                    disabled={assignProcessing}
-                                >
-                                    Cancel
-                                </Button>
-                                {eligibleMembers.length > 0 && (
-                                    <Button
-                                        type="submit"
-                                        variant="primary"
-                                        isLoading={assignProcessing}
-                                        disabled={assignProcessing || assignData.user_ids.length === 0}
-                                    >
-                                        {assignData.user_ids.length > 1
-                                            ? `Assign (${assignData.user_ids.length}) Members`
-                                            : 'Assign Member'}
-                                    </Button>
+                                {filteredEligibleMembers.length === 0 && (
+                                    <div className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                                        No members match "{memberSearchQuery}".
+                                    </div>
                                 )}
                             </div>
+
+                            <InputError message={assignErrors.user_id || assignErrors.user_ids} />
                         </div>
-                    </form>
-                </Modal>
-
-                {/* ── Upload & Scan Candidate Resume Modal ── */}
-                <Modal
-                    isOpen={isResumeModalOpen}
-                    onClose={() => !resumeUploadProcessing && setIsResumeModalOpen(false)}
-                    title="Attach Candidate Resume / CV"
-                    description={`Upload resume or CV document for ${userForResume?.name ?? 'candidate'} for Ollama AI eligibility analysis.`}
-                    maxWidth="md"
-                >
-                    <form onSubmit={handleUploadResumeSubmit} className="space-y-4 pt-1">
-                        <div className="space-y-2">
-                            <Label htmlFor="resume-file" required>
-                                Select Resume / CV Document (PDF, Image, or Word)
-                            </Label>
-                            <input
-                                id="resume-file"
-                                type="file"
-                                accept=".pdf,.png,.jpg,.jpeg,.docx,.txt"
-                                onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-                                className="w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[color:var(--color-brand-action-orange)] file:text-white hover:file:opacity-95 cursor-pointer border border-slate-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-[#14181F]"
-                                required
-                            />
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                Supports PDF resumes or scanned image CVs (PNG/JPG). Ollama will extract skills, certifications, and evaluate role eligibility.
-                            </p>
-                        </div>
-
-                        {resumeUploadError && (
-                            <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-700 dark:text-rose-300">
-                                {resumeUploadError}
-                            </div>
-                        )}
-
-                        {resumeUploadSuccess && (
-                            <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 font-medium">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                <span>{resumeUploadSuccess}</span>
-                            </div>
-                        )}
-
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsResumeModalOpen(false)}
-                                disabled={resumeUploadProcessing}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="primary"
-                                isLoading={resumeUploadProcessing}
-                                disabled={resumeUploadProcessing || !resumeFile}
-                            >
-                                <UploadCloud className="w-3.5 h-3.5 mr-1.5" />
-                                <span>Upload & Scan with Ollama</span>
-                            </Button>
-                        </div>
-                    </form>
-                </Modal>
-
-                {/* ── Remove Member Confirmation Modal ── */}
-                <Modal
-                    isOpen={isRemoveMemberModalOpen}
-                    onClose={handleCloseRemoveMemberModal}
-                    title="Remove Committee Member"
-                    description={`Remove ${memberToRemove?.name ?? 'member'} from ${committee.name}?`}
-                    maxWidth="md"
-                >
-                    <div className="space-y-4 pt-1">
-                        <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 space-y-2">
-                            <div className="font-bold text-rose-900 dark:text-rose-200">
-                                {memberToRemove?.name} ({memberToRemove?.email})
+                    ) : (
+                        <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
+                                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span>No Eligible Members Available</span>
                             </div>
                             <p className="leading-relaxed">
-                                This member will be removed from {committee.name}. If they belong to other committees in {project.title}, those assignments will remain intact.
+                                All Members in this event are already assigned to this committee, or no Members have been added to {project.title} yet.
                             </p>
                         </div>
+                    )}
 
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between gap-2.5">
+                        <span className="text-xs text-[color:var(--muted)]">
+                            {assignData.user_ids.length > 0
+                                ? `${assignData.user_ids.length} member${assignData.user_ids.length === 1 ? '' : 's'} selected`
+                                : 'No members selected'}
+                        </span>
+                        <div className="flex items-center gap-2">
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={handleCloseRemoveMemberModal}
-                                disabled={removeMemberProcessing}
+                                onClick={() => setIsAssignModalOpen(false)}
+                                disabled={assignProcessing}
                             >
                                 Cancel
                             </Button>
-                            <Button
-                                type="button"
-                                variant="danger"
-                                onClick={handleConfirmRemoveMember}
-                                isLoading={removeMemberProcessing}
-                                disabled={removeMemberProcessing}
-                            >
-                                Remove Member
-                            </Button>
+                            {eligibleMembers.length > 0 && (
+                                <Button
+                                    type="submit"
+                                    variant="primary"
+                                    isLoading={assignProcessing}
+                                    disabled={assignProcessing || assignData.user_ids.length === 0}
+                                >
+                                    {assignData.user_ids.length > 1
+                                        ? `Assign (${assignData.user_ids.length}) Members`
+                                        : 'Assign Member'}
+                                </Button>
+                            )}
                         </div>
                     </div>
-                </Modal>
+                </form>
+            </Modal>
 
-                {/* ── Staff Assignment Modal ── */}
-                <Modal
-                    isOpen={isStaffModalOpen}
-                    onClose={handleCloseStaffModal}
-                    title={committee.head ? 'Change Chairperson' : 'Assign Chairperson'}
-                    description={`Designate an eligible Chairperson to oversee ${committee.name}.`}
-                    maxWidth="md"
-                >
-                    <form onSubmit={handleAssignStaffSubmit} className="space-y-4 pt-1">
-                        {committee.head && (
-                            <div className="p-3 rounded-lg bg-orange-50/70 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/40 text-xs text-orange-950 dark:text-orange-200 space-y-1">
-                                <span className="font-bold text-[11px] uppercase tracking-wider text-[color:var(--color-brand-action-orange)]">
-                                    Current Chairperson
-                                </span>
-                                <div className="font-semibold text-slate-900 dark:text-slate-100">
-                                    {committee.head.name} ({committee.head.email})
-                                </div>
-                                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                                    Role: Chairperson
-                                </div>
+            {/* ── Upload & Scan Candidate Resume Modal ── */}
+            <Modal
+                isOpen={isResumeModalOpen}
+                onClose={() => !resumeUploadProcessing && setIsResumeModalOpen(false)}
+                title="Attach Candidate Resume / CV"
+                description={`Upload resume or CV document for ${userForResume?.name ?? 'candidate'} for Ollama AI eligibility analysis.`}
+                maxWidth="md"
+            >
+                <form onSubmit={handleUploadResumeSubmit} className="space-y-4 pt-1">
+                    <div className="space-y-2">
+                        <Label htmlFor="resume-file" required>
+                            Select Resume / CV Document (PDF, Image, or Word)
+                        </Label>
+                        <input
+                            id="resume-file"
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg,.docx,.txt"
+                            onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                            className="w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[color:var(--color-brand-action-orange)] file:text-white hover:file:opacity-95 cursor-pointer border border-slate-300 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-[#14181F]"
+                            required
+                        />
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Supports PDF resumes or scanned image CVs (PNG/JPG). Ollama will extract skills, certifications, and evaluate role eligibility.
+                        </p>
+                    </div>
+
+                    {resumeUploadError && (
+                        <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-700 dark:text-rose-300">
+                            {resumeUploadError}
+                        </div>
+                    )}
+
+                    {resumeUploadSuccess && (
+                        <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5 font-medium">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span>{resumeUploadSuccess}</span>
+                        </div>
+                    )}
+
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsResumeModalOpen(false)}
+                            disabled={resumeUploadProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            isLoading={resumeUploadProcessing}
+                            disabled={resumeUploadProcessing || !resumeFile}
+                        >
+                            <UploadCloud className="w-3.5 h-3.5 mr-1.5" />
+                            <span>Upload & Scan with Ollama</span>
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* ── Remove Member Confirmation Modal ── */}
+            <Modal
+                isOpen={isRemoveMemberModalOpen}
+                onClose={handleCloseRemoveMemberModal}
+                title="Remove Committee Member"
+                description={`Remove ${memberToRemove?.name ?? 'member'} from ${committee.name}?`}
+                maxWidth="md"
+            >
+                <div className="space-y-4 pt-1">
+                    <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 space-y-2">
+                        <div className="font-bold text-rose-900 dark:text-rose-200">
+                            {memberToRemove?.name} ({memberToRemove?.email})
+                        </div>
+                        <p className="leading-relaxed">
+                            This member will be removed from {committee.name}. If they belong to other committees in {project.title}, those assignments will remain intact.
+                        </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleCloseRemoveMemberModal}
+                            disabled={removeMemberProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={handleConfirmRemoveMember}
+                            isLoading={removeMemberProcessing}
+                            disabled={removeMemberProcessing}
+                        >
+                            Remove Member
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* ── Staff Assignment Modal ── */}
+            <Modal
+                isOpen={isStaffModalOpen}
+                onClose={handleCloseStaffModal}
+                title={committee.head ? 'Change Chairperson' : 'Assign Chairperson'}
+                description={`Designate an eligible Chairperson to oversee ${committee.name}.`}
+                maxWidth="md"
+            >
+                <form onSubmit={handleAssignStaffSubmit} className="space-y-4 pt-1">
+                    {committee.head && (
+                        <div className="p-3 rounded-lg bg-orange-50/70 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900/40 text-xs text-orange-950 dark:text-orange-200 space-y-1">
+                            <span className="font-bold text-[11px] uppercase tracking-wider text-[color:var(--color-brand-action-orange)]">
+                                Current Chairperson
+                            </span>
+                            <div className="font-semibold text-slate-900 dark:text-slate-100">
+                                {committee.head.name} ({committee.head.email})
                             </div>
-                        )}
-
-                        {availableStaff.length > 0 ? (
-                            <div className="space-y-2">
-                                <Label htmlFor="assign-staff-select" required>
-                                    Select Chairperson
-                                </Label>
-                                <select
-                                    id="assign-staff-select"
-                                    value={staffData.user_id}
-                                    onChange={(e) => setStaffData('user_id', e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
-                                    required
-                                >
-                                    <option value="">-- Choose an eligible Chairperson --</option>
-                                    {availableStaff.map((staff) => {
-                                        const isCurrent = staff.id === committee.head?.id;
-                                        const otherCommittee = staff.committee_id && staff.committee_id !== committee.id ? staff.committee_name : null;
-                                        let label = `${staff.name} (${staff.email})`;
-                                        if (isCurrent) {
-                                            label += ' — [Currently Assigned]';
-                                        } else if (staff.is_event_co_chair) {
-                                            label += otherCommittee ? ` — [Event Co-Chair • Assigned to ${otherCommittee}]` : ' — [Event Co-Chair]';
-                                        } else if (otherCommittee) {
-                                            label += ` — [Assigned to ${otherCommittee}]`;
-                                        }
-                                        return (
-                                            <option key={staff.id} value={staff.id}>
-                                                {label}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                                <InputError message={staffErrors.user_id} />
-
-                                {staffData.user_id && (() => {
-                                    const selectedStaff = availableStaff.find(s => String(s.id) === staffData.user_id);
-                                    if (selectedStaff?.committee_id && selectedStaff.committee_id !== committee.id) {
-                                        return (
-                                            <div className="p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2">
-                                                <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                                                <span>
-                                                    <strong>Notice:</strong> {selectedStaff.name} is currently assigned to <strong>{selectedStaff.committee_name}</strong>. Assigning them here will reassign them to this committee.
-                                                </span>
-                                            </div>
-                                        );
-                                    }
-                                    return null;
-                                })()}
-                            </div>
-                        ) : (
-                            <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-1">
-                                <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
-                                    <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                                    <span>No Eligible Chairperson Available</span>
-                                </div>
-                                <p className="leading-relaxed">
-                                    There are currently no eligible Chairpersons available for assignment.
-                                </p>
-                            </div>
-                        )}
-
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between gap-2.5">
-                            {committee.head ? (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsStaffModalOpen(false);
-                                        setIsUnassignStaffModalOpen(true);
-                                    }}
-                                    disabled={staffProcessing}
-                                    className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
-                                >
-                                    Unassign Chairperson
-                                </button>
-                            ) : (
-                                <div />
-                            )}
-                            <div className="flex items-center gap-2.5">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleCloseStaffModal}
-                                    disabled={staffProcessing}
-                                >
-                                    Cancel
-                                </Button>
-                                {availableStaff.length > 0 && (
-                                    <Button
-                                        type="submit"
-                                        variant="primary"
-                                        isLoading={staffProcessing}
-                                        disabled={staffProcessing || !staffData.user_id || staffData.user_id === String(committee.head?.id)}
-                                    >
-                                        {committee.head ? 'Update Chairperson' : 'Assign Chairperson'}
-                                    </Button>
-                                )}
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Role: Chairperson
                             </div>
                         </div>
-                    </form>
-                </Modal>
+                    )}
 
-                {/* ── Unassign Staff Confirmation Modal ── */}
-                <Modal
-                    isOpen={isUnassignStaffModalOpen}
-                    onClose={() => !unassignProcessing && setIsUnassignStaffModalOpen(false)}
-                    title="Unassign Chairperson"
-                    description={`Remove Chairperson assignment from ${committee.name}?`}
-                    maxWidth="md"
-                >
-                    <div className="space-y-4 pt-1">
-                        <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-2">
-                            {committee.head && (
-                                <div className="font-bold text-amber-900 dark:text-amber-200">
-                                    {committee.head.name} ({committee.head.email})
-                                </div>
-                            )}
+                    {availableStaff.length > 0 ? (
+                        <div className="space-y-2">
+                            <Label htmlFor="assign-staff-select" required>
+                                Select Chairperson
+                            </Label>
+                            <select
+                                id="assign-staff-select"
+                                value={staffData.user_id}
+                                onChange={(e) => setStaffData('user_id', e.target.value)}
+                                className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                required
+                            >
+                                <option value="">-- Choose an eligible Chairperson --</option>
+                                {availableStaff.map((staff) => {
+                                    const isCurrent = staff.id === committee.head?.id;
+                                    const otherCommittee = staff.committee_id && staff.committee_id !== committee.id ? staff.committee_name : null;
+                                    let label = `${staff.name} (${staff.email})`;
+                                    if (isCurrent) {
+                                        label += ' — [Currently Assigned]';
+                                    } else if (staff.is_event_co_chair) {
+                                        label += otherCommittee ? ` — [Event Co-Chair • Assigned to ${otherCommittee}]` : ' — [Event Co-Chair]';
+                                    } else if (otherCommittee) {
+                                        label += ` — [Assigned to ${otherCommittee}]`;
+                                    }
+                                    return (
+                                        <option key={staff.id} value={staff.id}>
+                                            {label}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                            <InputError message={staffErrors.user_id} />
+
+                            {staffData.user_id && (() => {
+                                const selectedStaff = availableStaff.find(s => String(s.id) === staffData.user_id);
+                                if (selectedStaff?.committee_id && selectedStaff.committee_id !== committee.id) {
+                                    return (
+                                        <div className="p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-xs text-blue-800 dark:text-blue-300 flex items-start gap-2">
+                                            <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                                            <span>
+                                                <strong>Notice:</strong> {selectedStaff.name} is currently assigned to <strong>{selectedStaff.committee_name}</strong>. Assigning them here will reassign them to this committee.
+                                            </span>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </div>
+                    ) : (
+                        <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200">
+                                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span>No Eligible Chairperson Available</span>
+                            </div>
                             <p className="leading-relaxed">
-                                This will unassign {committee.head?.name} as the committee chairperson. The committee will be left without a designated Chairperson supervisor until another chairperson is assigned.
+                                There are currently no eligible Chairpersons available for assignment.
                             </p>
                         </div>
+                    )}
 
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
-                            <Button
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between gap-2.5">
+                        {committee.head ? (
+                            <button
                                 type="button"
-                                variant="outline"
-                                onClick={() => setIsUnassignStaffModalOpen(false)}
-                                disabled={unassignProcessing}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="danger"
-                                onClick={handleUnassignStaff}
-                                isLoading={unassignProcessing}
-                                disabled={unassignProcessing}
+                                onClick={() => {
+                                    setIsStaffModalOpen(false);
+                                    setIsUnassignStaffModalOpen(true);
+                                }}
+                                disabled={staffProcessing}
+                                className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
                             >
                                 Unassign Chairperson
+                            </button>
+                        ) : (
+                            <div />
+                        )}
+                        <div className="flex items-center gap-2.5">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleCloseStaffModal}
+                                disabled={staffProcessing}
+                            >
+                                Cancel
                             </Button>
-                        </div>
-                    </div>
-                </Modal>
-
-                {/* ── Edit Committee Modal ── */}
-                <Modal
-                    isOpen={isEditModalOpen}
-                    onClose={handleCloseEditModal}
-                    title="Edit Committee"
-                    description="Update committee name, charter description, or designated Chairperson head."
-                    maxWidth="md"
-                >
-                    <form onSubmit={handleEditCommitteeSubmit} className="space-y-4 pt-1">
-                        <FormField
-                            label="Committee Name"
-                            id="edit-committee-name"
-                            value={editData.name}
-                            onChange={(e) => setEditData('name', e.target.value)}
-                            error={editErrors.name}
-                            required
-                            maxLength={255}
-                        />
-
-                        <div className="space-y-1">
-                            <Label htmlFor="edit-committee-description">Description</Label>
-                            <textarea
-                                id="edit-committee-description"
-                                rows={3}
-                                value={editData.description}
-                                onChange={(e) => setEditData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                                placeholder="Functional scope of this committee..."
-                            />
-                            <InputError message={editErrors.description} />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="edit-committee-staff">
-                                Committee Head (Chairperson - Optional)
-                            </Label>
-                            {staffOptions.length > 0 ? (
-                                <select
-                                    id="edit-committee-staff"
-                                    value={editData.user_id}
-                                    onChange={(e) => setEditData('user_id', e.target.value)}
-                                    className="w-full px-3 py-2 text-xs bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                            {availableStaff.length > 0 && (
+                                <Button
+                                    type="submit"
+                                    variant="primary"
+                                    isLoading={staffProcessing}
+                                    disabled={staffProcessing || !staffData.user_id || staffData.user_id === String(committee.head?.id)}
                                 >
-                                    <option value="">-- Unassigned (No Chairperson) --</option>
-                                    {staffOptions.map((staff) => (
-                                        <option key={staff.id} value={staff.id}>
-                                            {staff.name} ({staff.email})
-                                        </option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <div className="p-3 rounded-lg bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-xs text-slate-500 dark:text-slate-400">
-                                    <p>No eligible Chairperson assigned to this event yet.</p>
-                                </div>
+                                    {committee.head ? 'Update Chairperson' : 'Assign Chairperson'}
+                                </Button>
                             )}
-                            <InputError message={editErrors.user_id} />
-                        </div>
-
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleCloseEditModal}
-                                disabled={editProcessing}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="primary"
-                                isLoading={editProcessing}
-                                disabled={editProcessing}
-                            >
-                                Save Changes
-                            </Button>
-                        </div>
-                    </form>
-                </Modal>
-
-                {/* ── Delete Committee Confirmation Modal ── */}
-                <Modal
-                    isOpen={isDeleteModalOpen}
-                    onClose={() => !deleteProcessing && setIsDeleteModalOpen(false)}
-                    title="Remove Committee"
-                    description={`Are you sure you want to remove ${committee.name}?`}
-                    maxWidth="md"
-                >
-                    <div className="space-y-4 pt-1">
-                        <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 space-y-1">
-                            <p className="font-bold text-rose-900 dark:text-rose-200">
-                                This will remove the committee from {project.title}.
-                            </p>
-                            <p className="leading-relaxed">
-                                Assigned Chairperson and Members will remain part of the event personnel, but will be unlinked from this committee.
-                            </p>
-                        </div>
-
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsDeleteModalOpen(false)}
-                                disabled={deleteProcessing}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="danger"
-                                onClick={handleDeleteCommittee}
-                                isLoading={deleteProcessing}
-                                disabled={deleteProcessing}
-                            >
-                                Remove Committee
-                            </Button>
                         </div>
                     </div>
-                </Modal>
+                </form>
+            </Modal>
 
-                {/* ── Create Activity Modal ── */}
-                <Modal
-                    isOpen={isCreateActivityModalOpen}
-                    onClose={() => !activityProcessing && setIsCreateActivityModalOpen(false)}
-                    title="Create Committee Deliverable"
-                    description={`Create a new deliverable under ${committee.name}.`}
-                    maxWidth="md"
-                >
-                    <form onSubmit={handleCreateActivitySubmit} className="space-y-4 pt-1">
-                        <FormField
-                            label="Deliverable Title"
-                            id="create-activity-title"
-                            name="title"
-                            value={activityData.title}
-                            onChange={(e) => setActivityData('title', e.target.value)}
-                            error={activityErrors.title}
-                            required
-                            placeholder="e.g., Program Flow and Speaker Management"
-                            autoFocus
-                        />
-
-                        <div className="space-y-1">
-                            <Label htmlFor="create-activity-description">Description (Optional)</Label>
-                            <textarea
-                                id="create-activity-description"
-                                name="description"
-                                rows={3}
-                                value={activityData.description}
-                                onChange={(e) => setActivityData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                                placeholder="Scope, deliverables, or objectives..."
-                            />
-                            <InputError message={activityErrors.description} />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <FormField
-                                label="Start Date (Optional)"
-                                id="create-activity-start-date"
-                                type="date"
-                                value={activityData.start_date}
-                                onChange={(e) => setActivityData('start_date', e.target.value)}
-                                error={activityErrors.start_date}
-                            />
-                            <FormField
-                                label="Target Due Date (Optional)"
-                                id="create-activity-due-date"
-                                type="date"
-                                value={activityData.due_date}
-                                onChange={(e) => setActivityData('due_date', e.target.value)}
-                                error={activityErrors.due_date}
-                            />
-                        </div>
-
-                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsCreateActivityModalOpen(false)}
-                                disabled={activityProcessing}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="primary"
-                                isLoading={activityProcessing}
-                                disabled={activityProcessing}
-                            >
-                                Create Deliverable
-                            </Button>
-                        </div>
-                    </form>
-                </Modal>
-
-                {/* ── Manage Committee Co-Chairs Modal ── */}
-                <Modal
-                    isOpen={isCoChairModalOpen}
-                    onClose={() => !coChairProcessing && setIsCoChairModalOpen(false)}
-                    title="Committee Co-Chair Designations"
-                    maxWidth="md"
-                >
-                    <div className="space-y-5">
-                        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                            Designate committee members as Committee-level Co-Chairs to assist with coordinating tasks, managing deadlines, and preliminary evidence review.
+            {/* ── Unassign Staff Confirmation Modal ── */}
+            <Modal
+                isOpen={isUnassignStaffModalOpen}
+                onClose={() => !unassignProcessing && setIsUnassignStaffModalOpen(false)}
+                title="Unassign Chairperson"
+                description={`Remove Chairperson assignment from ${committee.name}?`}
+                maxWidth="md"
+            >
+                <div className="space-y-4 pt-1">
+                    <div className="p-3.5 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300 space-y-2">
+                        {committee.head && (
+                            <div className="font-bold text-amber-900 dark:text-amber-200">
+                                {committee.head.name} ({committee.head.email})
+                            </div>
+                        )}
+                        <p className="leading-relaxed">
+                            This will unassign {committee.head?.name} as the committee chairperson. The committee will be left without a designated Chairperson supervisor until another chairperson is assigned.
                         </p>
+                    </div>
 
-                        {/* Current Co-Chairs */}
-                        <div className="space-y-2">
-                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Current Committee Co-Chairs ({(committee.coChairs || []).length})
-                            </h4>
-                            {(committee.coChairs || []).length === 0 ? (
-                                <div className="p-3.5 rounded-lg border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)] text-center text-xs text-slate-500 dark:text-slate-400">
-                                    No Committee Co-Chairs currently designated.
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {(committee.coChairs || []).map((cc) => (
-                                        <div
-                                            key={cc.id}
-                                            className="flex items-center justify-between p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] text-xs"
-                                        >
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="font-bold text-slate-900 dark:text-slate-100">{cc.name}</span>
-                                                    <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
-                                                        Committee Co-Chair
-                                                    </span>
-                                                </div>
-                                                <span className="text-[11px] text-slate-500 dark:text-slate-400">{cc.email}</span>
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsUnassignStaffModalOpen(false)}
+                            disabled={unassignProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={handleUnassignStaff}
+                            isLoading={unassignProcessing}
+                            disabled={unassignProcessing}
+                        >
+                            Unassign Chairperson
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* ── Edit Committee Modal ── */}
+            <Modal
+                isOpen={isEditModalOpen}
+                onClose={handleCloseEditModal}
+                title="Edit Committee"
+                description="Update committee name, charter description, or designated Chairperson head."
+                maxWidth="md"
+            >
+                <form onSubmit={handleEditCommitteeSubmit} className="space-y-4 pt-1">
+                    <FormField
+                        label="Committee Name"
+                        id="edit-committee-name"
+                        value={editData.name}
+                        onChange={(e) => setEditData('name', e.target.value)}
+                        error={editErrors.name}
+                        required
+                        maxLength={255}
+                    />
+
+                    <div className="space-y-1">
+                        <Label htmlFor="edit-committee-description">Description</Label>
+                        <textarea
+                            id="edit-committee-description"
+                            rows={3}
+                            value={editData.description}
+                            onChange={(e) => setEditData('description', e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                            placeholder="Functional scope of this committee..."
+                        />
+                        <InputError message={editErrors.description} />
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="edit-committee-staff">
+                            Committee Head (Chairperson - Optional)
+                        </Label>
+                        {staffOptions.length > 0 ? (
+                            <select
+                                id="edit-committee-staff"
+                                value={editData.user_id}
+                                onChange={(e) => setEditData('user_id', e.target.value)}
+                                className="w-full px-3 py-2 text-xs bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                            >
+                                <option value="">-- Unassigned (No Chairperson) --</option>
+                                {staffOptions.map((staff) => (
+                                    <option key={staff.id} value={staff.id}>
+                                        {staff.name} ({staff.email})
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <div className="p-3 rounded-lg bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-xs text-slate-500 dark:text-slate-400">
+                                <p>No eligible Chairperson assigned to this event yet.</p>
+                            </div>
+                        )}
+                        <InputError message={editErrors.user_id} />
+                    </div>
+
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleCloseEditModal}
+                            disabled={editProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            isLoading={editProcessing}
+                            disabled={editProcessing}
+                        >
+                            Save Changes
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* ── Delete Committee Confirmation Modal ── */}
+            <Modal
+                isOpen={isDeleteModalOpen}
+                onClose={() => !deleteProcessing && setIsDeleteModalOpen(false)}
+                title="Remove Committee"
+                description={`Are you sure you want to remove ${committee.name}?`}
+                maxWidth="md"
+            >
+                <div className="space-y-4 pt-1">
+                    <div className="p-3.5 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 space-y-1">
+                        <p className="font-bold text-rose-900 dark:text-rose-200">
+                            This will remove the committee from {project.title}.
+                        </p>
+                        <p className="leading-relaxed">
+                            Assigned Chairperson and Members will remain part of the event personnel, but will be unlinked from this committee.
+                        </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsDeleteModalOpen(false)}
+                            disabled={deleteProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            onClick={handleDeleteCommittee}
+                            isLoading={deleteProcessing}
+                            disabled={deleteProcessing}
+                        >
+                            Remove Committee
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* ── Create Activity Modal ── */}
+            <Modal
+                isOpen={isCreateActivityModalOpen}
+                onClose={() => !activityProcessing && setIsCreateActivityModalOpen(false)}
+                title="Create Committee Deliverable"
+                description={`Create a new deliverable under ${committee.name}.`}
+                maxWidth="md"
+            >
+                <form onSubmit={handleCreateActivitySubmit} className="space-y-4 pt-1">
+                    <FormField
+                        label="Deliverable Title"
+                        id="create-activity-title"
+                        name="title"
+                        value={activityData.title}
+                        onChange={(e) => setActivityData('title', e.target.value)}
+                        error={activityErrors.title}
+                        required
+                        placeholder="e.g., Program Flow and Speaker Management"
+                        autoFocus
+                    />
+
+                    <div className="space-y-1">
+                        <Label htmlFor="create-activity-description">Description (Optional)</Label>
+                        <textarea
+                            id="create-activity-description"
+                            name="description"
+                            rows={3}
+                            value={activityData.description}
+                            onChange={(e) => setActivityData('description', e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                            placeholder="Scope, deliverables, or objectives..."
+                        />
+                        <InputError message={activityErrors.description} />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField
+                            label="Start Date (Optional)"
+                            id="create-activity-start-date"
+                            type="date"
+                            value={activityData.start_date}
+                            onChange={(e) => setActivityData('start_date', e.target.value)}
+                            error={activityErrors.start_date}
+                        />
+                        <FormField
+                            label="Target Due Date (Optional)"
+                            id="create-activity-due-date"
+                            type="date"
+                            value={activityData.due_date}
+                            onChange={(e) => setActivityData('due_date', e.target.value)}
+                            error={activityErrors.due_date}
+                        />
+                    </div>
+
+                    <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsCreateActivityModalOpen(false)}
+                            disabled={activityProcessing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            isLoading={activityProcessing}
+                            disabled={activityProcessing}
+                        >
+                            Create Deliverable
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* ── Manage Committee Co-Chairs Modal ── */}
+            <Modal
+                isOpen={isCoChairModalOpen}
+                onClose={() => !coChairProcessing && setIsCoChairModalOpen(false)}
+                title="Committee Co-Chair Designations"
+                maxWidth="md"
+            >
+                <div className="space-y-5">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                        Designate committee members as Committee-level Co-Chairs to assist with coordinating tasks, managing deadlines, and preliminary evidence review.
+                    </p>
+
+                    {/* Current Co-Chairs */}
+                    <div className="space-y-2">
+                        <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            Current Committee Co-Chairs ({(committee.coChairs || []).length})
+                        </h4>
+                        {(committee.coChairs || []).length === 0 ? (
+                            <div className="p-3.5 rounded-lg border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)] text-center text-xs text-slate-500 dark:text-slate-400">
+                                No Committee Co-Chairs currently designated.
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {(committee.coChairs || []).map((cc) => (
+                                    <div
+                                        key={cc.id}
+                                        className="flex items-center justify-between p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] text-xs"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-bold text-slate-900 dark:text-slate-100">{cc.name}</span>
+                                                <span className="text-[10px] px-1.5 py-0.2 rounded-full font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">
+                                                    Committee Co-Chair
+                                                </span>
                                             </div>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                disabled={coChairProcessing}
-                                                onClick={() => handleRemoveCoChair(cc.id)}
-                                                className="text-rose-600 border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs"
-                                            >
-                                                Remove
-                                            </Button>
+                                            <span className="text-[11px] text-slate-500 dark:text-slate-400">{cc.email}</span>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Form to designate new Co-Chair */}
-                        <div className="pt-4 border-t border-[color:var(--border)] space-y-3">
-                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                Designate New Committee Co-Chair
-                            </h4>
-
-                            {(committee.eligibleCoChairs || []).length === 0 ? (
-                                <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-                                    No eligible members available to designate. All committee members are already designated as Co-Chairs.
-                                </p>
-                            ) : (
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <Label htmlFor="designate-comm-cochair-select">Select Committee Member</Label>
-                                        <select
-                                            id="designate-comm-cochair-select"
-                                            value={selectedCoChairUserId}
-                                            onChange={(e) => setSelectedCoChairUserId(e.target.value)}
-                                            className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
-                                        >
-                                            <option value="">-- Choose an existing committee member --</option>
-                                            {(committee.eligibleCoChairs || []).map((m) => (
-                                                <option key={m.id} value={m.id}>
-                                                    {m.name} ({m.email})
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {coChairError && <InputError message={coChairError} />}
-                                    </div>
-                                    <div className="flex justify-end gap-2 pt-2">
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            onClick={() => setIsCoChairModalOpen(false)}
+                                            size="sm"
                                             disabled={coChairProcessing}
+                                            onClick={() => handleRemoveCoChair(cc.id)}
+                                            className="text-rose-600 border-rose-200 dark:border-rose-900/40 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs"
                                         >
-                                            Close
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="primary"
-                                            disabled={!selectedCoChairUserId || coChairProcessing}
-                                            isLoading={coChairProcessing}
-                                            onClick={() => handleDesignateCoChair()}
-                                            className="bg-amber-600 hover:bg-amber-700 text-white"
-                                        >
-                                            Designate as Co-Chair
+                                            Remove
                                         </Button>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                </Modal>
+
+                    {/* Form to designate new Co-Chair */}
+                    <div className="pt-4 border-t border-[color:var(--border)] space-y-3">
+                        <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            Designate New Committee Co-Chair
+                        </h4>
+
+                        {(committee.eligibleCoChairs || []).length === 0 ? (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                                No eligible members available to designate. All committee members are already designated as Co-Chairs.
+                            </p>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <Label htmlFor="designate-comm-cochair-select">Select Committee Member</Label>
+                                    <select
+                                        id="designate-comm-cochair-select"
+                                        value={selectedCoChairUserId}
+                                        onChange={(e) => setSelectedCoChairUserId(e.target.value)}
+                                        className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 cursor-pointer"
+                                    >
+                                        <option value="">-- Choose an existing committee member --</option>
+                                        {(committee.eligibleCoChairs || []).map((m) => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name} ({m.email})
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {coChairError && <InputError message={coChairError} />}
+                                </div>
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setIsCoChairModalOpen(false)}
+                                        disabled={coChairProcessing}
+                                    >
+                                        Close
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="primary"
+                                        disabled={!selectedCoChairUserId || coChairProcessing}
+                                        isLoading={coChairProcessing}
+                                        onClick={() => handleDesignateCoChair()}
+                                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                                    >
+                                        Designate as Co-Chair
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </Modal>
         </AppLayout>
     );
 }

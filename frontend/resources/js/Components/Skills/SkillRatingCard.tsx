@@ -72,9 +72,9 @@ export const SkillRatingCard: React.FC<SkillRatingCardProps> = ({
                                 disabled={disabled}
                                 onClick={() => onChange(skill.id, opt.value)}
                                 title={opt.title}
-                                className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500/40 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                className={`inline-flex items-center px-3 py-1.5 min-h-[44px] text-xs font-semibold rounded-lg border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]/40 disabled:opacity-50 disabled:cursor-not-allowed ${
                                     isSelected
-                                        ? 'bg-[color:var(--color-brand-action-orange)] text-white border-[color:var(--color-brand-action-orange)] shadow-xs scale-[1.02]'
+                                        ? 'bg-[color:var(--primary)] text-white border-[color:var(--primary)] shadow-xs scale-[1.02]'
                                         : 'bg-[color:var(--card)] text-[color:var(--text)] border-[color:var(--border)] hover:bg-[color:var(--soft-surface)]'
                                 }`}
                             >

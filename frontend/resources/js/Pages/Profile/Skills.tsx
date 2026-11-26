@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Head } from '@inertiajs/react';
+import axios from 'axios';
 import { AppLayout } from '@/Layouts/AppLayout';
 import { SkillProfileData } from '@/types/skills';
 import { SkillRatingCard } from '@/Components/Skills/SkillRatingCard';
@@ -80,26 +81,20 @@ export default function ProfileSkillsPage({
         }));
 
         try {
-            const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
-            const res = await fetch('/profile/skills', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken || '',
-                },
-                body: JSON.stringify({ ratings: payload }),
-            });
-
-            const data = await res.json();
-            if (res.ok && data.success) {
+            const res = await axios.post('/profile/skills', { ratings: payload });
+            if (res.data && res.data.success) {
                 setStatusMessage('Your skill profile has been updated successfully.');
                 setOriginalRatings({ ...ratingsMap });
             } else {
-                setErrorMessage(data.message || 'Failed to save changes. Please check your selections.');
+                setErrorMessage(res.data?.message || 'Failed to save changes. Please check your selections.');
             }
         } catch (err: any) {
-            setErrorMessage(err.message || 'Network error occurred while saving.');
+            setErrorMessage(
+                err.response?.data?.message ||
+                (err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(' ') : null) ||
+                err.message ||
+                'Network error occurred while saving.'
+            );
         } finally {
             setIsSaving(false);
         }
@@ -112,7 +107,11 @@ export default function ProfileSkillsPage({
     };
 
     return (
-        <AppLayout title="My Skill Profile">
+        <AppLayout
+            title="My Skill Profile"
+            subtitle="Manage your standardized self-assessment ratings across institutional activities."
+            breadcrumbs={[{ label: 'My Skill Profile' }]}
+        >
             <Head title="My Skill Profile - ITASK" />
 
             <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -120,7 +119,7 @@ export default function ProfileSkillsPage({
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[color:var(--border)]">
                     <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-lg bg-[color:var(--color-brand-action-orange)]/10 text-[color:var(--color-brand-action-orange)] flex items-center justify-center font-bold">
+                            <div className="w-8 h-8 rounded-lg bg-[color:var(--primary)]/10 text-[color:var(--primary)] flex items-center justify-center font-bold">
                                 <Sparkles className="w-4 h-4" />
                             </div>
                             <h1 className="text-xl font-bold text-[color:var(--text)]">My Skill Profile</h1>
@@ -136,7 +135,7 @@ export default function ProfileSkillsPage({
                                 type="button"
                                 onClick={handleResetChanges}
                                 disabled={isSaving}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] text-xs font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                             >
                                 <RefreshCw className="w-3.5 h-3.5" />
                                 <span>Reset</span>
@@ -146,7 +145,7 @@ export default function ProfileSkillsPage({
                             type="button"
                             onClick={handleSaveChanges}
                             disabled={!hasUnsavedChanges || isSaving}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[color:var(--color-brand-action-orange)] text-white hover:bg-orange-600 rounded-lg cursor-pointer transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[44px] text-xs font-semibold bg-[color:var(--primary)] text-white hover:opacity-90 rounded-lg cursor-pointer transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isSaving ? (
                                 <>
@@ -190,7 +189,7 @@ export default function ProfileSkillsPage({
 
                     <div className="w-full h-2 rounded-full bg-[color:var(--soft-surface)] overflow-hidden">
                         <div
-                            className="h-full bg-[color:var(--color-brand-action-orange)] transition-all duration-300 rounded-full"
+                            className="h-full bg-[color:var(--primary)] transition-all duration-300 rounded-full"
                             style={{ width: `${progressPercentage}%` }}
                         />
                     </div>
@@ -252,14 +251,14 @@ export default function ProfileSkillsPage({
                     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 max-w-md w-full px-4">
                         <div className="p-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--card)] shadow-lg flex items-center justify-between gap-3 text-xs">
                             <span className="font-medium text-[color:var(--text)] flex items-center gap-1.5">
-                                <Sparkles className="w-4 h-4 text-[color:var(--color-brand-action-orange)] animate-pulse" />
+                                <Sparkles className="w-4 h-4 text-[color:var(--primary)] animate-pulse" />
                                 You have unsaved rating changes.
                             </span>
                             <Button
                                 type="button"
                                 onClick={handleSaveChanges}
                                 disabled={isSaving}
-                                className="px-3.5 py-1.5 text-xs font-semibold bg-[color:var(--color-brand-action-orange)] text-white hover:bg-orange-600 rounded-lg cursor-pointer"
+                                className="px-3.5 py-1.5 min-h-[44px] text-xs font-semibold bg-[color:var(--primary)] text-white hover:opacity-90 rounded-lg cursor-pointer"
                             >
                                 {isSaving ? 'Saving...' : 'Save Now'}
                             </Button>
