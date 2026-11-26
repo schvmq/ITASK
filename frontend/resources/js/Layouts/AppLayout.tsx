@@ -152,11 +152,10 @@ function SidebarNavItem({
         >
             <div className="relative shrink-0 flex items-center justify-center">
                 <Icon
-                    className={`w-[18px] h-[18px] shrink-0 stroke-[2px] transition-colors ${
-                        isActive
-                            ? 'text-[color:var(--primary)]'
-                            : 'text-[color:var(--muted)] group-hover:text-[color:var(--text)]'
-                    }`}
+                    className={`w-[18px] h-[18px] shrink-0 stroke-[2px] transition-colors ${isActive
+                        ? 'text-[color:var(--primary)]'
+                        : 'text-[color:var(--muted)] group-hover:text-[color:var(--text)]'
+                        }`}
                 />
                 {isHighlighted && !isActive && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[color:var(--primary)] ring-2 ring-[color:var(--card)]" />
@@ -176,11 +175,10 @@ function SidebarNavItem({
 
             {!isCollapsed && badgeCount !== undefined && badgeCount > 0 && (
                 <span
-                    className={`px-1.5 py-0.5 text-[11px] font-semibold rounded-full tabular-nums shrink-0 ${
-                        isUrgent
-                            ? 'bg-[color:var(--status-danger-bg)] text-[color:var(--primary)] border border-[color:var(--status-danger-border)]'
-                            : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)]'
-                    }`}
+                    className={`px-1.5 py-0.5 text-[11px] font-semibold rounded-full tabular-nums shrink-0 ${isUrgent
+                        ? 'bg-[color:var(--status-danger-bg)] text-[color:var(--primary)] border border-[color:var(--status-danger-border)]'
+                        : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)]'
+                        }`}
                 >
                     {badgeCount}
                 </span>
@@ -259,9 +257,8 @@ function SidebarContent({
         <div className="flex flex-col h-full bg-[color:var(--card)] border-r border-[color:var(--border)] select-none">
             {/* ── Brand Header (Flat, no gradients) ── */}
             <div
-                className={`h-16 border-b border-[color:var(--border)] flex items-center shrink-0 ${
-                    isCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'
-                }`}
+                className={`h-16 border-b border-[color:var(--border)] flex items-center shrink-0 ${isCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'
+                    }`}
             >
                 {!isCollapsed ? (
                     <>
@@ -334,18 +331,18 @@ function SidebarContent({
                             item.href.includes('?')
                                 ? currentPage === item.href || currentPage.startsWith(`${item.href}&`)
                                 : item.exact || isDashboard
-                                ? currentPathname === item.href ||
-                                  (isDashboard && (currentPathname === '/' || currentPathname === '/dashboard')) ||
-                                  (item.href === '/admin/dashboard' && currentPathname.startsWith('/admin/dashboard') && !currentPage.includes('tab='))
-                                : isMessages
-                                ? currentPathname.startsWith('/messages') || currentPathname.startsWith('/chat')
-                                : isNotifications
-                                ? currentPathname.startsWith('/notifications')
-                                : isEligibility
-                                ? currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/')
-                                : isEvents
-                                ? currentPathname === '/projects' || currentPathname === '/projects/smart-import' || currentPathname.startsWith('/projects/')
-                                : currentPathname === item.href || currentPathname.startsWith(`${item.href}/`);
+                                    ? currentPathname === item.href ||
+                                    (isDashboard && (currentPathname === '/' || currentPathname === '/dashboard')) ||
+                                    (item.href === '/admin/dashboard' && currentPathname.startsWith('/admin/dashboard') && !currentPage.includes('tab='))
+                                    : isMessages
+                                        ? currentPathname.startsWith('/messages') || currentPathname.startsWith('/chat')
+                                        : isNotifications
+                                            ? currentPathname.startsWith('/notifications')
+                                            : isEligibility
+                                                ? currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/')
+                                                : isEvents
+                                                    ? currentPathname === '/projects' || currentPathname === '/projects/smart-import' || currentPathname.startsWith('/projects/')
+                                                    : currentPathname === item.href || currentPathname.startsWith(`${item.href}/`);
 
                         let badgeCount: number | undefined;
                         let isUrgent = false;
@@ -591,9 +588,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             {/* ══ Desktop / Tablet Sidebar (Hidden on mobile < 768px) ════════ */}
             <aside
                 aria-label="Primary sidebar"
-                className={`hidden md:flex md:flex-col shrink-0 fixed inset-y-0 left-0 z-30 transition-all duration-200 ease-in-out border-r border-[color:var(--border)] ${
-                    isCollapsed ? 'w-[72px]' : 'w-64'
-                }`}
+                className={`hidden md:flex md:flex-col shrink-0 fixed inset-y-0 left-0 z-30 transition-all duration-200 ease-in-out border-r border-[color:var(--border)] ${isCollapsed ? 'w-[72px]' : 'w-64'
+                    }`}
             >
                 <SidebarContent
                     currentPage={currentPath}
@@ -613,14 +609,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
             {/* ══ Main Shell Area (Offset for sidebar on >= 768px) ═════════ */}
             <div
-                className={`flex flex-col min-w-0 w-full transition-all duration-200 ease-in-out ${
-                    isCollapsed ? 'md:pl-[72px]' : 'md:pl-64'
-                }`}
+                className={`flex flex-col min-w-0 w-full transition-all duration-200 ease-in-out ${isCollapsed ? 'md:pl-[72px]' : 'md:pl-64'
+                    }`}
             >
                 {/* ── Sticky Top Bar (Section 2 & Section 4 requirement) ── */}
-                <header className="h-14 px-3 min-[375px]:px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between gap-1.5 min-[375px]:gap-2 bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
+                <header className="h-14 px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between gap-2 bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
                     {/* Left: Mobile Drawer Trigger & Global Quick Search */}
-                    <div className="flex items-center gap-1.5 min-[375px]:gap-2 sm:gap-2.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                             <SheetTrigger asChild>
                                 <motion.button
@@ -657,19 +652,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                         <button
                             type="button"
                             onClick={() => setIsCommandPaletteOpen(true)}
-                            className="inline-flex items-center justify-center w-11 h-11 p-0 min-w-0 md:w-full md:max-w-[210px] lg:max-w-[240px] xl:max-w-[280px] md:h-auto md:min-h-[38px] md:px-3 md:py-1.5 md:justify-start md:gap-2 rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] text-[13px] text-[color:var(--text)]/80 hover:text-[color:var(--text)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
-                            aria-label="Search pages or jump to page or action (Ctrl+K)"
+                            className="inline-flex items-center gap-2 px-2.5 sm:px-3 py-1.5 min-h-[44px] md:min-h-[38px] sm:min-w-[220px] rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] text-[13px] text-[color:var(--text)]/80 hover:text-[color:var(--text)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                            aria-label="Search or jump to page or action (Ctrl+K)"
                         >
                             <Search className="w-4 h-4 shrink-0 text-[color:var(--muted)]" />
-                            <span className="hidden md:inline xl:hidden truncate flex-1 text-left">
-                                Search pages
-                            </span>
-                            <span className="hidden xl:inline truncate flex-1 text-left">
-                                Jump to page or action<span aria-hidden="true">...</span>
-                            </span>
+                            <span className="hidden sm:inline flex-1 text-left">Jump to page or action...</span>
+                            <span className="sm:hidden">Search</span>
                             <kbd
                                 aria-hidden="true"
-                                className="hidden xl:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[color:var(--card)] border border-[color:var(--border)] rounded text-[color:var(--muted)] shrink-0"
+                                className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[color:var(--card)] border border-[color:var(--border)] rounded text-[color:var(--muted)]"
                             >
                                 Ctrl+K
                             </kbd>
@@ -677,12 +668,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                     </div>
 
                     {/* Right: Current Role Label, Theme Toggle, Notifications, User Identity Badge */}
-                    <div className="flex items-center gap-1 min-[375px]:gap-1.5 sm:gap-2.5 md:gap-1.5 lg:gap-2.5 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
 
                         {/* Current Role Label (Visible on all pages for all 3 roles) */}
                         <span
                             data-testid="topbar-role-label"
-                            className="inline-flex items-center px-2 min-[375px]:px-2.5 py-1 rounded-[6px] text-[11px] min-[375px]:text-[12px] font-semibold bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] select-none shrink-0 max-w-[76px] min-[375px]:max-w-[115px] sm:max-w-none md:max-w-[100px] lg:max-w-none truncate"
+                            className="inline-flex items-center px-2.5 py-1 rounded-[6px] text-[12px] font-semibold bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] select-none shrink-0"
                         >
                             {isAdmin ? 'System Admin' : formatRole(userRole)}
                         </span>
@@ -693,7 +684,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                         {/* Notifications (synced with unread count) */}
                         <NotificationDropdown />
 
-                        <Separator orientation="vertical" className="hidden sm:block md:hidden lg:block h-5 mx-0.5 bg-[color:var(--border)]" />
+                        <Separator orientation="vertical" className="h-5 mx-0.5 bg-[color:var(--border)]" />
 
                         {/* User Identity Badge */}
                         {user ? (
@@ -703,7 +694,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                         type="button"
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="flex items-center gap-2 p-1 sm:pl-1.5 sm:pr-2.5 md:p-1 lg:pl-1.5 lg:pr-2.5 rounded-full border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer select-none focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0 min-h-[36px]"
+                                        className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer select-none focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0 min-h-[36px]"
                                         aria-label="User account menu"
                                     >
                                         <Avatar size="sm" className="shrink-0 w-7 h-7">
@@ -712,8 +703,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                                 {getInitials(user.name) || 'BJ'}
                                             </AvatarFallback>
                                         </Avatar>
-                                        <div className="hidden sm:flex md:hidden lg:flex items-center gap-1.5 text-left text-[12px] leading-tight">
-                                            <span className="font-semibold text-[color:var(--text)] truncate max-w-[110px] xl:max-w-[130px]">
+                                        <div className="hidden sm:flex items-center gap-1.5 text-left text-[12px] leading-tight">
+                                            <span className="font-semibold text-[color:var(--text)] truncate max-w-[130px]">
                                                 {user.name}
                                             </span>
                                             <span className="text-[color:var(--muted)]">·</span>
@@ -779,44 +770,40 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                         <>
                                             <DropdownMenuItem
                                                 onClick={() => router.visit('/my-tasks')}
-                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${
-                                                    currentPathname === '/my-tasks' || currentPathname.startsWith('/my-tasks/')
-                                                        ? 'bg-[color:var(--soft-surface)] font-semibold'
-                                                        : 'font-medium'
-                                                }`}
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/my-tasks' || currentPathname.startsWith('/my-tasks/')
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
                                             >
-                                                <CheckSquare className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/my-tasks' || currentPathname.startsWith('/my-tasks/') ? 'text-[color:var(--primary)]' : ''}`} />
+                                                <CheckSquare className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/my-tasks' ? 'text-[color:var(--primary)]' : ''}`} />
                                                 My Tasks
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => router.visit('/projects')}
-                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${
-                                                    currentPathname === '/projects'
-                                                        ? 'bg-[color:var(--soft-surface)] font-semibold'
-                                                        : 'font-medium'
-                                                }`}
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/projects'
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
                                             >
                                                 <FolderOpen className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/projects' ? 'text-[color:var(--primary)]' : ''}`} />
                                                 Events
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => router.visit('/eligibility-profile')}
-                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${
-                                                    currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/')
-                                                        ? 'bg-[color:var(--soft-surface)] font-semibold'
-                                                        : 'font-medium'
-                                                }`}
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/')
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
                                             >
                                                 <UserCheck className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/') ? 'text-[color:var(--primary)]' : ''}`} />
                                                 Eligibility & Strengths
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => router.visit('/projects/smart-import')}
-                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${
-                                                    currentPathname === '/projects/smart-import'
-                                                        ? 'bg-[color:var(--soft-surface)] font-semibold'
-                                                        : 'font-medium'
-                                                }`}
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/projects/smart-import'
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
                                             >
                                                 <Sparkles className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/projects/smart-import' ? 'text-[color:var(--primary)]' : ''}`} />
                                                 Smart S.O. Import

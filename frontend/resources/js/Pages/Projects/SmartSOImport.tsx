@@ -502,7 +502,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                     <div className="space-y-6">
                         {/* ── Top Metric Stats Bar (matching PDF Page 3) ── */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <Card className="p-4 bg-[color:var(--surface)] border-[color:var(--border)] shadow-sm">
+                            <Card className="p-4 bg-[color:var(--card)] border-[color:var(--border)] shadow-sm">
                                 <div className="text-xs text-[color:var(--muted)] uppercase font-semibold tracking-wider">
                                     Document Reference
                                 </div>
@@ -514,7 +514,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                 </div>
                             </Card>
 
-                            <Card className="p-4 bg-[color:var(--surface)] border-[color:var(--border)] shadow-sm">
+                            <Card className="p-4 bg-[color:var(--card)] border-[color:var(--border)] shadow-sm">
                                 <div className="text-xs text-[color:var(--muted)] uppercase font-semibold tracking-wider">
                                     Committees / Groups
                                 </div>
@@ -526,11 +526,11 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                 </div>
                             </Card>
 
-                            <Card className="p-4 bg-[color:var(--surface)] border-[color:var(--border)] shadow-sm">
+                            <Card className="p-4 bg-[color:var(--card)] border-[color:var(--border)] shadow-sm">
                                 <div className="text-xs text-[color:var(--muted)] uppercase font-semibold tracking-wider">
                                     Event Co-Chairs
                                 </div>
-                                <div className="text-2xl font-black text-indigo-500 mt-1">
+                                <div className="text-2xl font-black text-[color:var(--text)] mt-1">
                                     {parsedData.event_co_chairs.length}
                                 </div>
                                 <div className="text-[11px] text-[color:var(--muted)] mt-0.5">
@@ -538,7 +538,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                 </div>
                             </Card>
 
-                            <Card className="p-4 bg-[color:var(--surface)] border-[color:var(--border)] shadow-sm">
+                            <Card className="p-4 bg-[color:var(--card)] border-[color:var(--border)] shadow-sm">
                                 <div className="text-xs text-[color:var(--muted)] uppercase font-semibold tracking-wider">
                                     Personnel Matching
                                 </div>
@@ -814,7 +814,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
 
                                                         {/* Co-Chairs */}
                                                         <div className="p-3.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)] space-y-2">
-                                                            <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider block">
+                                                            <span className="text-[11px] font-bold text-[color:var(--text)] uppercase tracking-wider block">
                                                                 Committee Co-Chairs ({committee.co_chairs.length})
                                                             </span>
 
@@ -928,7 +928,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                         </div>
 
                         {/* ── Action & Confirmation Bar ── */}
-                        <Card className="p-6 border-[color:var(--border)] bg-gradient-to-r from-emerald-500/5 via-[color:var(--card)] to-indigo-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <Card className="p-6 border-[color:var(--border)] bg-gradient-to-r from-emerald-500/5 via-[color:var(--card)] to-[color:var(--primary)]/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 text-sm font-bold text-[color:var(--text)]">
                                     <ShieldCheck className="w-4 h-4 text-emerald-500" />
