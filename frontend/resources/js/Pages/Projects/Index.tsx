@@ -173,21 +173,21 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                     </div>
 
                     <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-                        <Link href="/timeline">
+                        <Link href="/timeline" className="inline-flex min-h-[44px]">
                             <Button
                                 variant="secondary"
                                 size="md"
-                                className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-indigo-700/10 hover:bg-[color:var(--soft-surface)] text-[color:var(--primary)] font-bold border border-[color:var(--primary)]/30 flex items-center gap-1.5"
+                                className="min-h-[44px] hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] font-semibold border border-[color:var(--border)] flex items-center gap-1.5 cursor-pointer"
                                 leftIcon={<Calendar className="w-4 h-4 text-[color:var(--primary)]" />}
                             >
                                 <span>View in Timeline</span>
                             </Button>
                         </Link>
-                        <Link href="/projects/smart-import">
+                        <Link href="/projects/smart-import" className="inline-flex min-h-[44px]">
                             <Button
                                 variant="secondary"
                                 size="md"
-                                className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/30 flex items-center gap-1.5"
+                                className="min-h-[44px] hover:bg-[color:var(--soft-surface)] text-[color:var(--text)] font-semibold border border-[color:var(--border)] flex items-center gap-1.5 cursor-pointer"
                                 leftIcon={<Sparkles className="w-4 h-4 text-emerald-500" />}
                             >
                                 <span>Smart S.O. Import</span>
@@ -199,6 +199,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                     variant="secondary"
                                     size="md"
                                     onClick={() => setIsJoinCodeOpen(true)}
+                                    className="min-h-[44px] cursor-pointer"
                                 >
                                     <span>Join with code</span>
                                 </Button>
@@ -206,6 +207,7 @@ export default function ProjectsIndex({ projects = [], availableUsers = [] }: Pr
                                     variant="primary"
                                     size="md"
                                     onClick={() => openCreateProjectModal()}
+                                    className="min-h-[44px] cursor-pointer"
                                     leftIcon={<Plus className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
                                 >
                                     <span>Create event</span>

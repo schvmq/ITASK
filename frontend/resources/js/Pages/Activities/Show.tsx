@@ -8,6 +8,7 @@ import { FormField } from '@/Components/FormField';
 import { Label } from '@/Components/Label';
 import { InputError } from '@/Components/InputError';
 import { Button } from '@/Components/Button';
+import { TaskAssigneeDeliberationPanel } from '@/Components/TaskAssigneeDeliberationPanel';
 import {
     ArrowLeft,
     Bell,
@@ -2599,6 +2600,15 @@ export default function ActivityShow({
                                 <InputError message={taskErrors.status} />
                             </div>
                         </div>
+
+                        <TaskAssigneeDeliberationPanel
+                            projectId={project.id}
+                            committeeId={committee.id}
+                            taskTitle={taskData.title}
+                            taskDescription={taskData.description}
+                            selectedUserId={taskData.assigned_to}
+                            onSelectAssignee={(userId) => setTaskData('assigned_to', userId)}
+                        />
 
                         <div className="space-y-1.5">
                             <Label htmlFor="create-task-assignee">Assignee (Optional)</Label>

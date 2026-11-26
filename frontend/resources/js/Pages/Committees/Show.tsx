@@ -54,11 +54,14 @@ interface MemberRecommendation {
     name: string;
     email: string;
     has_resume: boolean;
+    has_questionnaire?: boolean;
     resume_name?: string;
     suitability_score: number;
     eligibility_status: string;
     recommendation_reason: string;
     extracted_skills: string[];
+    top_strengths?: string[];
+    availability?: string | null;
     certifications?: string[];
 }
 
@@ -1137,27 +1140,29 @@ export default function CommitteeShow({
                         {eligibleMembers.length > 0 ? (
                             <div className="space-y-3">
                                 {/* AI Screening & Recommendation Banner */}
-                                <div className="p-3 rounded-xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-transparent border border-orange-200 dark:border-orange-900/40 space-y-2">
+                                <div className="p-3.5 rounded-xl bg-[color:var(--soft-surface)]/60 border border-[color:var(--border)] space-y-2.5">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                         <div className="flex items-center gap-2">
-                                            <div className="p-1.5 rounded-lg bg-orange-500/20 text-[color:var(--color-brand-action-orange)] shrink-0">
-                                                <Sparkles className="w-4 h-4" />
+                                            <div className="p-1.5 rounded-lg bg-[color:var(--primary)]/15 text-[color:var(--primary)] shrink-0">
+                                                <Sparkles className="w-4 h-4 stroke-[2]" />
                                             </div>
                                             <div>
-                                                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                                                <h4 className="text-xs font-bold text-[color:var(--text)] flex items-center gap-1.5 flex-wrap">
                                                     <span>Ollama AI Resume & Eligibility Screening</span>
                                                     {ollamaActive !== null && (
-                                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                                                            ollamaActive
-                                                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                                                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                                        }`}>
+                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--muted)]">
                                                             {ollamaActive ? '● Ollama Active' : '● Heuristic Mode'}
                                                         </span>
                                                     )}
                                                 </h4>
-                                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                                                    Ranks candidates against <strong>{committee.name}</strong> deliverables by scanning CV skills.
+                                                <p className="text-[11px] text-[color:var(--muted)]">
+                                                    Ranks candidates against <strong>{committee.name}</strong> deliverables by combining questionnaire strengths and CV credentials.{' '}
+                                                    <Link
+                                                        href="/eligibility-profile"
+                                                        className="text-[color:var(--primary)] underline hover:no-underline font-medium"
+                                                    >
+                                                        Update questionnaire &rarr;
+                                                    </Link>
                                                 </p>
                                             </div>
                                         </div>
@@ -1165,7 +1170,7 @@ export default function CommitteeShow({
                                             type="button"
                                             onClick={handleFetchRecommendations}
                                             disabled={isRecommending}
-                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-[color:var(--color-brand-action-orange)] text-white hover:bg-orange-600 disabled:opacity-50 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] sm:min-h-0 text-xs font-semibold rounded-lg bg-[color:var(--primary)] text-white hover:opacity-90 disabled:opacity-50 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
                                         >
                                             <Sparkles className={`w-3.5 h-3.5 ${isRecommending ? 'animate-spin' : ''}`} />
                                             <span>{isRecommending ? 'Screening CVs...' : 'Rank by Suitability'}</span>
@@ -1173,20 +1178,20 @@ export default function CommitteeShow({
                                     </div>
 
                                     {recommendationError && (
-                                        <p className="text-[11px] text-rose-600 dark:text-rose-400">
+                                        <p className="text-[11px] text-[color:var(--status-danger-text)]">
                                             {recommendationError}
                                         </p>
                                     )}
 
                                     {recommendations && recommendations.length > 0 && (
-                                        <div className="pt-2 border-t border-orange-200/60 dark:border-orange-900/40 flex items-center justify-between text-[11px]">
-                                            <span className="text-slate-700 dark:text-slate-300 truncate">
+                                        <div className="pt-2 border-t border-[color:var(--border)] flex items-center justify-between text-[11px]">
+                                            <span className="text-[color:var(--text)] truncate">
                                                 Top match: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{recommendations[0].name}</strong> ({recommendations[0].suitability_score}% Match)
                                             </span>
                                             <button
                                                 type="button"
                                                 onClick={handleSelectTopMatch}
-                                                className="text-xs font-bold text-[color:var(--color-brand-action-orange)] hover:underline cursor-pointer shrink-0 ml-2"
+                                                className="text-xs font-bold text-[color:var(--primary)] hover:underline cursor-pointer shrink-0 ml-2"
                                             >
                                                 + Select Top Match
                                             </button>
@@ -1202,7 +1207,7 @@ export default function CommitteeShow({
                                             placeholder="Search members by name or email..."
                                             value={memberSearchQuery}
                                             onChange={(e) => setMemberSearchQuery(e.target.value)}
-                                            className="w-full pl-3 pr-8 py-1.5 text-xs bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                                            className="w-full pl-3 pr-8 py-1.5 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-lg shadow-xs focus:outline-none focus:ring-2 focus:ring-[color:var(--primary)]/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-[color:var(--muted)]"
                                         />
                                         {memberSearchQuery && (
                                             <button
@@ -1261,11 +1266,11 @@ export default function CommitteeShow({
                                                             type="checkbox"
                                                             checked={isSelected}
                                                             onChange={() => {}} // parent onClick handles toggle
-                                                            className="w-4 h-4 rounded text-[color:var(--color-brand-action-orange)] border-[color:var(--border)] bg-[color:var(--card)] focus:ring-orange-500/20 cursor-pointer shrink-0"
+                                                            className="w-4 h-4 rounded text-[color:var(--primary)] border-[color:var(--border)] bg-[color:var(--card)] focus:ring-[color:var(--primary)]/20 cursor-pointer shrink-0"
                                                         />
                                                         <div className="min-w-0">
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                <p className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                                                                <p className="text-xs font-semibold text-[color:var(--text)] truncate">
                                                                     {member.name}
                                                                 </p>
                                                                 {score !== undefined && (
@@ -1279,8 +1284,13 @@ export default function CommitteeShow({
                                                                         {score}% Match • {status || 'Eligible'}
                                                                     </span>
                                                                 )}
+                                                                {rec?.has_questionnaire && (
+                                                                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+                                                                        Questionnaire
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                                            <p className="text-[11px] text-[color:var(--muted)] truncate">
                                                                 {member.email}
                                                             </p>
                                                         </div>
@@ -1300,7 +1310,7 @@ export default function CommitteeShow({
                                                             className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium border transition-colors cursor-pointer ${
                                                                 hasResume
                                                                     ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                                                    : 'bg-slate-50 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-orange-300'
+                                                                    : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border-[color:var(--border)] hover:border-[color:var(--primary)]/50'
                                                             }`}
                                                             title={hasResume ? 'Update candidate resume / CV' : 'Attach resume / CV for AI screening'}
                                                         >
@@ -1310,24 +1320,37 @@ export default function CommitteeShow({
                                                     </div>
                                                 </div>
 
-                                                {/* Candidate Extracted Skills & Justification */}
-                                                {(skills.length > 0 || rec?.recommendation_reason) && (
+                                                {/* Candidate Extracted Skills, Questionnaire Strengths & Justification */}
+                                                {(skills.length > 0 || (rec?.top_strengths && rec.top_strengths.length > 0) || rec?.recommendation_reason) && (
                                                     <div className="pl-7 pt-1 flex flex-col gap-1">
                                                         {skills.length > 0 && (
                                                             <div className="flex items-center gap-1 flex-wrap">
-                                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">Skills:</span>
+                                                                <span className="text-[10px] text-[color:var(--muted)] font-medium">CV Skills:</span>
                                                                 {skills.map((s, idx) => (
                                                                     <span
                                                                         key={idx}
-                                                                        className="px-1.5 py-0.2 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                                                                        className="px-1.5 py-0.2 rounded text-[10px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)]"
                                                                     >
                                                                         {s}
                                                                     </span>
                                                                 ))}
                                                             </div>
                                                         )}
+                                                        {rec?.top_strengths && rec.top_strengths.length > 0 && (
+                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                                <span className="text-[10px] text-[color:var(--muted)] font-medium">Strengths:</span>
+                                                                {rec.top_strengths.map((st, sIdx) => (
+                                                                    <span
+                                                                        key={sIdx}
+                                                                        className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium"
+                                                                    >
+                                                                        {st}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
                                                         {rec?.recommendation_reason && (
-                                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic">
+                                                            <p className="text-[10px] text-[color:var(--muted)] italic">
                                                                 "{rec.recommendation_reason}"
                                                             </p>
                                                         )}
@@ -1359,7 +1382,7 @@ export default function CommitteeShow({
                         )}
 
                         <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between gap-2.5">
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                            <span className="text-xs text-[color:var(--muted)]">
                                 {assignData.user_ids.length > 0
                                     ? `${assignData.user_ids.length} member${assignData.user_ids.length === 1 ? '' : 's'} selected`
                                     : 'No members selected'}

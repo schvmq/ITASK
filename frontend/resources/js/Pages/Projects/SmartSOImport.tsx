@@ -368,46 +368,32 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
     }, [parsedData]);
 
     return (
-        <AppLayout hidePageHeadingBanner={true}>
+        <AppLayout
+            title="Smart S.O. Import"
+            subtitle="Automated Special Order parsing, committee layout generation, and personnel matching with review verification."
+            breadcrumbs={[
+                { label: 'Events', href: '/projects' },
+                { label: 'Smart S.O. Import' },
+            ]}
+        >
             <Head title="Smart S.O. Import" />
 
             <div className="max-w-6xl mx-auto space-y-6 pb-12">
-                {/* ══ Breadcrumbs & Header ══ */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[color:var(--border)]">
-                    <div>
-                        <div className="flex items-center gap-2 text-sm text-[color:var(--muted)] mb-1">
-                            <Link href="/projects" className="hover:text-[color:var(--primary)] flex items-center gap-1 transition-colors">
-                                <ArrowLeft className="w-3.5 h-3.5" />
-                                <span>Events</span>
-                            </Link>
-                            <span>/</span>
-                            <span className="text-[color:var(--text)] font-medium">Smart S.O. Import</span>
-                        </div>
-                        <h1 className="text-2xl sm:text-3xl font-extrabold text-[color:var(--text)] tracking-tight flex items-center gap-2.5">
-                            <Sparkles className="w-6 h-6 text-emerald-500 shrink-0" />
-                            Smart Special Order (S.O.) Import
-                        </h1>
-                        <p className="text-sm text-[color:var(--muted)] mt-1">
-                            Automated Special Order parsing, committee layout generation, and personnel matching with review verification.
-                        </p>
+                {parsedData && (
+                    <div className="flex items-center justify-end gap-2 pb-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                                setParsedData(null);
+                                setTempFilePath(null);
+                            }}
+                            leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
+                        >
+                            Re-upload / Reset
+                        </Button>
                     </div>
-
-                    {parsedData && (
-                        <div className="flex items-center gap-2 shrink-0">
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => {
-                                    setParsedData(null);
-                                    setTempFilePath(null);
-                                }}
-                                leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
-                            >
-                                Re-upload / Reset
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                )}
 
                 {errorMsg && (
                     <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-sm flex items-start gap-3">
@@ -752,9 +738,12 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                     return (
                                         <Card key={cIndex} className="overflow-hidden border-[color:var(--border)] transition-all">
                                             {/* Committee Header Accordion Toggle */}
-                                            <div
+                                            <button
+                                                type="button"
                                                 onClick={() => toggleCommitteeExpand(cIndex)}
-                                                className="p-4 bg-[color:var(--surface)] hover:bg-[color:var(--soft-surface)] cursor-pointer flex items-center justify-between gap-3 border-b border-[color:var(--border)]"
+                                                aria-expanded={isExpanded}
+                                                aria-controls={`committee-body-${cIndex}`}
+                                                className="w-full text-left p-4 bg-[color:var(--soft-surface)]/60 hover:bg-[color:var(--soft-surface)] transition-colors cursor-pointer flex items-center justify-between gap-3 border-b border-[color:var(--border)] focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-[-2px]"
                                             >
                                                 <div className="flex items-center gap-3 min-w-0">
                                                     <div className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs shrink-0">
@@ -780,11 +769,11 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                         <ChevronRight className="w-4 h-4 text-[color:var(--muted)]" />
                                                     )}
                                                 </div>
-                                            </div>
+                                            </button>
 
                                             {/* Committee Body */}
                                             {isExpanded && (
-                                                <div className="p-5 space-y-5 bg-[color:var(--bg)]/50">
+                                                <div id={`committee-body-${cIndex}`} className="p-5 space-y-5 bg-[color:var(--card)]">
                                                     {/* Description */}
                                                     {committee.description && (
                                                         <p className="text-xs text-[color:var(--muted)] italic">
@@ -795,7 +784,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                     {/* Roles Layout: Chair & Co-Chairs */}
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                         {/* Chairperson */}
-                                                        <div className="p-3.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] space-y-2">
+                                                        <div className="p-3.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)] space-y-2">
                                                             <div className="flex items-center justify-between">
                                                                 <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
                                                                     Committee Chairperson
@@ -812,7 +801,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                             <select
                                                                 value={committee.chairperson.user_id || ''}
                                                                 onChange={e => handleCommitteeChairChange(cIndex, Number(e.target.value))}
-                                                                className="w-full px-2.5 py-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--bg)] text-[color:var(--text)] text-xs focus:outline-none"
+                                                                className="w-full px-2.5 py-1.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] text-xs focus:outline-none"
                                                             >
                                                                 <option value="">-- Assign Chairperson Account --</option>
                                                                 {candidateList.map(u => (
@@ -824,7 +813,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                         </div>
 
                                                         {/* Co-Chairs */}
-                                                        <div className="p-3.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] space-y-2">
+                                                        <div className="p-3.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)] space-y-2">
                                                             <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider block">
                                                                 Committee Co-Chairs ({committee.co_chairs.length})
                                                             </span>
@@ -838,7 +827,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                                         <select
                                                                             value={coChair.user_id || ''}
                                                                             onChange={e => handleCommitteeCoChairChange(cIndex, coIdx, Number(e.target.value))}
-                                                                            className="w-40 px-2 py-1 rounded border border-[color:var(--border)] bg-[color:var(--bg)] text-[color:var(--text)] text-[11px] truncate focus:outline-none"
+                                                                            className="w-40 px-2 py-1 rounded border border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--text)] text-[11px] truncate focus:outline-none"
                                                                         >
                                                                             <option value="">-- Select User --</option>
                                                                             {candidateList.map(u => (
@@ -854,7 +843,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                     </div>
 
                                                     {/* Committee Members */}
-                                                    <div className="p-3.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] space-y-2">
+                                                    <div className="p-3.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--soft-surface)] space-y-2">
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-[11px] font-bold text-[color:var(--muted)] uppercase tracking-wider">
                                                                 Committee Members ({committee.members.length})
@@ -866,7 +855,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
 
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1">
                                                             {committee.members.map((member, mIdx) => (
-                                                                <div key={mIdx} className="p-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--bg)] space-y-1.5 text-xs">
+                                                                <div key={mIdx} className="p-2.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] space-y-1.5 text-xs">
                                                                     <div className="flex items-center justify-between gap-1">
                                                                         <span className="font-semibold text-[color:var(--text)] truncate" title={member.name}>
                                                                             {member.name}
@@ -880,7 +869,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                                     <select
                                                                         value={member.user_id || ''}
                                                                         onChange={e => handleCommitteeMemberChange(cIndex, mIdx, Number(e.target.value))}
-                                                                        className="w-full px-2 py-1 rounded border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text)] text-[11px] truncate focus:outline-none"
+                                                                        className="w-full px-2 py-1 rounded border border-[color:var(--border)] bg-[color:var(--soft-surface)] text-[color:var(--text)] text-[11px] truncate focus:outline-none"
                                                                     >
                                                                         <option value="">-- Assign Member --</option>
                                                                         {candidateList.map(u => (
@@ -895,7 +884,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                     </div>
 
                                                     {/* Proposed Deliverables for this Committee */}
-                                                    <div className="p-3.5 rounded-xl border border-dashed border-[color:var(--border)] bg-[color:var(--surface)]/50 space-y-2.5">
+                                                    <div className="p-3.5 rounded-xl border border-dashed border-[color:var(--border)] bg-[color:var(--soft-surface)]/50 space-y-2.5">
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                                                                 <FileCheck className="w-3.5 h-3.5" />
@@ -913,7 +902,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                                                                     className={`p-2.5 rounded-lg border text-xs cursor-pointer flex items-start gap-2.5 transition-all ${
                                                                         deliv.selected
                                                                             ? 'border-emerald-500/40 bg-emerald-500/5 text-[color:var(--text)]'
-                                                                            : 'border-[color:var(--border)] bg-[color:var(--bg)] text-[color:var(--muted)] opacity-60'
+                                                                            : 'border-[color:var(--border)] bg-[color:var(--card)] text-[color:var(--muted)] opacity-60'
                                                                     }`}
                                                                 >
                                                                     <input
@@ -939,7 +928,7 @@ export default function SmartSOImport({ users = [], currentUser }: SmartSOImport
                         </div>
 
                         {/* ── Action & Confirmation Bar ── */}
-                        <Card className="p-6 border-[color:var(--border)] bg-gradient-to-r from-emerald-500/5 via-[color:var(--surface)] to-indigo-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <Card className="p-6 border-[color:var(--border)] bg-gradient-to-r from-emerald-500/5 via-[color:var(--card)] to-indigo-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 text-sm font-bold text-[color:var(--text)]">
                                     <ShieldCheck className="w-4 h-4 text-emerald-500" />
