@@ -34,6 +34,8 @@
     --border: #E5E7EB; /* border-neutral-200 */
     --muted: #6B7280;
     --soft-surface: #F3F4F6;
+    --surface: var(--card);
+    --surface-elevated: var(--card-surface);
 
     /* Semantic Status Mixes (Emerald, Amber, Crimson) */
     /* Nominal / Completed (Emerald) */
@@ -98,6 +100,8 @@ html.dark {
     --border: #262626; /* dark:border-neutral-800 */
     --muted: #9CA3AF;
     --soft-surface: #1E232B;
+    --surface: var(--card);
+    --surface-elevated: var(--card-surface);
 
     /* Semantic Status Mixes (Emerald, Amber, Crimson) */
     /* Nominal / Completed (Emerald) */
