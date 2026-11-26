@@ -823,6 +823,17 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                             </DropdownMenuItem>
                                         </>
                                     )}
+                                    <DropdownMenuItem
+                                        onClick={() => router.visit('/profile/skills')}
+                                        className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${
+                                            currentPathname === '/profile/skills' || currentPathname.startsWith('/profile/skills/')
+                                                ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                : 'font-medium'
+                                        }`}
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 mr-2 stroke-[2px] text-amber-500" />
+                                        My Skill Profile
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                                     <DropdownMenuItem
                                         onClick={handleLogout}
@@ -1025,3 +1036,5 @@ export function openCommandPalette() {
         window.dispatchEvent(new CustomEvent('itask:open-command-palette'));
     }
 }
+
+export default AppLayout;

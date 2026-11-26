@@ -49,7 +49,14 @@ Route::get('/verify-email', function (Request $request) {
 Route::get('/verify-email/{id}/{hash}', function (
     EmailVerificationRequest $request
 ) {
+    $user = $request->user();
+    $wasAlreadyVerified = $user ? $user->hasVerifiedEmail() : false;
+
     $request->fulfill();
+
+    if ($user && ! $wasAlreadyVerified && ! $user->hasAcknowledgedSkillOnboarding()) {
+        return redirect()->route('onboarding.skills');
+    }
 
     return redirect()->route('dashboard');
 })->middleware(['auth', 'signed'])->name('verification.verify');
@@ -67,6 +74,14 @@ Route::post('/email/verification-notification', function (Request $request) {
 // Authenticated Application / Dashboard Route
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+    // Post-Verification Skill Onboarding
+    Route::get('/onboarding/skills', [\App\Http\Controllers\UserSkillProfileController::class, 'showOnboarding'])->name('onboarding.skills');
+    Route::post('/onboarding/skills/complete-later', [\App\Http\Controllers\UserSkillProfileController::class, 'completeLater'])->name('onboarding.skills.complete-later');
+
+    // Account Skill Profile Management
+    Route::get('/profile/skills', [\App\Http\Controllers\UserSkillProfileController::class, 'showProfile'])->name('profile.skills');
+    Route::post('/profile/skills', [\App\Http\Controllers\UserSkillProfileController::class, 'update'])->name('profile.skills.update');
 
     // My Tasks (cross-project task hub, role-scoped)
     Route::get('/my-tasks', [MyTasksController::class, 'index'])->name('my-tasks.index');

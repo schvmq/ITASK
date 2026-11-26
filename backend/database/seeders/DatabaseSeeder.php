@@ -63,5 +63,8 @@ class DatabaseSeeder extends Seeder
                 ]
             );
         }
+
+        // 3. Standardized Skills Catalog (18 Skills across 4 Categories)
+        $this->call(StandardizedSkillsSeeder::class);
     }
 }
