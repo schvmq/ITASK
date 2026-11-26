@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\MemberResume;
+use App\Models\Project;
 use App\Models\User;
 use App\Services\AI\OllamaResumeScreeningService;
+use App\Services\Authorization\AuthorizationService;
+use App\Services\Authorization\RoleRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -112,8 +115,8 @@ class MemberResumeController extends Controller
         $existing = MemberResume::where('user_id', $user->id)->first();
         $hasQuestionnaire = $existing?->assessment_completed_at !== null;
 
-        $cvSkills = $this->cleanStringList($analysis['extracted_skills'] ?? []);
-        $cvCertifications = $this->cleanStringList($analysis['certifications'] ?? []);
+        $cvSkills = $this->screeningService->normalizeStringList($analysis['extracted_skills'] ?? []);
+        $cvCertifications = $this->screeningService->normalizeStringList($analysis['certifications'] ?? []);
         $rawAi = is_array($analysis['raw_ai_analysis'] ?? null) ? $analysis['raw_ai_analysis'] : [];
         $rawAi['cv_certifications'] = $cvCertifications;
 
@@ -129,7 +132,7 @@ class MemberResumeController extends Controller
         if ($hasQuestionnaire) {
             $oldCvCerts = $this->extractCvCertifications($existing);
             $existingSelfCerts = array_values(array_diff(
-                $this->cleanStringList($existing->certifications ?? []),
+                $this->screeningService->normalizeStringList($existing->certifications ?? []),
                 $oldCvCerts
             ));
 
@@ -137,11 +140,11 @@ class MemberResumeController extends Controller
                 array_column(OllamaResumeScreeningService::COMPETENCY_DOMAINS, 'label'),
                 array_keys(OllamaResumeScreeningService::TASK_CATEGORY_DOMAINS)
             );
-            $existingSkills = $this->cleanStringList($existing->extracted_skills ?? []);
+            $existingSkills = $this->screeningService->normalizeStringList($existing->extracted_skills ?? []);
             $questionnaireSkills = $existing->original_name
                 ? array_values(array_intersect(
                     $existingSkills,
-                    array_merge($canonicalLabels, $this->cleanStringList($existing->preferred_task_categories ?? []))
+                    array_merge($canonicalLabels, $this->screeningService->normalizeStringList($existing->preferred_task_categories ?? []))
                 ))
                 : $existingSkills;
 
@@ -201,8 +204,50 @@ class MemberResumeController extends Controller
     /**
      * Get member resume and eligibility questionnaire summary.
      */
-    public function show(User $user): JsonResponse
+    public function show(Request $request, User $user, AuthorizationService $authService): JsonResponse
     {
+        $currentUser = $request->user();
+
+        if (! $currentUser) {
+            abort(403, 'Unauthorized to view eligibility profile for this user.');
+        }
+
+        $isOwnerOrAdmin = (int) $currentUser->id === (int) $user->id
+            || $authService->isAdmin($currentUser);
+
+        if (! $isOwnerOrAdmin) {
+            $canManageInSharedProject = Project::query()
+                ->where('status', '!=', Project::STATUS_ARCHIVED)
+                ->where(function ($projectQuery) use ($currentUser) {
+                    $projectQuery->where('created_by', $currentUser->id)
+                        ->orWhereHas('roleAssignments', function ($roleQuery) use ($currentUser) {
+                            $roleQuery->where('user_id', $currentUser->id)
+                                ->whereIn('role', [
+                                    RoleRegistry::ROLE_PROJECT_LEADER,
+                                    RoleRegistry::ROLE_PROJECT_COMMITTEE,
+                                    RoleRegistry::ROLE_PROJECT_STAFF,
+                                ]);
+                        })
+                        ->orWhereHas('coChairDesignations', function ($coChairQuery) use ($currentUser) {
+                            $coChairQuery->where('user_id', $currentUser->id);
+                        });
+                })
+                ->where(function ($targetQuery) use ($user) {
+                    $targetQuery->where('created_by', $user->id)
+                        ->orWhereHas('roleAssignments', function ($roleQuery) use ($user) {
+                            $roleQuery->where('user_id', $user->id);
+                        })
+                        ->orWhereHas('coChairDesignations', function ($coChairQuery) use ($user) {
+                            $coChairQuery->where('user_id', $user->id);
+                        });
+                })
+                ->exists();
+
+            if (! $canManageInSharedProject) {
+                abort(403, 'Unauthorized to view eligibility profile for this user.');
+            }
+        }
+
         $resume = MemberResume::where('user_id', $user->id)->first();
 
         if (!$resume) {
@@ -259,35 +304,18 @@ class MemberResumeController extends Controller
         $rawAnalysis = is_array($resume->raw_ai_analysis) ? $resume->raw_ai_analysis : [];
 
         if (is_array($rawAnalysis['cv_certifications'] ?? null)) {
-            return $this->cleanStringList($rawAnalysis['cv_certifications']);
+            return $this->screeningService->normalizeStringList($rawAnalysis['cv_certifications']);
         }
 
         if (is_array($rawAnalysis['certifications'] ?? null)) {
-            return $this->cleanStringList($rawAnalysis['certifications']);
+            return $this->screeningService->normalizeStringList($rawAnalysis['certifications']);
         }
 
         if ($resume->original_name && $resume->assessment_completed_at === null) {
-            return $this->cleanStringList($resume->certifications ?? []);
+            return $this->screeningService->normalizeStringList($resume->certifications ?? []);
         }
 
         return [];
-    }
-
-    protected function cleanStringList(mixed $items): array
-    {
-        if (!is_array($items)) {
-            return [];
-        }
-
-        $cleaned = [];
-        foreach ($items as $item) {
-            $trimmed = trim((string) $item);
-            if ($trimmed !== '') {
-                $cleaned[] = $trimmed;
-            }
-        }
-
-        return array_values(array_unique($cleaned));
     }
 
     protected function getSampleDeliberationTasks(): array

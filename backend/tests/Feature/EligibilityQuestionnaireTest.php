@@ -947,15 +947,103 @@ class EligibilityQuestionnaireTest extends TestCase
             'committee_id' => $this->committee->id,
         ])->assertStatus(403);
 
-        // Mismatched committee from another project returns 404
+        // Unauthorized callers cannot probe validation (422) or foreign committee existence (404)
+        $this->actingAs($outsider)->postJson($endpoint, [])->assertStatus(403);
+        $this->actingAs($outsider)->postJson($endpoint, [
+            'task_title' => 'Probe Foreign Committee',
+            'committee_id' => $foreignCommittee->id,
+        ])->assertStatus(403);
+        $this->actingAs($outsider)->postJson($endpoint, [
+            'committee_id' => 999999,
+        ])->assertStatus(403);
+        $this->actingAs($this->techMember)->postJson($endpoint, [
+            'committee_id' => $foreignCommittee->id,
+        ])->assertStatus(403);
+
+        // Mismatched committee from another project returns 404 for authorized leader
         $this->actingAs($this->leader)->postJson($endpoint, [
             'task_title' => 'Build React API Data Table',
             'committee_id' => $foreignCommittee->id,
         ])->assertStatus(404);
 
-        // Validation requires task_title
+        // Validation requires task_title for authorized leader
         $this->actingAs($this->leader)->postJson($endpoint, [
             'committee_id' => $this->committee->id,
         ])->assertStatus(422)->assertJsonValidationErrors(['task_title']);
+    }
+
+    public function test_resume_show_enforces_ownership_admin_or_shared_project_leadership(): void
+    {
+        $service = new OllamaResumeScreeningService();
+        $service->saveQuestionnaireProfile($this->techMember, [
+            'strength_ratings' => ['technical_engineering' => 5],
+            'preferred_task_categories' => ['Web & System Setup'],
+            'certifications_list' => ['Laravel Certified'],
+            'leadership_readiness' => 'Lead or Independent',
+            'availability_hours' => '6-10 hrs/week',
+            'deliberation_notes' => 'Private deliberation note for leader review.',
+        ]);
+
+        $admin = User::factory()->create(['is_admin' => true, 'email_verified_at' => now()]);
+        $outsider = User::factory()->create(['email_verified_at' => now()]);
+        $committeeStaff = User::factory()->create(['email_verified_at' => now()]);
+
+        ProjectRoleAssignment::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $this->committee->id,
+            'user_id' => $committeeStaff->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+        ]);
+
+        $showUrl = route('users.resume.show', ['user' => $this->techMember->id]);
+
+        // Owner, Admin, shared Project Leader, and shared Committee Staff get 200
+        $this->actingAs($this->techMember)
+            ->getJson($showUrl)
+            ->assertStatus(200)
+            ->assertJsonPath('deliberation_notes', 'Private deliberation note for leader review.');
+
+        $this->actingAs($admin)
+            ->getJson($showUrl)
+            ->assertStatus(200)
+            ->assertJsonPath('availability_hours', '6-10 hrs/week');
+
+        $this->actingAs($this->leader)
+            ->getJson($showUrl)
+            ->assertStatus(200)
+            ->assertJsonPath('has_questionnaire', true);
+
+        $this->actingAs($committeeStaff)
+            ->getJson($showUrl)
+            ->assertStatus(200)
+            ->assertJsonPath('has_questionnaire', true);
+
+        // Unrelated peer (plain member) and external outsider receive 403
+        $this->actingAs($this->docsMember)
+            ->getJson($showUrl)
+            ->assertStatus(403);
+
+        $this->actingAs($outsider)
+            ->getJson($showUrl)
+            ->assertStatus(403);
+    }
+
+    public function test_normalize_string_list_skips_nested_arrays_and_is_available_is_memoized(): void
+    {
+        Http::fake([
+            '127.0.0.1:11434/api/tags' => Http::response(['models' => []], 200),
+        ]);
+
+        $service = new OllamaResumeScreeningService();
+
+        $this->assertSame(
+            ['Laravel', '42', 'React'],
+            $service->normalizeStringList([' Laravel ', ['nested'], 42, '', null, 'React', 'Laravel'])
+        );
+
+        $this->assertTrue($service->isAvailable());
+        $this->assertTrue($service->isAvailable());
+
+        Http::assertSentCount(1);
     }
 }

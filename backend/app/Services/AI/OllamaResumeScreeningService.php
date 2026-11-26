@@ -91,6 +91,7 @@ class OllamaResumeScreeningService
     protected string $model;
     protected string $visionModel;
     protected int $timeout;
+    protected ?bool $availabilityCache = null;
 
     public function __construct()
     {
@@ -147,8 +148,8 @@ class OllamaResumeScreeningService
             }
         }
 
-        $preferredCategories = $this->cleanStringList($payload['preferred_task_categories'] ?? []);
-        $submittedCertifications = $this->cleanStringList($payload['certifications_list'] ?? []);
+        $preferredCategories = $this->normalizeStringList($payload['preferred_task_categories'] ?? []);
+        $submittedCertifications = $this->normalizeStringList($payload['certifications_list'] ?? []);
 
         $canonicalLabels = array_merge(
             array_column(self::COMPETENCY_DOMAINS, 'label'),
@@ -170,11 +171,11 @@ class OllamaResumeScreeningService
 
         $rawAnalysis = is_array($existing?->raw_ai_analysis) ? $existing->raw_ai_analysis : [];
         if (is_array($rawAnalysis['certifications'] ?? null)) {
-            $cvCertifications = $this->cleanStringList($rawAnalysis['certifications']);
+            $cvCertifications = $this->normalizeStringList($rawAnalysis['certifications']);
         } elseif (is_array($rawAnalysis['cv_certifications'] ?? null)) {
-            $cvCertifications = $this->cleanStringList($rawAnalysis['cv_certifications']);
+            $cvCertifications = $this->normalizeStringList($rawAnalysis['cv_certifications']);
         } elseif ($hasCv && $existing?->assessment_completed_at === null) {
-            $cvCertifications = $this->cleanStringList($existing->certifications ?? []);
+            $cvCertifications = $this->normalizeStringList($existing->certifications ?? []);
             if (!empty($cvCertifications)) {
                 $rawAnalysis['cv_certifications'] = $cvCertifications;
             }
@@ -225,15 +226,19 @@ class OllamaResumeScreeningService
     }
 
     /**
-     * Check if Ollama service is reachable on the local machine.
+     * Check if Ollama service is reachable on the local machine (memoized per service instance).
      */
     public function isAvailable(): bool
     {
+        if ($this->availabilityCache !== null) {
+            return $this->availabilityCache;
+        }
+
         try {
             $response = Http::timeout(2)->get("{$this->host}/api/tags");
-            return $response->successful();
+            return $this->availabilityCache = $response->successful();
         } catch (\Throwable $e) {
-            return false;
+            return $this->availabilityCache = false;
         }
     }
 
@@ -864,7 +869,10 @@ class OllamaResumeScreeningService
             : 'Completed institutional eligibility and competency questionnaire.';
     }
 
-    protected function cleanStringList(mixed $items): array
+    /**
+     * Normalize a list into unique, non-empty trimmed strings, safely skipping non-scalar items.
+     */
+    public function normalizeStringList(mixed $items): array
     {
         if (!is_array($items)) {
             return [];
@@ -872,6 +880,10 @@ class OllamaResumeScreeningService
 
         $cleaned = [];
         foreach ($items as $item) {
+            if (!is_scalar($item)) {
+                continue;
+            }
+
             $trimmed = trim((string) $item);
             if ($trimmed !== '') {
                 $cleaned[] = $trimmed;

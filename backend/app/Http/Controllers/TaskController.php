@@ -439,6 +439,16 @@ class TaskController extends Controller
         AuthorizationService $authService,
         OllamaResumeScreeningService $screeningService
     ): JsonResponse {
+        $user = $request->user();
+
+        $canAccessProjectRecommendations = $authService->canCreateProjectTask($user, $project)
+            || $authService->isEventCoChair($user, $project)
+            || ($user && $project->coChairDesignations()->where('user_id', $user->id)->exists());
+
+        if (! $canAccessProjectRecommendations) {
+            abort(403, 'Unauthorized to deliberate task assignees.');
+        }
+
         $validated = $request->validate([
             'task_title' => ['required', 'string', 'max:255'],
             'task_description' => ['nullable', 'string', 'max:5000'],
@@ -452,10 +462,7 @@ class TaskController extends Controller
             if (! $committee) {
                 abort(404, 'Selected committee not found in this project.');
             }
-        }
 
-        $user = $request->user();
-        if ($committee) {
             $authorized = $authService->isAdmin($user)
                 || $authService->isProjectLeader($user, $project)
                 || $authService->isEventCoChair($user, $project)
