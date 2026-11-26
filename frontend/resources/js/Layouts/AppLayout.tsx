@@ -620,7 +620,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 {/* ── Sticky Top Bar (Section 2 & Section 4 requirement) ── */}
                 <header className="h-14 px-3 min-[375px]:px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between gap-1.5 min-[375px]:gap-2 bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
                     {/* Left: Mobile Drawer Trigger & Global Quick Search */}
-                    <div className="flex items-center gap-1.5 min-[375px]:gap-2 sm:gap-2.5 min-w-0">
+                    <div className="flex items-center gap-1.5 min-[375px]:gap-2 sm:gap-2.5 min-w-0 flex-1">
                         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                             <SheetTrigger asChild>
                                 <motion.button
@@ -657,16 +657,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                         <button
                             type="button"
                             onClick={() => setIsCommandPaletteOpen(true)}
-                            className="inline-flex items-center justify-center w-11 h-11 p-0 md:w-auto md:h-auto md:min-h-[38px] md:min-w-[220px] md:px-3 md:py-1.5 md:justify-start md:gap-2 rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] text-[13px] text-[color:var(--text)]/80 hover:text-[color:var(--text)] transition-colors cursor-pointer shrink-0 focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
-                            aria-label="Jump to page or action (Ctrl+K)"
+                            className="inline-flex items-center justify-center w-11 h-11 p-0 min-w-0 md:w-full md:max-w-[210px] lg:max-w-[240px] xl:max-w-[280px] md:h-auto md:min-h-[38px] md:px-3 md:py-1.5 md:justify-start md:gap-2 rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] text-[13px] text-[color:var(--text)]/80 hover:text-[color:var(--text)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                            aria-label="Search pages or jump to page or action (Ctrl+K)"
                         >
                             <Search className="w-4 h-4 shrink-0 text-[color:var(--muted)]" />
-                            <span className="hidden md:inline flex-1 text-left">
+                            <span className="hidden md:inline xl:hidden truncate flex-1 text-left">
+                                Search pages
+                            </span>
+                            <span className="hidden xl:inline truncate flex-1 text-left">
                                 Jump to page or action<span aria-hidden="true">...</span>
                             </span>
                             <kbd
                                 aria-hidden="true"
-                                className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[color:var(--card)] border border-[color:var(--border)] rounded text-[color:var(--muted)]"
+                                className="hidden xl:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[color:var(--card)] border border-[color:var(--border)] rounded text-[color:var(--muted)] shrink-0"
                             >
                                 Ctrl+K
                             </kbd>
@@ -710,7 +713,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="hidden sm:flex md:hidden lg:flex items-center gap-1.5 text-left text-[12px] leading-tight">
-                                            <span className="font-semibold text-[color:var(--text)] truncate max-w-[130px]">
+                                            <span className="font-semibold text-[color:var(--text)] truncate max-w-[110px] xl:max-w-[130px]">
                                                 {user.name}
                                             </span>
                                             <span className="text-[color:var(--muted)]">·</span>

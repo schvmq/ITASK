@@ -190,7 +190,7 @@ export function CommandPalette({
                         ref={inputRef}
                         type="text"
                         role="combobox"
-                        aria-expanded={true}
+                        aria-expanded={filteredLinks.length > 0}
                         aria-autocomplete="list"
                         aria-activedescendant={activeOptionId}
                         value={query}
