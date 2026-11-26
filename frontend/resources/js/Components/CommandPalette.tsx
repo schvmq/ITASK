@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { router, usePage } from '@inertiajs/react';
 import {
     Search,
@@ -11,7 +11,9 @@ import {
     Bell,
     Plus,
     X,
-    ArrowRight,
+    UserCheck,
+    Sparkles,
+    ShieldCheck,
 } from 'lucide-react';
 import { PageProps } from '@/types';
 
@@ -29,30 +31,49 @@ export function CommandPalette({
     onOpenCreateProject,
 }: CommandPaletteProps) {
     const { auth } = usePage<PageProps>().props;
+    const isAdmin = Boolean(auth?.user?.is_admin);
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const quickLinks = [
-        { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
-        { label: 'My Tasks', href: '/my-tasks', icon: CheckSquare },
-        { label: 'Events', href: '/projects', icon: FolderOpen },
-        { label: 'Calendar', href: '/calendar', icon: CalendarDays },
-        { label: 'Timeline', href: '/timeline', icon: GanttChartSquare },
-        { label: 'Messages', href: '/messages', icon: MessageSquare },
-        { label: 'Notifications', href: '/notifications', icon: Bell },
-    ];
+    const quickLinks = isAdmin
+        ? [
+              { label: 'Admin User Management', href: '/admin/dashboard', icon: ShieldCheck },
+              { label: 'Pending Registrations', href: '/admin/dashboard?tab=pending', icon: UserCheck },
+              { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
+              { label: 'Events', href: '/projects', icon: FolderOpen },
+              { label: 'Notifications', href: '/notifications', icon: Bell },
+          ]
+        : [
+              { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
+              { label: 'My Tasks', href: '/my-tasks', icon: CheckSquare },
+              { label: 'Events', href: '/projects', icon: FolderOpen },
+              { label: 'Smart S.O. Import', href: '/projects/smart-import', icon: Sparkles },
+              { label: 'Eligibility & Strengths', href: '/eligibility-profile', icon: UserCheck },
+              { label: 'Calendar', href: '/calendar', icon: CalendarDays },
+              { label: 'Timeline', href: '/timeline', icon: GanttChartSquare },
+              { label: 'Messages', href: '/messages', icon: MessageSquare },
+              { label: 'Notifications', href: '/notifications', icon: Bell },
+          ];
 
     const filteredLinks = quickLinks.filter((item) =>
         item.label.toLowerCase().includes(query.toLowerCase())
     );
 
+    const handleSelect = useCallback(
+        (href: string) => {
+            onClose();
+            router.visit(href);
+        },
+        [onClose]
+    );
+
     useEffect(() => {
-        if (isOpen) {
-            setQuery('');
-            setSelectedIndex(0);
-            setTimeout(() => inputRef.current?.focus(), 50);
-        }
+        if (!isOpen) return;
+        setQuery('');
+        setSelectedIndex(0);
+        const timer = window.setTimeout(() => inputRef.current?.focus(), 50);
+        return () => window.clearTimeout(timer);
     }, [isOpen]);
 
     useEffect(() => {
@@ -60,29 +81,25 @@ export function CommandPalette({
     }, [query]);
 
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-                e.preventDefault();
-                if (isOpen) {
-                    onClose();
-                }
-            }
-            if (!isOpen) return;
+        if (!isOpen) return;
 
+        const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 e.preventDefault();
                 onClose();
             } else if (e.key === 'ArrowDown') {
+                if (filteredLinks.length === 0) return;
                 e.preventDefault();
                 setSelectedIndex((prev) =>
                     prev < filteredLinks.length - 1 ? prev + 1 : 0
                 );
             } else if (e.key === 'ArrowUp') {
+                if (filteredLinks.length === 0) return;
                 e.preventDefault();
                 setSelectedIndex((prev) =>
                     prev > 0 ? prev - 1 : filteredLinks.length - 1
                 );
-            } else if (e.key === 'Enter') {
+            } else if (e.key === 'Enter' && document.activeElement === inputRef.current) {
                 e.preventDefault();
                 if (filteredLinks[selectedIndex]) {
                     handleSelect(filteredLinks[selectedIndex].href);
@@ -92,14 +109,9 @@ export function CommandPalette({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose, filteredLinks, selectedIndex]);
+    }, [isOpen, onClose, filteredLinks, selectedIndex, handleSelect]);
 
     if (!isOpen) return null;
-
-    const handleSelect = (href: string) => {
-        onClose();
-        router.visit(href);
-    };
 
     return (
         <div
@@ -107,12 +119,15 @@ export function CommandPalette({
             onClick={onClose}
         >
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Global command navigation"
                 className="w-full max-w-xl bg-[color:var(--card)] border border-[color:var(--border)] rounded-[12px] overflow-hidden animate-fade-in text-[color:var(--text)]"
                 style={{ boxShadow: 'none' }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Search Bar Input */}
-                <div className="relative flex items-center px-4 py-3 border-b border-[color:var(--border)]">
+                <div className="relative flex items-center gap-2 px-4 py-3 border-b border-[color:var(--border)]">
                     <Search className="w-[18px] h-[18px] stroke-[2px] text-[color:var(--muted)] shrink-0" />
                     <input
                         ref={inputRef}
@@ -120,12 +135,14 @@ export function CommandPalette({
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search pages or quick actions..."
-                        className="w-full pl-3 pr-8 py-1 bg-transparent text-[color:var(--text)] placeholder-[color:var(--muted)] text-[15px] outline-none border-none ring-0 focus:outline-none"
+                        aria-label="Search pages or quick actions"
+                        aria-controls="command-palette-navigation"
+                        className="w-full pl-1 pr-2 py-1 rounded-[6px] bg-transparent text-[color:var(--text)] placeholder-[color:var(--muted)] text-[15px] outline-none border-none ring-0 focus:outline-none"
                     />
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1 rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                        className="p-1.5 min-h-[44px] min-w-[44px] sm:min-h-[32px] sm:min-w-[32px] flex items-center justify-center rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0"
                         aria-label="Close command palette"
                     >
                         <X className="w-4 h-4" />
@@ -134,44 +151,88 @@ export function CommandPalette({
 
                 {/* Quick Actions */}
                 <div className="p-3 border-b border-[color:var(--border)] bg-[color:var(--soft-surface)]">
-                    <p className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider px-1 mb-2">
+                    <p className="text-[11px] font-semibold text-[color:var(--text)]/75 uppercase tracking-wider px-1 mb-2">
                         Quick actions
                     </p>
-                    <div className="grid grid-cols-2 gap-2">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                onClose();
-                                if (onOpenNewTask) onOpenNewTask();
-                            }}
-                            className="flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
-                        >
-                            <Plus className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
-                            Create new task
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                onClose();
-                                if (onOpenCreateProject) onOpenCreateProject();
-                                else router.visit('/projects');
-                            }}
-                            className="flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
-                        >
-                            <FolderOpen className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
-                            Create new event
-                        </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {isAdmin ? (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelect('/admin/dashboard')}
+                                    className="flex items-center gap-2 px-3 py-2 min-h-[44px] sm:min-h-[38px] rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:border-[color:var(--primary)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <ShieldCheck className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
+                                    Admin User Management
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelect('/admin/dashboard?tab=pending')}
+                                    className="flex items-center gap-2 px-3 py-2 min-h-[44px] sm:min-h-[38px] rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:border-[color:var(--primary)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <UserCheck className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
+                                    Pending Registrations
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onClose();
+                                        if (onOpenNewTask) onOpenNewTask();
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-2 min-h-[44px] sm:min-h-[38px] rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:border-[color:var(--primary)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <Plus className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
+                                    Create new task
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onClose();
+                                        if (onOpenCreateProject) onOpenCreateProject();
+                                        else router.visit('/projects');
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-2 min-h-[44px] sm:min-h-[38px] rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:border-[color:var(--primary)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <FolderOpen className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
+                                    Create new event
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelect('/projects/smart-import')}
+                                    className="flex items-center gap-2 px-3 py-2 min-h-[44px] sm:min-h-[38px] rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:border-[color:var(--primary)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <Sparkles className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
+                                    Smart S.O. Import
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelect('/eligibility-profile')}
+                                    className="flex items-center gap-2 px-3 py-2 min-h-[44px] sm:min-h-[38px] rounded-[8px] text-[13px] font-medium bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] hover:border-[color:var(--primary)] transition-colors text-left cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                >
+                                    <UserCheck className="w-4 h-4 text-[color:var(--primary)] shrink-0" />
+                                    Eligibility & Strengths
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
                 {/* Search Results / Navigation */}
-                <div className="max-h-64 overflow-y-auto p-2" role="listbox">
+                <div
+                    id="command-palette-navigation"
+                    className="max-h-64 overflow-y-auto p-2"
+                    role="listbox"
+                    aria-label="Navigation destinations"
+                >
                     <p className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider px-2 py-1">
                         Navigation
                     </p>
                     {filteredLinks.length === 0 ? (
                         <div className="py-6 text-center text-[13px] text-[color:var(--muted)]">
-                            No matching pages found for "{query}"
+                            No matching pages found for &ldquo;{query}&rdquo;
                         </div>
                     ) : (
                         filteredLinks.map((item, idx) => {
@@ -184,17 +245,23 @@ export function CommandPalette({
                                     role="option"
                                     aria-selected={isSelected}
                                     onClick={() => handleSelect(item.href)}
-                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-left text-[13px] transition-colors cursor-pointer group ${
+                                    className={`w-full flex items-center justify-between px-3 py-2 min-h-[44px] sm:min-h-[38px] rounded-[8px] text-left text-[13px] transition-colors cursor-pointer group border ${
                                         isSelected
-                                            ? 'bg-[color:var(--soft-surface)] text-[color:var(--text)] font-semibold border-l-2 border-l-[color:var(--primary)]'
-                                            : 'text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] font-medium'
+                                            ? 'bg-[color:var(--status-primary-bg)] border-[color:var(--status-primary-border)] text-[color:var(--text)] font-semibold'
+                                            : 'border-transparent text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] font-medium'
                                     }`}
                                 >
                                     <div className="flex items-center gap-2.5">
-                                        <Icon className="w-[18px] h-[18px] stroke-[2px] text-[color:var(--muted)] group-hover:text-[color:var(--primary)] shrink-0" />
+                                        <Icon
+                                            className={`w-[18px] h-[18px] stroke-[2px] shrink-0 transition-colors ${
+                                                isSelected
+                                                    ? 'text-[color:var(--primary)]'
+                                                    : 'text-[color:var(--muted)] group-hover:text-[color:var(--primary)]'
+                                            }`}
+                                        />
                                         <span>{item.label}</span>
                                     </div>
-                                    <span className="text-[12px] text-[color:var(--muted)]">Jump</span>
+                                    <span className="text-[12px] text-[color:var(--text)]/70">Jump</span>
                                 </button>
                             );
                         })
