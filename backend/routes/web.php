@@ -125,6 +125,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/staff', [CommitteeController::class, 'assignStaff'])->name('projects.committees.staff.store');
     Route::delete('/projects/{project}/committees/{committee}', [CommitteeController::class, 'destroy'])->name('projects.committees.destroy');
 
+    // Member Eligibility & Strengths Profile (Questionnaire + CV OCR)
+    Route::get('/eligibility-profile', [\App\Http\Controllers\MemberResumeController::class, 'profile'])->name('eligibility-profile.index');
+    Route::post('/eligibility-profile', [\App\Http\Controllers\MemberResumeController::class, 'storeQuestionnaire'])->name('eligibility-profile.store');
+
     // Committee Members
     Route::post('/projects/{project}/committees/{committee}/members', [CommitteeController::class, 'assignMember'])->name('projects.committees.members.store');
     Route::delete('/projects/{project}/committees/{committee}/members/{user}', [CommitteeController::class, 'removeMember'])->name('projects.committees.members.destroy');
@@ -147,6 +151,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Tasks
     Route::post('/projects/{project}/tasks', [\App\Http\Controllers\TaskController::class, 'storeProjectTask'])->name('projects.tasks.store');
+    Route::post('/projects/{project}/tasks/recommend-assignees', [\App\Http\Controllers\TaskController::class, 'recommendAssignees'])->name('projects.tasks.recommend-assignees');
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('projects.committees.activities.tasks.update');
     Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('projects.committees.activities.tasks.destroy');

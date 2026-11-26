@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CoChairDesignation;
 use App\Models\Committee;
 use App\Models\MemberResume;
 use App\Models\Project;
@@ -9,7 +10,10 @@ use App\Models\ProjectRoleAssignment;
 use App\Models\User;
 use App\Services\AI\OllamaResumeScreeningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class EligibilityQuestionnaireTest extends TestCase
@@ -552,5 +556,406 @@ class EligibilityQuestionnaireTest extends TestCase
                 putenv("OLLAMA_HOST={$previousHost}");
             }
         }
+    }
+
+    public function test_verified_user_can_view_and_submit_eligibility_profile_via_http(): void
+    {
+        Http::fake(['127.0.0.1:11434/*' => Http::response([], 503)]);
+
+        $this->get('/eligibility-profile')->assertRedirect('/login');
+
+        $unverified = User::factory()->create(['email_verified_at' => null]);
+        $this->actingAs($unverified)
+            ->get('/eligibility-profile')
+            ->assertRedirect(route('verification.notice'));
+
+        $this->actingAs($this->techMember)
+            ->get(route('eligibility-profile.index'))
+            ->assertStatus(200)
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/EligibilityProfile')
+                ->has('profile')
+                ->where('profile.has_resume', false)
+                ->where('profile.has_questionnaire', false)
+                ->has('framework.domains', 6)
+                ->has('sampleDeliberationTasks', 4)
+                ->where('ollamaActive', false)
+            );
+
+        $payload = [
+            'strength_ratings' => [
+                'technical_engineering' => 5,
+                'documentation_secretariat' => 3,
+                'quality_assurance' => 4,
+                'logistics_operations' => 2,
+                'leadership_facilitation' => 4,
+                'media_creative' => 3,
+            ],
+            'preferred_task_categories' => ['Web & System Setup', 'Quality & Evidence Audit'],
+            'certifications_list' => ['Laravel & React Specialist'],
+            'leadership_readiness' => 'Lead or Independent',
+            'availability_hours' => '6-10 hrs/week',
+            'deliberation_notes' => 'Built React dashboards and API integrations for CCIS.',
+        ];
+
+        $this->actingAs($this->techMember)
+            ->from(route('eligibility-profile.index'))
+            ->post(route('eligibility-profile.store'), $payload)
+            ->assertRedirect(route('eligibility-profile.index'))
+            ->assertSessionHas('status');
+
+        $resume = MemberResume::where('user_id', $this->techMember->id)->firstOrFail();
+        $this->assertNotNull($resume->assessment_completed_at);
+        $this->assertNull($resume->original_name);
+        $this->assertEquals(5, $resume->strengths_assessment['technical_engineering']);
+        $this->assertEquals(['Web & System Setup', 'Quality & Evidence Audit'], $resume->preferred_task_categories);
+        $this->assertEquals('Lead or Independent', $resume->leadership_readiness);
+        $this->assertEquals('6-10 hrs/week', $resume->availability_hours);
+        $this->assertEquals('Built React dashboards and API integrations for CCIS.', $resume->deliberation_notes);
+
+        $this->actingAs($this->techMember)
+            ->get(route('eligibility-profile.index'))
+            ->assertStatus(200)
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Profile/EligibilityProfile')
+                ->where('profile.has_resume', false)
+                ->where('profile.has_questionnaire', true)
+                ->where('profile.strengths_assessment.technical_engineering', 5)
+                ->where('profile.leadership_readiness', 'Lead or Independent')
+                ->where('profile.availability_hours', '6-10 hrs/week')
+                ->where('profile.deliberation_notes', 'Built React dashboards and API integrations for CCIS.')
+            );
+
+        $this->actingAs($this->techMember)
+            ->getJson(route('users.resume.show', ['user' => $this->techMember->id]))
+            ->assertStatus(200)
+            ->assertJson([
+                'has_resume' => false,
+                'has_questionnaire' => true,
+                'leadership_readiness' => 'Lead or Independent',
+                'availability_hours' => '6-10 hrs/week',
+                'deliberation_notes' => 'Built React dashboards and API integrations for CCIS.',
+            ]);
+
+        $this->actingAs($this->techMember)
+            ->postJson(route('eligibility-profile.store'), [
+                ...$payload,
+                'availability_hours' => '10+ hrs/week',
+                'deliberation_notes' => 'Updated availability for accreditation week.',
+            ])
+            ->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        $this->assertEquals('10+ hrs/week', $resume->fresh()->availability_hours);
+        $this->assertEquals('Updated availability for accreditation week.', $resume->fresh()->deliberation_notes);
+    }
+
+    public function test_eligibility_profile_submission_validates_payload(): void
+    {
+        $this->actingAs($this->techMember)
+            ->postJson(route('eligibility-profile.store'), [
+                'strength_ratings' => ['technical_engineering' => 6],
+                'preferred_task_categories' => ['Web & System Setup'],
+                'leadership_readiness' => 'Invalid Readiness',
+                'availability_hours' => '999 hrs/week',
+                'deliberation_notes' => str_repeat('a', 1501),
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([
+                'strength_ratings.technical_engineering',
+                'leadership_readiness',
+                'availability_hours',
+                'deliberation_notes',
+            ]);
+
+        $this->actingAs($this->techMember)
+            ->postJson(route('eligibility-profile.store'), [
+                'strength_ratings' => ['nonexistent_domain' => 4],
+                'preferred_task_categories' => [],
+                'leadership_readiness' => 'Support Role',
+                'availability_hours' => '3-5 hrs/week',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['strength_ratings']);
+    }
+
+    public function test_resume_upload_preserves_existing_questionnaire_and_tracks_cv_certifications(): void
+    {
+        Storage::fake('local');
+        Http::fake(['127.0.0.1:11434/*' => Http::response([], 503)]);
+
+        $this->actingAs($this->techMember)
+            ->postJson(route('eligibility-profile.store'), [
+                'strength_ratings' => [
+                    'technical_engineering' => 5,
+                    'quality_assurance' => 4,
+                ],
+                'preferred_task_categories' => ['Web & System Setup'],
+                'certifications_list' => ['Self Entered Cert'],
+                'leadership_readiness' => 'Lead or Independent',
+                'availability_hours' => '6-10 hrs/week',
+                'deliberation_notes' => 'Built React dashboards for accreditation.',
+            ])
+            ->assertStatus(200);
+
+        $cvFile = UploadedFile::fake()->createWithContent(
+            'laravel_react_cv.txt',
+            'Senior developer experienced in Laravel, React, PostgreSQL, and Project Management.'
+        );
+
+        $this->actingAs($this->techMember)
+            ->postJson(route('users.resume.upload', ['user' => $this->techMember->id]), [
+                'resume' => $cvFile,
+            ])
+            ->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'resume' => [
+                    'original_name' => 'laravel_react_cv.txt',
+                    'has_resume' => true,
+                    'has_questionnaire' => true,
+                ],
+            ]);
+
+        $resume = MemberResume::where('user_id', $this->techMember->id)->firstOrFail();
+        $this->assertEquals('laravel_react_cv.txt', $resume->original_name);
+        $this->assertNotNull($resume->assessment_completed_at);
+        $this->assertEquals(5, $resume->strengths_assessment['technical_engineering']);
+        $this->assertEquals(['Web & System Setup'], $resume->preferred_task_categories);
+        $this->assertEquals('Lead or Independent', $resume->leadership_readiness);
+        $this->assertEquals('6-10 hrs/week', $resume->availability_hours);
+        $this->assertEquals('Built React dashboards for accreditation.', $resume->deliberation_notes);
+        $this->assertEquals(
+            ['CarSU Institutional Leadership Certificate'],
+            $resume->raw_ai_analysis['cv_certifications'] ?? []
+        );
+        $this->assertContains('CarSU Institutional Leadership Certificate', $resume->certifications);
+        $this->assertContains('Self Entered Cert', $resume->certifications);
+        $this->assertContains('Laravel', $resume->extracted_skills);
+        $this->assertContains('Technical & Web Engineering', $resume->extracted_skills);
+        $this->assertContains('Web & System Setup', $resume->extracted_skills);
+
+        $this->actingAs($this->techMember)
+            ->getJson(route('users.resume.show', ['user' => $this->techMember->id]))
+            ->assertStatus(200)
+            ->assertJson([
+                'has_resume' => true,
+                'has_questionnaire' => true,
+                'original_name' => 'laravel_react_cv.txt',
+                'leadership_readiness' => 'Lead or Independent',
+                'availability_hours' => '6-10 hrs/week',
+                'deliberation_notes' => 'Built React dashboards for accreditation.',
+            ]);
+
+        // Subsequent questionnaire edit preserves cv_certifications without locking self-entered certs
+        $this->actingAs($this->techMember)
+            ->postJson(route('eligibility-profile.store'), [
+                'strength_ratings' => [
+                    'technical_engineering' => 5,
+                    'quality_assurance' => 4,
+                ],
+                'preferred_task_categories' => ['Web & System Setup'],
+                'certifications_list' => ['Updated Self Cert'],
+                'leadership_readiness' => 'Lead or Independent',
+                'availability_hours' => '6-10 hrs/week',
+                'deliberation_notes' => 'Built React dashboards for accreditation.',
+            ])
+            ->assertStatus(200);
+
+        $refreshed = $resume->fresh();
+        $this->assertEquals(
+            ['CarSU Institutional Leadership Certificate', 'Updated Self Cert'],
+            $refreshed->certifications
+        );
+    }
+
+    public function test_recommend_assignees_authorizes_roles_and_scopes_candidates_accurately(): void
+    {
+        Http::fake(['127.0.0.1:11434/*' => Http::response([], 503)]);
+
+        $service = new OllamaResumeScreeningService();
+        $service->saveQuestionnaireProfile($this->techMember, [
+            'strength_ratings' => ['technical_engineering' => 5, 'quality_assurance' => 4],
+            'preferred_task_categories' => ['Web & System Setup'],
+            'certifications_list' => ['Laravel Certified'],
+            'leadership_readiness' => 'Lead or Independent',
+            'availability_hours' => '6-10 hrs/week',
+            'deliberation_notes' => 'Built React dashboards and REST APIs.',
+        ]);
+        $service->saveQuestionnaireProfile($this->docsMember, [
+            'strength_ratings' => ['documentation_secretariat' => 5, 'technical_engineering' => 1],
+            'preferred_task_categories' => ['Documentation & Minutes'],
+            'certifications_list' => ['Secretariat Training'],
+            'leadership_readiness' => 'Support Role',
+            'availability_hours' => '3-5 hrs/week',
+            'deliberation_notes' => 'Prepared minutes and MOV binders.',
+        ]);
+
+        $committeeChair = User::factory()->create(['name' => 'Tech Chair', 'email_verified_at' => now()]);
+        $committeeCoChair = User::factory()->create(['name' => 'Tech CoChair', 'email_verified_at' => now()]);
+        $eventCoChair = User::factory()->create(['name' => 'Event CoChair', 'email_verified_at' => now()]);
+        $otherCommitteeChair = User::factory()->create(['name' => 'Other Chair', 'email_verified_at' => now()]);
+        $otherCommitteeMember = User::factory()->create(['name' => 'Other Member', 'email_verified_at' => now()]);
+        $unverifiedMember = User::factory()->create(['name' => 'Unverified Member', 'email_verified_at' => null]);
+        $outsider = User::factory()->create(['name' => 'External Outsider', 'email_verified_at' => now()]);
+
+        ProjectRoleAssignment::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $this->committee->id,
+            'user_id' => $committeeChair->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+        ]);
+        ProjectRoleAssignment::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $this->committee->id,
+            'user_id' => $committeeCoChair->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+        ]);
+        CoChairDesignation::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $this->committee->id,
+            'user_id' => $committeeCoChair->id,
+            'designated_by' => $this->leader->id,
+        ]);
+        ProjectRoleAssignment::create([
+            'project_id' => $this->project->id,
+            'committee_id' => null,
+            'user_id' => $eventCoChair->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+        ]);
+        CoChairDesignation::create([
+            'project_id' => $this->project->id,
+            'committee_id' => null,
+            'user_id' => $eventCoChair->id,
+            'designated_by' => $this->leader->id,
+        ]);
+        ProjectRoleAssignment::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $this->committee->id,
+            'user_id' => $unverifiedMember->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+        ]);
+
+        $otherCommittee = Committee::create([
+            'project_id' => $this->project->id,
+            'name' => 'Hospitality & Logistics Committee',
+            'description' => 'Venue and food coordination.',
+        ]);
+        ProjectRoleAssignment::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $otherCommittee->id,
+            'user_id' => $otherCommitteeChair->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_STAFF,
+        ]);
+        ProjectRoleAssignment::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $otherCommittee->id,
+            'user_id' => $otherCommitteeMember->id,
+            'role' => ProjectRoleAssignment::ROLE_PROJECT_MEMBER,
+        ]);
+
+        $foreignProject = Project::create([
+            'created_by' => $outsider->id,
+            'title' => 'Foreign Project',
+            'status' => Project::STATUS_ACTIVE,
+        ]);
+        $foreignCommittee = Committee::create([
+            'project_id' => $foreignProject->id,
+            'name' => 'Foreign Committee',
+        ]);
+
+        $endpoint = route('projects.tasks.recommend-assignees', ['project' => $this->project->id]);
+
+        // Leader with committee_id gets 200, scoped to verified users in target committee
+        $leaderResponse = $this->actingAs($this->leader)
+            ->postJson($endpoint, [
+                'task_title' => 'Build React API Data Table',
+                'task_description' => 'Develop React table component and endpoint integration.',
+                'committee_id' => $this->committee->id,
+            ])
+            ->assertStatus(200)
+            ->assertJsonStructure([
+                'success',
+                'ollama_active',
+                'recommendations' => [
+                    '*' => [
+                        'user_id',
+                        'name',
+                        'suitability_score',
+                        'eligibility_status',
+                        'recommendation_reason',
+                        'has_resume',
+                        'has_questionnaire',
+                        'top_strengths',
+                    ],
+                ],
+            ]);
+
+        $committeeCandidateIds = collect($leaderResponse->json('recommendations'))->pluck('user_id')->all();
+        $this->assertEquals($this->techMember->id, $committeeCandidateIds[0]);
+        $this->assertContains($this->docsMember->id, $committeeCandidateIds);
+        $this->assertNotContains($otherCommitteeMember->id, $committeeCandidateIds);
+        $this->assertNotContains($unverifiedMember->id, $committeeCandidateIds);
+        $this->assertNotContains($outsider->id, $committeeCandidateIds);
+
+        // Leader without committee_id scopes across all verified project personnel
+        $projectWideResponse = $this->actingAs($this->leader)
+            ->postJson($endpoint, [
+                'task_title' => 'Build React API Data Table',
+                'task_description' => 'Develop React table component.',
+            ])
+            ->assertStatus(200);
+        $projectWideIds = collect($projectWideResponse->json('recommendations'))->pluck('user_id')->all();
+        $this->assertContains($otherCommitteeMember->id, $projectWideIds);
+        $this->assertNotContains($unverifiedMember->id, $projectWideIds);
+
+        // Event Co-Chair, Committee Chair, and Committee Co-Chair are authorized (200)
+        $this->actingAs($eventCoChair)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+        ])->assertStatus(200);
+
+        $this->actingAs($committeeChair)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+            'committee_id' => $this->committee->id,
+        ])->assertStatus(200);
+
+        $this->actingAs($committeeCoChair)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+            'committee_id' => $this->committee->id,
+        ])->assertStatus(200);
+
+        // Cross-committee chair cannot request recommendations for another committee (403)
+        $this->actingAs($otherCommitteeChair)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+            'committee_id' => $this->committee->id,
+        ])->assertStatus(403);
+
+        // Regular member and external outsider receive 403
+        $this->actingAs($this->techMember)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+            'committee_id' => $this->committee->id,
+        ])->assertStatus(403);
+
+        $this->actingAs($this->techMember)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+        ])->assertStatus(403);
+
+        $this->actingAs($outsider)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+            'committee_id' => $this->committee->id,
+        ])->assertStatus(403);
+
+        // Mismatched committee from another project returns 404
+        $this->actingAs($this->leader)->postJson($endpoint, [
+            'task_title' => 'Build React API Data Table',
+            'committee_id' => $foreignCommittee->id,
+        ])->assertStatus(404);
+
+        // Validation requires task_title
+        $this->actingAs($this->leader)->postJson($endpoint, [
+            'committee_id' => $this->committee->id,
+        ])->assertStatus(422)->assertJsonValidationErrors(['task_title']);
     }
 }

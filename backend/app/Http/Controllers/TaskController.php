@@ -16,7 +16,11 @@ use App\Models\Task;
 use App\Notifications\TaskAssignedNotification;
 use App\Notifications\TaskReviewedNotification;
 use App\Notifications\TaskSubmittedForReviewNotification;
+use App\Services\AI\OllamaResumeScreeningService;
+use App\Services\Authorization\AuthorizationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -424,6 +428,71 @@ class TaskController extends Controller
         });
 
         return $this->redirectAfterTaskAction($request, $project, $committee, $activity, 'Task resubmitted and moved to in progress.');
+    }
+
+    /**
+     * Rank verified committee or project candidates for a specific task scope using strengths and CV credentials.
+     */
+    public function recommendAssignees(
+        Request $request,
+        Project $project,
+        AuthorizationService $authService,
+        OllamaResumeScreeningService $screeningService
+    ): JsonResponse {
+        $validated = $request->validate([
+            'task_title' => ['required', 'string', 'max:255'],
+            'task_description' => ['nullable', 'string', 'max:5000'],
+            'committee_id' => ['nullable', 'integer', 'exists:committees,id'],
+            'use_ollama' => ['nullable', 'boolean'],
+        ]);
+
+        $committee = null;
+        if (! empty($validated['committee_id'])) {
+            $committee = $project->committees()->where('id', (int) $validated['committee_id'])->first();
+            if (! $committee) {
+                abort(404, 'Selected committee not found in this project.');
+            }
+        }
+
+        $user = $request->user();
+        if ($committee) {
+            $authorized = $authService->isAdmin($user)
+                || $authService->isProjectLeader($user, $project)
+                || $authService->isEventCoChair($user, $project)
+                || $authService->isStaffInCommittee($user, $committee)
+                || $authService->isCommitteeCoChair($user, $committee);
+        } else {
+            $authorized = $authService->canCreateProjectTask($user, $project)
+                || $authService->isEventCoChair($user, $project);
+        }
+
+        if (! $authorized) {
+            abort(403, 'Unauthorized to deliberate task assignees.');
+        }
+
+        $assignmentSource = $committee ? $committee->roleAssignments() : $project->roleAssignments();
+        $candidates = $assignmentSource
+            ->whereHas('user', fn ($q) => $q->whereNotNull('email_verified_at'))
+            ->with('user.resume')
+            ->get()
+            ->unique('user_id')
+            ->map(fn ($assignment) => $assignment->user)
+            ->filter()
+            ->values();
+
+        $recommendations = $screeningService->rankCandidatesForTask(
+            $validated['task_title'],
+            $validated['task_description'] ?? null,
+            $committee?->name,
+            $candidates,
+            (bool) ($validated['use_ollama'] ?? false)
+        );
+
+        return response()->json([
+            'success' => true,
+            'ollama_active' => $screeningService->isAvailable(),
+            'recommendations' => $recommendations,
+        ]);
     }
 
     /**
