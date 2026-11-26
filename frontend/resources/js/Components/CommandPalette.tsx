@@ -35,14 +35,15 @@ export function CommandPalette({
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const previousActiveElementRef = useRef<HTMLElement | null>(null);
+    const wasOpenRef = useRef(false);
+    const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
     const quickLinks = isAdmin
         ? [
               { label: 'Admin User Management', href: '/admin/dashboard', icon: ShieldCheck },
               { label: 'Pending Registrations', href: '/admin/dashboard?tab=pending', icon: UserCheck },
-              { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
-              { label: 'Events', href: '/projects', icon: FolderOpen },
-              { label: 'Notifications', href: '/notifications', icon: Bell },
           ]
         : [
               { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
@@ -69,16 +70,41 @@ export function CommandPalette({
     );
 
     useEffect(() => {
-        if (!isOpen) return;
-        setQuery('');
-        setSelectedIndex(0);
-        const timer = window.setTimeout(() => inputRef.current?.focus(), 50);
-        return () => window.clearTimeout(timer);
+        if (isOpen) {
+            if (!wasOpenRef.current) {
+                previousActiveElementRef.current =
+                    document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            }
+            wasOpenRef.current = true;
+            setQuery('');
+            setSelectedIndex(0);
+            const timer = window.setTimeout(() => inputRef.current?.focus(), 50);
+            return () => window.clearTimeout(timer);
+        } else if (wasOpenRef.current) {
+            wasOpenRef.current = false;
+            const prev = previousActiveElementRef.current;
+            previousActiveElementRef.current = null;
+            if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+                window.requestAnimationFrame(() => {
+                    if (!document.querySelector('[role="dialog"]') && document.contains(prev)) {
+                        prev.focus();
+                    }
+                });
+            }
+        }
     }, [isOpen]);
 
     useEffect(() => {
         setSelectedIndex(0);
     }, [query]);
+
+    useEffect(() => {
+        if (!isOpen || filteredLinks.length === 0) return;
+        const activeOption = optionRefs.current[selectedIndex];
+        if (activeOption && typeof activeOption.scrollIntoView === 'function') {
+            activeOption.scrollIntoView({ block: 'nearest' });
+        }
+    }, [isOpen, selectedIndex, filteredLinks.length]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -87,6 +113,32 @@ export function CommandPalette({
             if (e.key === 'Escape') {
                 e.preventDefault();
                 onClose();
+            } else if (e.key === 'Tab') {
+                const container = dialogRef.current;
+                if (!container) return;
+                const focusable = Array.from(
+                    container.querySelectorAll<HTMLElement>(
+                        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                    )
+                ).filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
+                if (focusable.length === 0) {
+                    e.preventDefault();
+                    return;
+                }
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                const active = document.activeElement as HTMLElement | null;
+                if (e.shiftKey) {
+                    if (!active || active === first || !container.contains(active)) {
+                        e.preventDefault();
+                        last.focus();
+                    }
+                } else {
+                    if (!active || active === last || !container.contains(active)) {
+                        e.preventDefault();
+                        first.focus();
+                    }
+                }
             } else if (e.key === 'ArrowDown') {
                 if (filteredLinks.length === 0) return;
                 e.preventDefault();
@@ -113,12 +165,17 @@ export function CommandPalette({
 
     if (!isOpen) return null;
 
+    const activeOptionId = filteredLinks[selectedIndex]
+        ? `command-palette-option-${selectedIndex}`
+        : undefined;
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-start justify-center pt-20 px-4 bg-black/50 backdrop-blur-[2px]"
             onClick={onClose}
         >
             <div
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label="Global command navigation"
@@ -132,6 +189,10 @@ export function CommandPalette({
                     <input
                         ref={inputRef}
                         type="text"
+                        role="combobox"
+                        aria-expanded={true}
+                        aria-autocomplete="list"
+                        aria-activedescendant={activeOptionId}
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search pages or quick actions..."
@@ -142,7 +203,7 @@ export function CommandPalette({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 min-h-[44px] min-w-[44px] sm:min-h-[32px] sm:min-w-[32px] flex items-center justify-center rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0"
+                        className="p-1.5 min-h-[44px] min-w-[44px] md:min-h-[32px] md:min-w-[32px] flex items-center justify-center rounded-[6px] text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0"
                         aria-label="Close command palette"
                     >
                         <X className="w-4 h-4" />
@@ -221,26 +282,28 @@ export function CommandPalette({
                 </div>
 
                 {/* Search Results / Navigation */}
-                <div
-                    id="command-palette-navigation"
-                    className="max-h-64 overflow-y-auto p-2"
-                    role="listbox"
-                    aria-label="Navigation destinations"
-                >
-                    <p className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider px-2 py-1">
+                <div className="max-h-64 overflow-y-auto p-2">
+                    <p
+                        id="command-palette-navigation-label"
+                        className="text-[11px] font-semibold text-[color:var(--muted)] uppercase tracking-wider px-2 py-1"
+                    >
                         Navigation
                     </p>
-                    {filteredLinks.length === 0 ? (
-                        <div className="py-6 text-center text-[13px] text-[color:var(--muted)]">
-                            No matching pages found for &ldquo;{query}&rdquo;
-                        </div>
-                    ) : (
-                        filteredLinks.map((item, idx) => {
+                    <div
+                        id="command-palette-navigation"
+                        role="listbox"
+                        aria-labelledby="command-palette-navigation-label"
+                    >
+                        {filteredLinks.map((item, idx) => {
                             const Icon = item.icon;
                             const isSelected = idx === selectedIndex;
                             return (
                                 <button
                                     key={item.href}
+                                    id={`command-palette-option-${idx}`}
+                                    ref={(el) => {
+                                        optionRefs.current[idx] = el;
+                                    }}
                                     type="button"
                                     role="option"
                                     aria-selected={isSelected}
@@ -264,7 +327,15 @@ export function CommandPalette({
                                     <span className="text-[12px] text-[color:var(--text)]/70">Jump</span>
                                 </button>
                             );
-                        })
+                        })}
+                    </div>
+                    {filteredLinks.length === 0 && (
+                        <div
+                            role="status"
+                            className="py-6 text-center text-[13px] text-[color:var(--muted)]"
+                        >
+                            No matching pages found for &ldquo;{query}&rdquo;
+                        </div>
                     )}
                 </div>
 

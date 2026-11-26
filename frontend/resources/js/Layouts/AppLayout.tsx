@@ -618,9 +618,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 }`}
             >
                 {/* ── Sticky Top Bar (Section 2 & Section 4 requirement) ── */}
-                <header className="h-14 px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between gap-2 bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
+                <header className="h-14 px-3 min-[375px]:px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between gap-1.5 min-[375px]:gap-2 bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
                     {/* Left: Mobile Drawer Trigger & Global Quick Search */}
-                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                    <div className="flex items-center gap-1.5 min-[375px]:gap-2 sm:gap-2.5 min-w-0">
                         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                             <SheetTrigger asChild>
                                 <motion.button
@@ -657,12 +657,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                         <button
                             type="button"
                             onClick={() => setIsCommandPaletteOpen(true)}
-                            className="inline-flex items-center gap-2 px-2.5 sm:px-3 py-1.5 min-h-[44px] md:min-h-[38px] sm:min-w-[220px] rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] text-[13px] text-[color:var(--text)]/80 hover:text-[color:var(--text)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
-                            aria-label="Search or jump to page or action (Ctrl+K)"
+                            className="inline-flex items-center justify-center w-11 h-11 p-0 md:w-auto md:h-auto md:min-h-[38px] md:min-w-[220px] md:px-3 md:py-1.5 md:justify-start md:gap-2 rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] text-[13px] text-[color:var(--text)]/80 hover:text-[color:var(--text)] transition-colors cursor-pointer shrink-0 focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                            aria-label="Jump to page or action (Ctrl+K)"
                         >
                             <Search className="w-4 h-4 shrink-0 text-[color:var(--muted)]" />
-                            <span className="hidden sm:inline flex-1 text-left">Jump to page or action...</span>
-                            <span className="sm:hidden">Search</span>
+                            <span className="hidden md:inline flex-1 text-left">
+                                Jump to page or action<span aria-hidden="true">...</span>
+                            </span>
                             <kbd
                                 aria-hidden="true"
                                 className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[color:var(--card)] border border-[color:var(--border)] rounded text-[color:var(--muted)]"
@@ -673,12 +674,12 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                     </div>
 
                     {/* Right: Current Role Label, Theme Toggle, Notifications, User Identity Badge */}
-                    <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+                    <div className="flex items-center gap-1 min-[375px]:gap-1.5 sm:gap-2.5 md:gap-1.5 lg:gap-2.5 shrink-0">
 
                         {/* Current Role Label (Visible on all pages for all 3 roles) */}
                         <span
                             data-testid="topbar-role-label"
-                            className="inline-flex items-center px-2.5 py-1 rounded-[6px] text-[12px] font-semibold bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] select-none shrink-0"
+                            className="inline-flex items-center px-2 min-[375px]:px-2.5 py-1 rounded-[6px] text-[11px] min-[375px]:text-[12px] font-semibold bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] select-none shrink-0 max-w-[76px] min-[375px]:max-w-[115px] sm:max-w-none md:max-w-[100px] lg:max-w-none truncate"
                         >
                             {isAdmin ? 'System Admin' : formatRole(userRole)}
                         </span>
@@ -689,7 +690,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                         {/* Notifications (synced with unread count) */}
                         <NotificationDropdown />
 
-                        <Separator orientation="vertical" className="h-5 mx-0.5 bg-[color:var(--border)]" />
+                        <Separator orientation="vertical" className="hidden sm:block md:hidden lg:block h-5 mx-0.5 bg-[color:var(--border)]" />
 
                         {/* User Identity Badge */}
                         {user ? (
@@ -699,7 +700,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                         type="button"
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
-                                        className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-full border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer select-none focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0 min-h-[36px]"
+                                        className="flex items-center gap-2 p-1 sm:pl-1.5 sm:pr-2.5 md:p-1 lg:pl-1.5 lg:pr-2.5 rounded-full border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] transition-colors cursor-pointer select-none focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 shrink-0 min-h-[36px]"
                                         aria-label="User account menu"
                                     >
                                         <Avatar size="sm" className="shrink-0 w-7 h-7">
@@ -708,7 +709,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                                 {getInitials(user.name) || 'BJ'}
                                             </AvatarFallback>
                                         </Avatar>
-                                        <div className="hidden sm:flex items-center gap-1.5 text-left text-[12px] leading-tight">
+                                        <div className="hidden sm:flex md:hidden lg:flex items-center gap-1.5 text-left text-[12px] leading-tight">
                                             <span className="font-semibold text-[color:var(--text)] truncate max-w-[130px]">
                                                 {user.name}
                                             </span>
@@ -781,7 +782,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                                         : 'font-medium'
                                                 }`}
                                             >
-                                                <CheckSquare className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/my-tasks' ? 'text-[color:var(--primary)]' : ''}`} />
+                                                <CheckSquare className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/my-tasks' || currentPathname.startsWith('/my-tasks/') ? 'text-[color:var(--primary)]' : ''}`} />
                                                 My Tasks
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
