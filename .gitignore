@@ -25,3 +25,9 @@ storage/pail
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Ephemeral AI execution scratch & diff packages (NEVER commit)
+.superpowers/
+.worktrees/
+.claude/
+*.tmp
