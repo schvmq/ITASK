@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Award,
     Check,
@@ -102,11 +103,6 @@ const MAX_DELIBERATION_NOTES = 1500;
 const MAX_CERTIFICATION_LENGTH = 150;
 const MAX_CV_FILE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_CV_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.txt'];
-
-function getCsrfToken(): string {
-    if (typeof document === 'undefined') return '';
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-}
 
 function buildInitialRatings(
     domains: CompetencyDomain[],
@@ -563,64 +559,16 @@ export default function EligibilityProfile({
         setValidationErrors({});
 
         try {
-            const response = await fetch('/eligibility-profile', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: JSON.stringify({
-                    strength_ratings: strengthRatings,
-                    preferred_task_categories: preferredCategories,
-                    certifications_list: selfCertifications,
-                    leadership_readiness: leadershipReadiness,
-                    availability_hours: availabilityHours,
-                    deliberation_notes: deliberationNotes,
-                }),
+            const response = await axios.post('/eligibility-profile', {
+                strength_ratings: strengthRatings,
+                preferred_task_categories: preferredCategories,
+                certifications_list: selfCertifications,
+                leadership_readiness: leadershipReadiness,
+                availability_hours: availabilityHours,
+                deliberation_notes: deliberationNotes,
             });
 
-            const data = await response.json().catch(() => ({}));
-
-            if (response.status === 422) {
-                const parsedErrors: Record<string, string> = {};
-                if (data?.errors && typeof data.errors === 'object') {
-                    for (const [key, messages] of Object.entries(data.errors)) {
-                        if (Array.isArray(messages) && messages.length > 0) {
-                            parsedErrors[key] = String(messages[0]);
-                        }
-                    }
-                }
-                setValidationErrors(parsedErrors);
-                setSaveFeedback({
-                    variant: 'danger',
-                    message:
-                        data?.message ||
-                        'Please fix the highlighted fields before saving your profile.',
-                });
-                return;
-            }
-
-            if (response.status === 419) {
-                setSaveFeedback({
-                    variant: 'danger',
-                    message:
-                        'Your session expired. Refresh this page and submit your answers again.',
-                });
-                return;
-            }
-
-            if (!response.ok || !data?.success) {
-                setSaveFeedback({
-                    variant: 'danger',
-                    message:
-                        data?.message ||
-                        'Could not save your eligibility profile. Please try again.',
-                });
-                return;
-            }
+            const data = response.data;
 
             if (data.profile) {
                 setStrengthRatings(
@@ -646,12 +594,44 @@ export default function EligibilityProfile({
                 message: data.message || 'Eligibility & strengths profile saved successfully.',
             });
             router.reload({ only: ['profile'] });
-        } catch {
+        } catch (err: any) {
+            if (err.response?.status === 422) {
+                const parsedErrors: Record<string, string> = {};
+                const errors = err.response?.data?.errors;
+                if (errors && typeof errors === 'object') {
+                    for (const [key, messages] of Object.entries(errors)) {
+                        if (Array.isArray(messages) && messages.length > 0) {
+                            parsedErrors[key] = String(messages[0]);
+                        }
+                    }
+                }
+                setValidationErrors(parsedErrors);
+                setSaveFeedback({
+                    variant: 'danger',
+                    message:
+                        err.response?.data?.message ||
+                        'Please fix the highlighted fields before saving your profile.',
+                });
+                return;
+            }
+
+            if (err.response?.status === 419) {
+                setSaveFeedback({
+                    variant: 'danger',
+                    message:
+                        'Your session expired. Refresh this page and submit your answers again.',
+                });
+                return;
+            }
+
             setSaveFeedback({
                 variant: 'danger',
                 message:
-                    'Network error while saving your profile. Check your connection and try again.',
+                    err.response?.data?.message ||
+                    err.message ||
+                    'Could not save your eligibility profile. Please try again.',
             });
+            return;
         } finally {
             setIsSaving(false);
         }
@@ -719,48 +699,9 @@ export default function EligibilityProfile({
         formData.append('resume', selectedCvFile);
 
         try {
-            const response = await fetch(`/users/${authUser.id}/resume`, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': getCsrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                body: formData,
-            });
+            const response = await axios.post(`/users/${authUser.id}/resume`, formData);
 
-            const data = await response.json().catch(() => ({}));
-
-            if (response.status === 422) {
-                const resumeErr = data?.errors?.resume?.[0];
-                setCvFeedback({
-                    variant: 'danger',
-                    message:
-                        resumeErr ||
-                        data?.message ||
-                        'Invalid CV file. Accepted formats: PDF, PNG, JPG, DOCX, or TXT up to 10 MB.',
-                });
-                return;
-            }
-
-            if (response.status === 419) {
-                setCvFeedback({
-                    variant: 'danger',
-                    message: 'Session expired. Refresh the page before uploading your CV.',
-                });
-                return;
-            }
-
-            if (!response.ok || !data?.success) {
-                setCvFeedback({
-                    variant: 'danger',
-                    message:
-                        data?.message ||
-                        'Failed to scan the uploaded CV. Please try again.',
-                });
-                return;
-            }
+            const data = response.data;
 
             setSelectedCvFile(null);
             if (cvFileInputRef.current) {
@@ -771,11 +712,33 @@ export default function EligibilityProfile({
                 message: data.message || 'Resume uploaded and analyzed successfully.',
             });
             router.reload({ only: ['profile'] });
-        } catch {
+        } catch (err: any) {
+            if (err.response?.status === 422) {
+                const resumeErr = err.response?.data?.errors?.resume?.[0];
+                setCvFeedback({
+                    variant: 'danger',
+                    message:
+                        resumeErr ||
+                        err.response?.data?.message ||
+                        'Invalid CV file. Accepted formats: PDF, PNG, JPG, DOCX, or TXT up to 10 MB.',
+                });
+                return;
+            }
+
+            if (err.response?.status === 419) {
+                setCvFeedback({
+                    variant: 'danger',
+                    message: 'Session expired. Refresh the page before uploading your CV.',
+                });
+                return;
+            }
+
             setCvFeedback({
                 variant: 'danger',
                 message:
-                    'Network error while uploading your CV. Check your connection and try again.',
+                    err.response?.data?.message ||
+                    err.message ||
+                    'Failed to scan the uploaded CV. Please try again.',
             });
         } finally {
             setIsUploadingCv(false);
@@ -901,10 +864,8 @@ export default function EligibilityProfile({
                                     const descId = `domain-desc-${domain.slug}`;
 
                                     return (
-                                        <fieldset
-                                            key={domain.slug}
-                                            className="p-4 sm:px-5 sm:py-4"
-                                        >
+                                        <div key={domain.slug} className="p-4 sm:px-5 sm:py-4">
+                                            <fieldset>
                                             <legend className="text-[15px] font-semibold text-[color:var(--text)] leading-snug">
                                                 {domain.label}
                                             </legend>
@@ -968,6 +929,7 @@ export default function EligibilityProfile({
 
                                             <InputError message={fieldError} className="mt-2" />
                                         </fieldset>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -1178,7 +1140,7 @@ export default function EligibilityProfile({
                                                             handleRemoveCertification(cert)
                                                         }
                                                         aria-label={`Remove certification ${cert}`}
-                                                        className="min-h-[38px] min-w-[38px] rounded-[6px] inline-flex items-center justify-center text-[color:var(--text)]/75 hover:text-[color:var(--text)] hover:bg-[color:var(--card)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                                                        className="min-h-[44px] min-w-[44px] rounded-[6px] inline-flex items-center justify-center text-[color:var(--text)]/75 hover:text-[color:var(--text)] hover:bg-[color:var(--card)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                                                     >
                                                         <X className="w-3.5 h-3.5 stroke-[2px]" />
                                                     </button>
