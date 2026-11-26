@@ -51,7 +51,7 @@ class OllamaResumeScreeningService
             'label' => 'Committee Leadership & Facilitation',
             'keywords' => [
                 'leadership', 'facilitat', 'lead', 'chair', 'manage', 'coordinat', 'direct',
-                'committee', 'meeting', 'stakeholder', 'planning', 'supervis', 'delegat', 'moderat', 'emcee',
+                'meeting', 'stakeholder', 'planning', 'supervis', 'delegat', 'moderat', 'emcee',
             ],
             'examples' => 'Directing committee deliverables, moderating sessions, cross-team coordination',
         ],
@@ -166,8 +166,24 @@ class OllamaResumeScreeningService
             $preferredCategories
         )));
 
+        $hasCv = (bool) ($existing?->original_name);
+
+        $rawAnalysis = is_array($existing?->raw_ai_analysis) ? $existing->raw_ai_analysis : [];
+        if (is_array($rawAnalysis['certifications'] ?? null)) {
+            $cvCertifications = $this->cleanStringList($rawAnalysis['certifications']);
+        } elseif (is_array($rawAnalysis['cv_certifications'] ?? null)) {
+            $cvCertifications = $this->cleanStringList($rawAnalysis['cv_certifications']);
+        } elseif ($hasCv && $existing?->assessment_completed_at === null) {
+            $cvCertifications = $this->cleanStringList($existing->certifications ?? []);
+            if (!empty($cvCertifications)) {
+                $rawAnalysis['cv_certifications'] = $cvCertifications;
+            }
+        } else {
+            $cvCertifications = [];
+        }
+
         $mergedCertifications = array_values(array_unique(array_merge(
-            $existing?->certifications ?? [],
+            $cvCertifications,
             $submittedCertifications
         )));
 
@@ -175,16 +191,19 @@ class OllamaResumeScreeningService
         $availabilityHours = $this->nullableTrimmedString($payload['availability_hours'] ?? null);
         $deliberationNotes = $this->nullableTrimmedString($payload['deliberation_notes'] ?? null);
 
-        $hasCv = (bool) ($existing?->original_name);
         $existingCvSummary = $this->nullableTrimmedString($existing?->experience_summary);
         $experienceSummary = ($hasCv && $existingCvSummary !== null)
             ? $existingCvSummary
             : $this->synthesizeExperienceSummary($sortedStrengths, $leadershipReadiness, $availabilityHours, $deliberationNotes);
 
         $highConfidenceCount = count(array_filter($strengthRatings, fn (int $rating) => $rating >= 4));
-        $eligibilityStatus = ($hasCv || ($highConfidenceCount >= 2 && $deliberationNotes !== null))
-            ? 'Highly Recommended'
-            : 'Eligible';
+        if ($existing?->eligibility_status === 'Needs Verification') {
+            $eligibilityStatus = 'Needs Verification';
+        } else {
+            $eligibilityStatus = ($hasCv || ($highConfidenceCount >= 2 && $deliberationNotes !== null))
+                ? 'Highly Recommended'
+                : 'Eligible';
+        }
 
         return MemberResume::updateOrCreate(
             ['user_id' => $user->id],
@@ -194,6 +213,7 @@ class OllamaResumeScreeningService
                 'certifications' => $mergedCertifications,
                 'experience_summary' => $experienceSummary,
                 'eligibility_status' => $eligibilityStatus,
+                'raw_ai_analysis' => !empty($rawAnalysis) ? $rawAnalysis : $existing?->raw_ai_analysis,
                 'strengths_assessment' => $strengthRatings,
                 'preferred_task_categories' => $preferredCategories,
                 'leadership_readiness' => $leadershipReadiness,
@@ -274,17 +294,13 @@ class OllamaResumeScreeningService
         Collection $candidates,
         bool $useOllama = false
     ): Collection {
-        $combinedDescription = trim(implode(' ', array_filter([
-            $this->nullableTrimmedString($taskDescription),
-            $committeeName ? "Committee Context: {$committeeName}" : null,
-        ])));
-
         return $this->rankCandidatesForScope(
             $taskTitle,
-            $combinedDescription !== '' ? $combinedDescription : null,
+            $this->nullableTrimmedString($taskDescription),
             'task',
             $candidates,
-            $useOllama
+            $useOllama,
+            $this->nullableTrimmedString($committeeName)
         );
     }
 
@@ -296,7 +312,8 @@ class OllamaResumeScreeningService
         ?string $scopeDescription,
         string $scopeType,
         Collection $candidates,
-        bool $allowOllama = true
+        bool $allowOllama = true,
+        ?string $scopeContext = null
     ): Collection {
         if ($candidates->isEmpty()) {
             return collect();
@@ -304,7 +321,7 @@ class OllamaResumeScreeningService
 
         $ollamaReady = $allowOllama && $this->isAvailable();
 
-        return $candidates->map(function ($candidate) use ($scopeTitle, $scopeDescription, $scopeType, $ollamaReady) {
+        return $candidates->map(function ($candidate) use ($scopeTitle, $scopeDescription, $scopeType, $ollamaReady, $scopeContext) {
             $user = $candidate instanceof User ? $candidate : ($candidate->user ?? null);
             if (!$user) {
                 return null;
@@ -320,7 +337,7 @@ class OllamaResumeScreeningService
             $deliberationNotes = $this->nullableTrimmedString($resume?->deliberation_notes);
             $leadershipReadiness = $this->nullableTrimmedString($resume?->leadership_readiness);
             $availabilityHours = $this->nullableTrimmedString($resume?->availability_hours);
-            $experience = $this->nullableTrimmedString($resume?->experience_summary) ?? 'Registered CarSU Department Member.';
+            $rawExperienceSummary = $this->nullableTrimmedString($resume?->experience_summary);
             $topStrengths = $this->formatTopStrengths($strengths);
 
             $heuristic = $this->evaluateHeuristicScopeFit(
@@ -336,7 +353,7 @@ class OllamaResumeScreeningService
                 $preferredCategories,
                 $deliberationNotes,
                 $leadershipReadiness,
-                $experience
+                $rawExperienceSummary
             );
 
             $score = $heuristic['score'];
@@ -351,11 +368,12 @@ class OllamaResumeScreeningService
                         $scopeDescription,
                         $user->name,
                         $skills,
-                        $experience,
+                        $rawExperienceSummary ?? 'Registered CarSU Department Member.',
                         $topStrengths,
                         $deliberationNotes,
                         $leadershipReadiness,
-                        $availabilityHours
+                        $availabilityHours,
+                        $scopeContext
                     );
                     if ($aiScore) {
                         $score = max(50, min(100, (int) ($aiScore['suitability_score'] ?? $score)));
@@ -488,12 +506,14 @@ class OllamaResumeScreeningService
         array $topStrengths = [],
         ?string $deliberationNotes = null,
         ?string $leadershipReadiness = null,
-        ?string $availabilityHours = null
+        ?string $availabilityHours = null,
+        ?string $scopeContext = null
     ): ?array {
         $scopeLabel = ucfirst($scopeType);
         $prompt = "Evaluate candidate '{$candidateName}' for assignment to this {$scopeType}.\n"
             . "{$scopeLabel}: {$scopeTitle}\n"
             . "Description: " . ($scopeDescription ?: 'General departmental and institutional deliverables.') . "\n"
+            . ($scopeContext ? "Committee Context: {$scopeContext}\n" : '')
             . "Candidate Skills: " . implode(', ', $skills) . "\n"
             . "Candidate Experience: {$experience}\n"
             . (!empty($topStrengths) ? "Self-Assessed Strengths: " . implode(', ', $topStrengths) . "\n" : '')
@@ -615,7 +635,7 @@ class OllamaResumeScreeningService
         array $preferredCategories,
         ?string $deliberationNotes,
         ?string $leadershipReadiness,
-        string $experience
+        ?string $experience
     ): array {
         $targetText = strtolower(trim($scopeTitle . ' ' . $scopeDescription));
 
@@ -623,28 +643,67 @@ class OllamaResumeScreeningService
         $matchedHighlights = [];
 
         if (!empty($strengths)) {
-            $totalScopeWeight = 0.0;
-            $weightedAlignment = 0.0;
-
-            foreach (self::COMPETENCY_DOMAINS as $slug => $meta) {
-                $hits = $this->countKeywordMatches($targetText, $meta['keywords']);
-                if ($hits > 0 && isset($strengths[$slug])) {
-                    $weight = min(4, $hits);
-                    $rating = max(1, min(5, (int) $strengths[$slug]));
-                    $totalScopeWeight += $weight;
-                    $weightedAlignment += $weight * (($rating - 1) / 4);
-
-                    if ($rating >= 4) {
-                        $matchedHighlights[] = $meta['label'];
-                    }
+            $clampedRatings = [];
+            foreach ($strengths as $slug => $val) {
+                if (isset(self::COMPETENCY_DOMAINS[$slug])) {
+                    $clampedRatings[$slug] = max(1, min(5, (int) $val));
                 }
             }
 
-            if ($totalScopeWeight > 0) {
-                $domainScore = (int) round(25 * ($weightedAlignment / $totalScopeWeight));
-            } else {
-                $avgRating = array_sum($strengths) / max(1, count($strengths));
-                $domainScore = (int) round(14 * (($avgRating - 1) / 4));
+            if (!empty($clampedRatings)) {
+                $totalScopeWeight = 0.0;
+                $weightedAlignment = 0.0;
+
+                foreach (self::COMPETENCY_DOMAINS as $slug => $meta) {
+                    $hits = $this->countKeywordMatches($targetText, $meta['keywords']);
+                    if ($hits > 0 && isset($clampedRatings[$slug])) {
+                        $weight = min(4, $hits);
+                        $rating = $clampedRatings[$slug];
+                        $totalScopeWeight += $weight;
+                        $weightedAlignment += $weight * (($rating - 1) / 4);
+
+                        if ($rating >= 4) {
+                            $matchedHighlights[] = $meta['label'];
+                        }
+                    }
+                }
+
+                if ($totalScopeWeight > 0) {
+                    $domainScore = (int) round(20 * ($weightedAlignment / $totalScopeWeight));
+                } else {
+                    $avgRating = array_sum($clampedRatings) / count($clampedRatings);
+                    $domainScore = (int) round(5 * (($avgRating - 1) / 4));
+                }
+            }
+        } elseif ($hasResume) {
+            $cvProfileText = strtolower(trim(implode(' ', array_filter(array_merge(
+                $skills,
+                $certifications,
+                [$experience]
+            )))));
+
+            if ($cvProfileText !== '') {
+                $totalScopeWeight = 0.0;
+                $weightedAlignment = 0.0;
+
+                foreach (self::COMPETENCY_DOMAINS as $meta) {
+                    $scopeHits = $this->countKeywordMatches($targetText, $meta['keywords']);
+                    if ($scopeHits > 0) {
+                        $weight = min(4, $scopeHits);
+                        $cvHits = $this->countKeywordMatches($cvProfileText, $meta['keywords']);
+                        $domainFit = min(1.0, $cvHits / 2.0);
+                        $totalScopeWeight += $weight;
+                        $weightedAlignment += $weight * $domainFit;
+
+                        if ($cvHits >= 2) {
+                            $matchedHighlights[] = $meta['label'];
+                        }
+                    }
+                }
+
+                if ($totalScopeWeight > 0) {
+                    $domainScore = (int) round(20 * ($weightedAlignment / $totalScopeWeight));
+                }
             }
         }
 
@@ -653,10 +712,10 @@ class OllamaResumeScreeningService
         foreach ($preferredCategories as $category) {
             $mappedSlug = self::TASK_CATEGORY_DOMAINS[$category] ?? null;
             if ($mappedSlug !== null && $this->countKeywordMatches($targetText, self::COMPETENCY_DOMAINS[$mappedSlug]['keywords']) > 0) {
-                $skillCategoryScore += 7;
+                $skillCategoryScore += 6;
                 $matchedHighlights[] = $category;
             } elseif ($this->phraseMatchesText($category, $targetText)) {
-                $skillCategoryScore += 7;
+                $skillCategoryScore += 6;
                 $matchedHighlights[] = $category;
             }
         }
@@ -675,33 +734,42 @@ class OllamaResumeScreeningService
             }
         }
 
-        $notesAndExperience = trim(($deliberationNotes ?? '') . ' ' . $experience);
+        $notesAndExperience = trim(($deliberationNotes ?? '') . ' ' . ($experience ?? ''));
         if ($notesAndExperience !== '') {
             $tokenHits = $this->countSignificantTokenMatches($notesAndExperience, $targetText);
             $skillCategoryScore += min(6, $tokenHits * 3);
         }
 
-        $skillCategoryScore = min(22, $skillCategoryScore);
+        $skillCategoryScore = min(20, $skillCategoryScore);
 
         $evidenceScore = 0;
         if ($hasResume) {
-            $evidenceScore += 6;
+            $evidenceScore += 8;
         }
         if (!empty($certifications)) {
-            $evidenceScore += 4;
+            $certMatch = false;
+            foreach ($certifications as $cert) {
+                if ($this->phraseMatchesText((string) $cert, $targetText)) {
+                    $certMatch = true;
+                    break;
+                }
+            }
+            $evidenceScore += $certMatch ? 5 : 4;
         }
         if ($hasQuestionnaire && $deliberationNotes !== null && mb_strlen($deliberationNotes) >= 15) {
-            $evidenceScore += 3;
+            $evidenceScore += 2;
         }
         $evidenceScore += match ($leadershipReadiness) {
-            'Lead or Independent' => 3,
-            'Co-Lead / Active Contributor' => 2,
-            'Support Role' => 1,
+            'Lead or Independent' => 2,
+            'Co-Lead / Active Contributor' => 1,
             default => 0,
         };
-        $evidenceScore = min(13, $evidenceScore);
+        $evidenceScore = min(14, $evidenceScore);
 
         $score = max(45, min(98, 50 + $domainScore + $skillCategoryScore + $evidenceScore));
+        if (!$hasResume && empty($certifications)) {
+            $score = min(84, $score);
+        }
 
         $matchedHighlights = array_values(array_unique($matchedHighlights));
         if ($score >= 85) {
@@ -718,8 +786,12 @@ class OllamaResumeScreeningService
                 default => '',
             };
             $reason = trim("{$candidateName} aligns strongly with {$scopeTitle} via " . implode(', ', array_slice($matchedHighlights, 0, 3)) . ". {$sourceNote}");
-        } elseif ($hasResume || $hasQuestionnaire) {
-            $reason = "{$candidateName} holds verified profile credentials suited for general {$scopeType} deliverables.";
+        } elseif ($hasResume && $hasQuestionnaire) {
+            $reason = "{$candidateName} holds uploaded CV credentials and completed strengths questionnaire suited for general {$scopeType} deliverables.";
+        } elseif ($hasResume) {
+            $reason = "{$candidateName} holds uploaded CV credentials suited for general {$scopeType} deliverables.";
+        } elseif ($hasQuestionnaire) {
+            $reason = "{$candidateName} completed the self-assessed strengths questionnaire suited for general {$scopeType} deliverables.";
         } else {
             $reason = 'Eligible participant with confirmed institutional account.';
         }

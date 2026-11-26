@@ -9,6 +9,7 @@ use App\Models\ProjectRoleAssignment;
 use App\Models\User;
 use App\Services\AI\OllamaResumeScreeningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class EligibilityQuestionnaireTest extends TestCase
@@ -255,7 +256,7 @@ class EligibilityQuestionnaireTest extends TestCase
 
     public function test_rank_candidates_for_task_handles_empty_collection_and_unreachable_ollama_gracefully(): void
     {
-        config(['app.env' => 'testing']);
+        $previousHost = getenv('OLLAMA_HOST');
         putenv('OLLAMA_HOST=http://127.0.0.1:59999');
 
         try {
@@ -283,7 +284,273 @@ class EligibilityQuestionnaireTest extends TestCase
             $this->assertEquals($this->techMember->id, $ranked->first()['user_id']);
             $this->assertGreaterThanOrEqual(75, $ranked->first()['suitability_score']);
         } finally {
-            putenv('OLLAMA_HOST=http://127.0.0.1:11434');
+            if ($previousHost === false) {
+                putenv('OLLAMA_HOST');
+            } else {
+                putenv("OLLAMA_HOST={$previousHost}");
+            }
+        }
+    }
+
+    public function test_cv_only_matching_candidate_achieves_highly_recommended_score(): void
+    {
+        $docsCommittee = Committee::create([
+            'project_id' => $this->project->id,
+            'name' => 'Documentation & Secretariat Committee',
+            'description' => 'Responsible for PACUCOA accreditation documentation, minutes of meeting, and MOV archiving.',
+        ]);
+
+        $cvCandidate = User::factory()->create(['name' => 'CV Docs Specialist', 'email_verified_at' => now()]);
+        MemberResume::create([
+            'user_id' => $cvCandidate->id,
+            'original_name' => 'candidate_cv.pdf',
+            'file_path' => 'resumes/candidate_cv.pdf',
+            'file_size' => 1024,
+            'mime_type' => 'application/pdf',
+            'extracted_skills' => ['Documentation', 'Secretariat', 'Technical Writing'],
+            'certifications' => ['Accreditation Officer Training'],
+            'experience_summary' => '3 years committee documentation lead at CarSU.',
+            'eligibility_status' => 'Highly Recommended',
+        ]);
+
+        $service = new OllamaResumeScreeningService();
+        $ranked = $service->rankCandidatesForScope(
+            $docsCommittee->name,
+            $docsCommittee->description,
+            'committee',
+            collect([$cvCandidate->fresh('resume')]),
+            false
+        );
+
+        $this->assertCount(1, $ranked);
+        $this->assertGreaterThanOrEqual(85, $ranked->first()['suitability_score']);
+        $this->assertEquals('Highly Recommended', $ranked->first()['eligibility_status']);
+        $this->assertTrue($ranked->first()['has_resume']);
+        $this->assertFalse($ranked->first()['has_questionnaire']);
+    }
+
+    public function test_questionnaire_only_neutral_reason_does_not_claim_verified_credentials(): void
+    {
+        $service = new OllamaResumeScreeningService();
+        $service->saveQuestionnaireProfile($this->techMember, [
+            'strength_ratings' => ['technical_engineering' => 3],
+            'preferred_task_categories' => [],
+            'certifications_list' => [],
+            'leadership_readiness' => 'Support Role',
+            'availability_hours' => '1-2 hrs/week',
+            'deliberation_notes' => 'Available to assist.',
+        ]);
+
+        $ranked = $service->rankCandidatesForTask(
+            'General Hallway Assistance',
+            'Assist visitors at main lobby',
+            null,
+            collect([$this->techMember->fresh('resume')]),
+            false
+        );
+
+        $reason = $ranked->first()['recommendation_reason'];
+        $this->assertStringNotContainsString('verified profile credentials', strtolower($reason));
+        $this->assertStringContainsString('self-assessed strengths questionnaire', strtolower($reason));
+    }
+
+    public function test_saving_questionnaire_preserves_needs_verification_status_and_allows_editing_self_certs(): void
+    {
+        MemberResume::create([
+            'user_id' => $this->docsMember->id,
+            'original_name' => 'unverified_scan.png',
+            'file_path' => 'resumes/unverified_scan.png',
+            'file_size' => 512,
+            'mime_type' => 'image/png',
+            'extracted_skills' => ['Documentation'],
+            'certifications' => ['CV Extracted Cert'],
+            'experience_summary' => 'Pending registrar verification.',
+            'eligibility_status' => 'Needs Verification',
+            'raw_ai_analysis' => [
+                'certifications' => ['CV Extracted Cert'],
+            ],
+        ]);
+
+        $service = new OllamaResumeScreeningService();
+        $updated = $service->saveQuestionnaireProfile($this->docsMember, [
+            'strength_ratings' => [
+                'documentation_secretariat' => 5,
+                'quality_assurance' => 5,
+            ],
+            'preferred_task_categories' => ['Documentation & Minutes'],
+            'certifications_list' => ['Typo Self Cert'],
+            'leadership_readiness' => 'Lead or Independent',
+            'availability_hours' => '6-10 hrs/week',
+            'deliberation_notes' => 'Extensive documentation background.',
+        ]);
+
+        $this->assertEquals('Needs Verification', $updated->eligibility_status);
+        $this->assertEquals(['CV Extracted Cert', 'Typo Self Cert'], $updated->certifications);
+
+        // Removing typo self-entered cert preserves CV-extracted cert while dropping the removed self-entry
+        $reUpdated = $service->saveQuestionnaireProfile($this->docsMember, [
+            'strength_ratings' => ['documentation_secretariat' => 5],
+            'preferred_task_categories' => ['Documentation & Minutes'],
+            'certifications_list' => ['Clean Self Cert'],
+            'leadership_readiness' => 'Lead or Independent',
+            'availability_hours' => '6-10 hrs/week',
+            'deliberation_notes' => 'Extensive documentation background.',
+        ]);
+
+        $this->assertEquals(['CV Extracted Cert', 'Clean Self Cert'], $reUpdated->certifications);
+
+        // Pure questionnaire profile (no CV) cleanly replaces self-entered certifications
+        $service->saveQuestionnaireProfile($this->techMember, [
+            'strength_ratings' => ['technical_engineering' => 5],
+            'certifications_list' => ['Typo Cert'],
+            'leadership_readiness' => 'Support Role',
+            'availability_hours' => '3-5 hrs/week',
+        ]);
+        $techEdited = $service->saveQuestionnaireProfile($this->techMember, [
+            'strength_ratings' => ['technical_engineering' => 5],
+            'certifications_list' => ['Valid Cert'],
+            'leadership_readiness' => 'Support Role',
+            'availability_hours' => '3-5 hrs/week',
+        ]);
+
+        $this->assertEquals(['Valid Cert'], $techEdited->certifications);
+    }
+
+    public function test_committee_and_department_noise_words_do_not_inflate_bare_accounts_or_misroute_tasks(): void
+    {
+        $bareMember = User::factory()->create(['name' => 'Bare Account', 'email_verified_at' => now()]);
+        $coordinatorMember = User::factory()->create(['name' => 'Coordinator Only', 'email_verified_at' => now()]);
+
+        $service = new OllamaResumeScreeningService();
+        $service->saveQuestionnaireProfile($coordinatorMember, [
+            'strength_ratings' => [
+                'technical_engineering' => 1,
+                'leadership_facilitation' => 5,
+            ],
+            'preferred_task_categories' => ['Committee Coordination'],
+            'certifications_list' => [],
+            'leadership_readiness' => 'Lead or Independent',
+            'availability_hours' => '6-10 hrs/week',
+            'deliberation_notes' => 'Led general assemblies.',
+        ]);
+
+        $service->saveQuestionnaireProfile($this->techMember, [
+            'strength_ratings' => [
+                'technical_engineering' => 5,
+                'leadership_facilitation' => 2,
+            ],
+            'preferred_task_categories' => ['Web & System Setup'],
+            'certifications_list' => [],
+            'leadership_readiness' => 'Support Role',
+            'availability_hours' => '6-10 hrs/week',
+            'deliberation_notes' => 'Built React portal.',
+        ]);
+
+        // Even if committee name repeats "Committee Coordination Committee", a technical task must favor techMember,
+        // and bareMember must not receive token-match inflation from placeholder "Registered CarSU Department Member."
+        $ranked = $service->rankCandidatesForTask(
+            'Build React API Portal',
+            'Configure backend database endpoints',
+            'Committee Coordination Committee',
+            collect([$bareMember->fresh('resume'), $coordinatorMember->fresh('resume'), $this->techMember->fresh('resume')])
+        );
+
+        $byUser = $ranked->keyBy('user_id');
+        $this->assertEquals($this->techMember->id, $ranked->first()['user_id']);
+        $this->assertEquals(50, $byUser[$bareMember->id]['suitability_score']);
+
+        $bareDepartmentScope = $service->rankCandidatesForScope(
+            'Department Committee Review',
+            'Department general assembly',
+            'committee',
+            collect([$bareMember->fresh('resume')]),
+            false
+        );
+        $this->assertEquals(50, $bareDepartmentScope->first()['suitability_score']);
+    }
+
+    public function test_ollama_online_scoring_clamps_scores_and_falls_back_on_malformed_json(): void
+    {
+        $previousHost = getenv('OLLAMA_HOST');
+        putenv('OLLAMA_HOST=http://127.0.0.1:11434');
+
+        try {
+            $service = new OllamaResumeScreeningService();
+            $service->saveQuestionnaireProfile($this->techMember, [
+                'strength_ratings' => ['technical_engineering' => 5],
+                'preferred_task_categories' => ['Web & System Setup'],
+                'certifications_list' => ['Laravel Certified'],
+                'leadership_readiness' => 'Lead or Independent',
+                'availability_hours' => '6-10 hrs/week',
+                'deliberation_notes' => 'Built React dashboards.',
+            ]);
+
+            Http::fake([
+                '127.0.0.1:11434/api/tags' => Http::response(['models' => []], 200),
+                '127.0.0.1:11434/api/chat' => Http::sequence()
+                    ->push([
+                        'message' => [
+                            'content' => json_encode([
+                                'suitability_score' => 150,
+                                'eligibility_status' => 'Highly Recommended',
+                                'recommendation_reason' => 'Strong match verified by Ollama.',
+                            ]),
+                        ],
+                    ], 200)
+                    ->push([
+                        'message' => [
+                            'content' => json_encode([
+                                'suitability_score' => 10,
+                                'eligibility_status' => 'Needs Verification',
+                                'recommendation_reason' => 'Lower bound clamped check.',
+                            ]),
+                        ],
+                    ], 200)
+                    ->push([
+                        'message' => [
+                            'content' => '{invalid json',
+                        ],
+                    ], 200),
+            ]);
+
+            $clampedHigh = $service->rankCandidatesForTask(
+                'Build React Portal',
+                'Create dashboard UI',
+                null,
+                collect([$this->techMember->fresh('resume')]),
+                true
+            );
+
+            $this->assertEquals(100, $clampedHigh->first()['suitability_score']);
+            $this->assertEquals('Strong match verified by Ollama.', $clampedHigh->first()['recommendation_reason']);
+
+            $clampedLow = $service->rankCandidatesForTask(
+                'Build React Portal',
+                'Create dashboard UI',
+                null,
+                collect([$this->techMember->fresh('resume')]),
+                true
+            );
+
+            $this->assertEquals(50, $clampedLow->first()['suitability_score']);
+            $this->assertEquals('Needs Verification', $clampedLow->first()['eligibility_status']);
+
+            $fallback = $service->rankCandidatesForTask(
+                'Build React Portal',
+                'Create dashboard UI',
+                null,
+                collect([$this->techMember->fresh('resume')]),
+                true
+            );
+
+            $this->assertGreaterThanOrEqual(85, $fallback->first()['suitability_score']);
+            $this->assertStringContainsString('aligns strongly', $fallback->first()['recommendation_reason']);
+        } finally {
+            if ($previousHost === false) {
+                putenv('OLLAMA_HOST');
+            } else {
+                putenv("OLLAMA_HOST={$previousHost}");
+            }
         }
     }
 }
