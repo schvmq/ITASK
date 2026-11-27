@@ -34,12 +34,8 @@ class DevTestDataSeeder extends Seeder
         );
         $admin->forceFill(['email_verified_at' => now(), 'is_admin' => true])->save();
 
-        // Ensure bryanjay.oja@carsu.edu.ph is non-admin and can log in with 'password'
-        User::where('email', 'bryanjay.oja@carsu.edu.ph')->update([
-            'is_admin' => false,
-            'password' => Hash::make('password'),
-            'email_verified_at' => now(),
-        ]);
+        // Isolated test accounts are strictly namespaced under *.itask@carsu.edu.ph
+        // Real user accounts (e.g., faculty/staff personal emails) are never modified by test seeders.
 
         $leader = User::updateOrCreate(
             ['email' => 'leader.itask@carsu.edu.ph'],
