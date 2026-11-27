@@ -42,6 +42,9 @@ class ChatController extends Controller
     public function index(Request $request, ?int $projectId = null): Response|JsonResponse
     {
         $user = $request->user();
+        if ($user) {
+            Cache::put("user_online_{$user->id}", true, now()->addMinutes(2));
+        }
 
         // Lazy-loaded sidebar data closure (evaluated only when sidebar props are requested)
         $sidebarData = null;
@@ -339,7 +342,7 @@ class ChatController extends Controller
                 'roleAssignments.committee',
             ]);
 
-            $participants = $allActiveMembers->map(function (User $u) use ($project, $readStates) {
+            $participants = $allActiveMembers->map(function (User $u) use ($project, $readStates, $user) {
                 $isOverallChair = (int) $project->created_by === (int) $u->id
                     || $project->roleAssignments->contains(fn ($a) => (int) $a->user_id === (int) $u->id && $a->isLeader());
 
@@ -404,7 +407,7 @@ class ChatController extends Controller
                     'role_label' => $roleLabel,
                     'role_type' => $roleType,
                     'committee_name' => $committeeName,
-                    'is_online' => true,
+                    'is_online' => (int) $u->id === (int) $user->id || Cache::has("user_online_{$u->id}"),
                     'last_read_message_id' => $userReadState?->last_read_message_id,
                     'last_read_at' => $userReadState?->read_at?->toISOString(),
                 ];
@@ -542,6 +545,9 @@ class ChatController extends Controller
     public function store(Request $request, $chat)
     {
         $user = $request->user();
+        if ($user) {
+            Cache::put("user_online_{$user->id}", true, now()->addMinutes(2));
+        }
         $chat = $this->resolveChat($chat);
 
         // 1. Enforce active project membership
@@ -652,6 +658,9 @@ class ChatController extends Controller
     public function markAsRead(Request $request, $chat): JsonResponse
     {
         $user = $request->user();
+        if ($user) {
+            Cache::put("user_online_{$user->id}", true, now()->addMinutes(2));
+        }
         $chat = $this->resolveChat($chat);
 
         if (! $chat->hasActiveMember($user->id)) {
@@ -1041,6 +1050,9 @@ class ChatController extends Controller
     public function typing(Request $request, $chat): JsonResponse
     {
         $user = $request->user();
+        if ($user) {
+            Cache::put("user_online_{$user->id}", true, now()->addMinutes(2));
+        }
         $chat = $this->resolveChat($chat);
 
         if (! $chat->hasActiveMember($user->id)) {

@@ -384,10 +384,10 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
     return (
         <div className={`space-y-4 ${className}`}>
             {/* ── Controls Row (Filters, Scale Selector, & Expand/Collapse) ── */}
-            <Card className="p-3.5 space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <Card className="p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
                     {/* Left Dropdown Filters & Day/Week/Month Scale Selector */}
-                    <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
                         {/* Project Selector (only in global or multi-project mode) */}
                         {(isGlobal || allProjects.length > 1) && (
                             <div className="relative">
@@ -485,7 +485,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                 </div>
 
                 {/* ── Status Legend Row ── */}
-                <div className="flex items-center gap-4 flex-wrap text-[12px] text-[color:var(--muted)] pt-2 border-t border-[color:var(--border)]">
+                <div className="pt-3.5 border-t border-[color:var(--border)] flex items-center gap-x-5 gap-y-2.5 flex-wrap text-[12px] text-[color:var(--muted)]">
                     {Object.entries(STATUS_THEMES).map(([statusKey, theme]) => (
                         <div key={statusKey} className="flex items-center gap-1.5">
                             <span className={`w-2 h-2 rounded-full ${theme.dotColor} shrink-0`} />

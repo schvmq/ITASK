@@ -75,6 +75,11 @@ class Task extends Model
         return $this->hasMany(TaskEvidence::class);
     }
 
+    public function skillRequirements(): HasMany
+    {
+        return $this->hasMany(TaskSkillRequirement::class, 'task_id');
+    }
+
     protected static function booted(): void
     {
         static::saved(function (Task $task) {

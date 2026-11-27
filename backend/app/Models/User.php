@@ -6,6 +6,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -48,6 +49,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_admin' => 'boolean',
+            'skill_onboarding_acknowledged_at' => 'datetime',
+            'skill_assessment_completed_at' => 'datetime',
         ];
     }
 
@@ -121,5 +124,32 @@ class User extends Authenticatable implements MustVerifyEmail
     public function sentMessages(): HasMany
     {
         return $this->hasMany(Message::class, 'sender_id');
+    }
+
+    public function resume(): HasOne
+    {
+        return $this->hasOne(MemberResume::class);
+    }
+
+    public function skillRatings(): HasMany
+    {
+        return $this->hasMany(UserSkillRating::class);
+    }
+
+    public function skills(): BelongsToMany
+    {
+        return $this->belongsToMany(Skill::class, 'user_skill_ratings')
+            ->withPivot('rating')
+            ->withTimestamps();
+    }
+
+    public function hasAcknowledgedSkillOnboarding(): bool
+    {
+        return $this->skill_onboarding_acknowledged_at !== null;
+    }
+
+    public function hasCompletedSkillAssessment(): bool
+    {
+        return $this->skill_assessment_completed_at !== null;
     }
 }

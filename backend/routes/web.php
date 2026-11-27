@@ -8,12 +8,14 @@ use App\Http\Controllers\CommitteeController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectPersonnelController;
+use App\Http\Controllers\SpecialOrderImportController;
 use App\Http\Controllers\TimelineIndexController;
 use App\Models\User;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -47,7 +49,14 @@ Route::get('/verify-email', function (Request $request) {
 Route::get('/verify-email/{id}/{hash}', function (
     EmailVerificationRequest $request
 ) {
+    $user = $request->user();
+    $wasAlreadyVerified = $user ? $user->hasVerifiedEmail() : false;
+
     $request->fulfill();
+
+    if ($user && ! $wasAlreadyVerified && ! $user->hasAcknowledgedSkillOnboarding()) {
+        return redirect()->route('onboarding.skills');
+    }
 
     return redirect()->route('dashboard');
 })->middleware(['auth', 'signed'])->name('verification.verify');
@@ -65,6 +74,14 @@ Route::post('/email/verification-notification', function (Request $request) {
 // Authenticated Application / Dashboard Route
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+    // Post-Verification Skill Onboarding
+    Route::get('/onboarding/skills', [\App\Http\Controllers\UserSkillProfileController::class, 'showOnboarding'])->name('onboarding.skills');
+    Route::post('/onboarding/skills/complete-later', [\App\Http\Controllers\UserSkillProfileController::class, 'completeLater'])->name('onboarding.skills.complete-later');
+
+    // Account Skill Profile Management
+    Route::get('/profile/skills', [\App\Http\Controllers\UserSkillProfileController::class, 'showProfile'])->name('profile.skills');
+    Route::post('/profile/skills', [\App\Http\Controllers\UserSkillProfileController::class, 'update'])->name('profile.skills.update');
 
     // My Tasks (cross-project task hub, role-scoped)
     Route::get('/my-tasks', [MyTasksController::class, 'index'])->name('my-tasks.index');
@@ -93,6 +110,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/chat/{chat}/mute', [ChatController::class, 'toggleMute'])->name('chat.mute');
     Route::get('/chat/attachments/{message}', [ChatController::class, 'downloadAttachment'])->name('chat.attachments.download');
 
+    // Smart S.O. Import (Special Order Document Parsing & Event Structure Generator)
+    Route::get('/projects/smart-import', [SpecialOrderImportController::class, 'create'])->name('projects.smart-import.create');
+    Route::post('/projects/smart-import/parse', [SpecialOrderImportController::class, 'parse'])->name('projects.smart-import.parse');
+    Route::post('/projects/smart-import/confirm', [SpecialOrderImportController::class, 'confirm'])->name('projects.smart-import.confirm');
+
     Route::get('/projects', [ProjectController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectController::class, 'store'])->name('projects.store');
     Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
@@ -118,11 +140,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/projects/{project}/committees/{committee}/staff', [CommitteeController::class, 'assignStaff'])->name('projects.committees.staff.store');
     Route::delete('/projects/{project}/committees/{committee}', [CommitteeController::class, 'destroy'])->name('projects.committees.destroy');
 
+    // Member Eligibility & Strengths Profile (Questionnaire + CV OCR)
+    Route::get('/eligibility-profile', [\App\Http\Controllers\MemberResumeController::class, 'profile'])->name('eligibility-profile.index');
+    Route::post('/eligibility-profile', [\App\Http\Controllers\MemberResumeController::class, 'storeQuestionnaire'])->name('eligibility-profile.store');
+
     // Committee Members
     Route::post('/projects/{project}/committees/{committee}/members', [CommitteeController::class, 'assignMember'])->name('projects.committees.members.store');
     Route::delete('/projects/{project}/committees/{committee}/members/{user}', [CommitteeController::class, 'removeMember'])->name('projects.committees.members.destroy');
     Route::post('/projects/{project}/committees/{committee}/co-chairs', [\App\Http\Controllers\CoChairDesignationController::class, 'storeCommittee'])->name('projects.committees.co-chairs.store');
     Route::delete('/projects/{project}/committees/{committee}/co-chairs/{user}', [\App\Http\Controllers\CoChairDesignationController::class, 'destroyCommittee'])->name('projects.committees.co-chairs.destroy');
+    Route::post('/projects/{project}/committees/{committee}/recommend-members', [CommitteeController::class, 'recommendMembers'])->name('projects.committees.members.recommend');
+    Route::post('/users/{user}/resume', [\App\Http\Controllers\MemberResumeController::class, 'upload'])->name('users.resume.upload');
+    Route::get('/users/{user}/resume', [\App\Http\Controllers\MemberResumeController::class, 'show'])->name('users.resume.show');
 
     // Activities
     Route::post('/projects/{project}/committees/{committee}/activities', [\App\Http\Controllers\ActivityController::class, 'store'])->name('projects.committees.activities.store');
@@ -137,6 +166,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Tasks
     Route::post('/projects/{project}/tasks', [\App\Http\Controllers\TaskController::class, 'storeProjectTask'])->name('projects.tasks.store');
+    Route::post('/projects/{project}/tasks/recommend-assignees', [\App\Http\Controllers\TaskController::class, 'recommendAssignees'])->name('projects.tasks.recommend-assignees');
     Route::post('/projects/{project}/committees/{committee}/activities/{activity}/tasks', [\App\Http\Controllers\TaskController::class, 'store'])->name('projects.committees.activities.tasks.store');
     Route::match(['put', 'patch'], '/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'update'])->name('projects.committees.activities.tasks.update');
     Route::delete('/projects/{project}/committees/{committee}/activities/{activity}/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'destroy'])->name('projects.committees.activities.tasks.destroy');
@@ -172,6 +202,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // Logout
 Route::match(['get', 'post'], '/logout', function (Request $request) {
+    if ($user = Auth::user()) {
+        Cache::forget("user_online_{$user->id}");
+    }
     Auth::logout();
 
     $request->session()->invalidate();

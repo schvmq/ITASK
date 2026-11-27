@@ -1065,7 +1065,7 @@ export default function ProjectShow({
                                             : 'bg-[color:var(--primary)] animate-pulse ring-2 ring-[color:var(--primary)]/20'
                                     }`}
                                 />
-                                <span className="font-semibold text-[color:var(--muted)]">Overall event progress</span>
+                                <span className="font-semibold text-[color:var(--muted)]">Overall Deliverable Progress</span>
                             </div>
                             {(() => {
                                 const progVal = Math.round(initialProject.progress ?? 0);

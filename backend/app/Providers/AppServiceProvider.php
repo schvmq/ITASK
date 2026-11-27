@@ -13,6 +13,7 @@ use App\Policies\CommitteePolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\TaskPolicy;
 use App\Models\Chat;
+use App\Services\Database\DatabaseSafetyGuard;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -32,6 +33,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        DatabaseSafetyGuard::enforce();
+
         Gate::policy(Project::class, ProjectPolicy::class);
         Gate::policy(Committee::class, CommitteePolicy::class);
         Gate::policy(Activity::class, ActivityPolicy::class);

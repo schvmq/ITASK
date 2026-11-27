@@ -26,8 +26,8 @@ export const Pagination: React.FC<PaginationProps> = ({
 }) => {
     const totalPages = propTotalPages ?? Math.max(1, Math.ceil(totalItems / pageSize));
     const displayTotalPages = Math.max(5, totalPages);
-    // Safe clamped page allowing selection of tabs 1..5
-    const safeCurrentPage = Math.min(Math.max(1, currentPage), displayTotalPages);
+    // Clamped active page bounded by actual total pages with data
+    const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
 
     const hasItemsOnPage = safeCurrentPage <= totalPages && totalItems > 0;
     const startIndex = !hasItemsOnPage ? 0 : (safeCurrentPage - 1) * pageSize + 1;
@@ -74,18 +74,23 @@ export const Pagination: React.FC<PaginationProps> = ({
                             );
                         }
 
+                        const isPageValid = p <= totalPages && totalItems > 0;
                         const isActive = p === safeCurrentPage;
                         return (
                             <button
                                 key={`page-${p}`}
                                 type="button"
-                                onClick={() => onPageChange(p)}
-                                className={`min-w-[36px] h-[34px] px-3 rounded-[7px] text-[13px] font-semibold tabular-nums transition-all cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 ${
+                                onClick={isPageValid ? () => onPageChange(p) : undefined}
+                                disabled={!isPageValid}
+                                className={`min-w-[36px] h-[34px] px-3 rounded-[7px] text-[13px] font-semibold tabular-nums transition-all focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 ${
                                     isActive
                                         ? 'bg-[color:var(--primary)] text-white shadow-xs font-bold'
-                                        : 'text-[color:var(--text)] hover:bg-[color:var(--card)]'
+                                        : isPageValid
+                                        ? 'text-[color:var(--text)] hover:bg-[color:var(--card)] cursor-pointer'
+                                        : 'text-[color:var(--muted)] opacity-40 cursor-not-allowed select-none'
                                 }`}
                                 aria-current={isActive ? 'page' : undefined}
+                                aria-disabled={!isPageValid ? 'true' : undefined}
                                 aria-label={`Page ${p}`}
                             >
                                 {p}
@@ -97,7 +102,7 @@ export const Pagination: React.FC<PaginationProps> = ({
                 <button
                     type="button"
                     onClick={() => onPageChange(safeCurrentPage + 1)}
-                    disabled={safeCurrentPage >= displayTotalPages}
+                    disabled={safeCurrentPage >= totalPages}
                     className="p-2 rounded-[8px] text-[color:var(--text)] hover:bg-[color:var(--card)] disabled:opacity-30 disabled:cursor-not-allowed focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2 transition-colors cursor-pointer"
                     aria-label="Next page"
                 >

@@ -30,7 +30,7 @@ import { Card } from '@/Components/Card';
 import { Checkbox } from '@/Components/Checkbox';
 import { Pagination } from '@/Components/Pagination';
 import { EmptyState } from '@/Components/EmptyState';
-import { getProgressBarGradient } from '@/lib/progress';
+import { getProgressBarGradient, calculateProgressPercentage } from '@/lib/progress';
 import {
     Sheet,
     SheetContent,
@@ -450,7 +450,7 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
     }, [tasks, isTaskCompleted]);
 
     const totalTasksCount = tasks.length;
-    const percentDone = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 100;
+    const percentDone = calculateProgressPercentage(completedTasksCount, totalTasksCount);
 
     const overdueCount = useMemo(() => {
         return tasks.filter((t) => {
@@ -734,19 +734,24 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                     </div>
                 </div>
 
-                {/* ══ 2. Deliverables Progress Bar & Interactive Checklist Card ══ */}
-                <Card className="p-5 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[color:var(--border)]">
+                {/* ══ 2. Overall Task Progress Bar & Interactive Checklist Card ══ */}
+                <Card className="p-5 sm:p-6 space-y-4 sm:space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[color:var(--border)]">
                         <div>
                             <div className="flex items-center gap-2">
                                 <ClipboardCheck className="w-5 h-5 text-[color:var(--primary)]" />
                                 <h2 className="text-[17px] font-bold text-[color:var(--text)]">
-                                    Deliverables Progress
+                                    Overall Task Progress
                                 </h2>
                             </div>
                             <p className="text-[13px] text-[color:var(--muted)] mt-0.5">
-                                Check off deliverables below or change status to advance progress in real time.
+                                Track the completion of your assigned tasks across all events.
                             </p>
+                            {totalTasksCount === 0 && (
+                                <p className="text-[12px] text-[color:var(--muted)]/80 italic mt-0.5">
+                                    No assigned tasks yet.
+                                </p>
+                            )}
                         </div>
                         <div className="sm:text-right shrink-0">
                             <motion.span
@@ -756,7 +761,7 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                                 transition={{ type: 'spring', damping: 15 }}
                                 className="text-[18px] font-bold text-[color:var(--text)] tabular-nums block"
                             >
-                                {percentDone}% done
+                                {totalTasksCount === 0 ? '0%' : `${percentDone}% done`}
                             </motion.span>
                             <span className="text-[12px] font-medium text-[color:var(--muted)] tabular-nums">
                                 {completedTasksCount} of {totalTasksCount} tasks completed
@@ -765,9 +770,9 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                     </div>
 
                     {/* Progress Bar (10-30% Red, 40-70% Yellow, Green Complete) */}
-                    <div className="space-y-1.5">
+                    <div className="py-1">
                         {(() => {
-                            const myStyles = getProgressBarGradient(percentDone, percentDone >= 100);
+                            const myStyles = getProgressBarGradient(percentDone, totalTasksCount > 0 && percentDone >= 100);
                             return (
                                 <div className="w-full h-3 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden shadow-inner p-[1px]">
                                     <motion.div
@@ -790,44 +795,44 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                         variants={staggerContainer}
                         initial="hidden"
                         animate="visible"
-                        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2"
+                        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3"
                     >
-                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-3 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
                             <span className="text-[11px] font-medium text-[color:var(--muted)] block">1. Overdue</span>
                             <span className="text-[14px] font-bold text-[color:var(--status-danger-text)] tabular-nums">
                                 {overdueCount}
                             </span>
                         </motion.div>
 
-                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-3 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
                             <span className="text-[11px] font-medium text-[color:var(--muted)] block">2. Revision</span>
                             <span className="text-[14px] font-bold text-rose-600 tabular-nums">
                                 {returnedCount}
                             </span>
                         </motion.div>
 
-                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-3 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
                             <span className="text-[11px] font-medium text-[color:var(--muted)] block">3. Due Today</span>
                             <span className="text-[14px] font-bold text-amber-600 tabular-nums">
                                 {dueTodayCount}
                             </span>
                         </motion.div>
 
-                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-3 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
                             <span className="text-[11px] font-medium text-[color:var(--muted)] block">4. In Review</span>
                             <span className="text-[14px] font-bold text-purple-600 tabular-nums">
                                 {inReviewCount}
                             </span>
                         </motion.div>
 
-                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-3 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
                             <span className="text-[11px] font-medium text-[color:var(--muted)] block">5. Due This Week</span>
                             <span className="text-[14px] font-bold text-[color:var(--text)] tabular-nums">
                                 {dueThisWeekCount}
                             </span>
                         </motion.div>
 
-                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-2.5 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
+                        <motion.div variants={cardVariant} whileHover={{ y: -2 }} className="p-3 rounded-[8px] bg-[color:var(--soft-surface)] border border-[color:var(--border)] text-center">
                             <span className="text-[11px] font-medium text-[color:var(--muted)] block">Completed</span>
                             <span className="text-[14px] font-bold text-[color:var(--status-success-text)] tabular-nums">
                                 {completedTasksCount}
@@ -836,372 +841,388 @@ export default function MyTasksIndex({ tasks = [], stats, roleContext }: MyTasks
                     </motion.div>
                 </Card>
 
-                {/* ══ 3. Multi-Criteria Filters & Sorting Toolbar ══ */}
-                <Card className="p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
-                        {/* Search Input */}
-                        <div className="relative lg:col-span-2">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] pointer-events-none" />
-                            <input
-                                type="text"
-                                placeholder="Search tasks, deliverables, events..."
-                                value={searchTerm}
-                                onChange={(e) => handleSearchChange(e.target.value)}
-                                className="w-full pl-9 pr-8 py-2 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] placeholder:text-[color:var(--muted)] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors"
-                            />
-                            {searchTerm && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleSearchChange('')}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer"
-                                    aria-label="Clear search"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            )}
+                {/* ══ 3. Unified Assigned Tasks Container ══ */}
+                <Card className="p-5 sm:p-6 space-y-4 sm:space-y-5">
+                    {/* Section Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                        <div className="flex items-center gap-2">
+                            <List className="w-5 h-5 text-[color:var(--primary)]" />
+                            <h2 className="text-[17px] font-bold text-[color:var(--text)]">
+                                Assigned Tasks
+                            </h2>
                         </div>
-
-                        {/* Project Filter */}
-                        <div>
-                            <select
-                                value={projectFilter}
-                                onChange={(e) => handleProjectFilterChange(e.target.value)}
-                                className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
-                                aria-label="Filter by event"
-                            >
-                                <option value="ALL">All events ({projectOptions.length})</option>
-                                {projectOptions.map((proj) => (
-                                    <option key={proj.id} value={proj.id}>
-                                        {proj.title}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Status Filter */}
-                        <div>
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => handleStatusFilterChange(e.target.value)}
-                                className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
-                                aria-label="Filter by status"
-                            >
-                                <option value="ALL">All statuses</option>
-                                <option value="ACTIVE">All active</option>
-                                <option value="To Do">To Do</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Under Review">Under Review</option>
-                                <option value="Returned">Returned</option>
-                                <option value="Completed">Completed</option>
-                            </select>
-                        </div>
-
-                        {/* Priority Filter */}
-                        <div>
-                            <select
-                                value={priorityFilter}
-                                onChange={(e) => handlePriorityFilterChange(e.target.value)}
-                                className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
-                                aria-label="Filter by priority"
-                            >
-                                <option value="ALL">All priorities</option>
-                                <option value="Urgent">Urgent</option>
-                                <option value="High">High</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Low">Low</option>
-                            </select>
-                        </div>
-
-                        {/* Due Date Filter */}
-                        <div>
-                            <select
-                                value={dueDateFilter}
-                                onChange={(e) => handleDueDateFilterChange(e.target.value)}
-                                className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
-                                aria-label="Filter by due date"
-                            >
-                                <option value="ALL">All due dates</option>
-                                <option value="overdue">Overdue</option>
-                                <option value="today">Due today</option>
-                                <option value="this_week">Due this week</option>
-                                <option value="later">Later</option>
-                            </select>
-                        </div>
+                        <span className="text-[12px] font-medium text-[color:var(--muted)] tabular-nums">
+                            Showing {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
+                        </span>
                     </div>
 
-                    {/* Secondary Row: Group/Sort selector when in List view */}
-                    {viewMode === 'list' && (
-                        <div className="pt-2 border-t border-[color:var(--border)] flex items-center justify-between gap-3 text-[12px] text-[color:var(--muted)] flex-wrap">
-                            <div className="flex items-center gap-2">
-                                <span className="font-semibold text-[color:var(--text)]">Group by:</span>
-                                <div className="inline-flex rounded-md border border-[color:var(--border)] bg-[color:var(--soft-surface)] p-0.5">
-                                    {(['hierarchy', 'due_date', 'priority', 'project', 'status'] as const).map((grp) => (
-                                        <button
-                                            key={grp}
-                                            type="button"
-                                            onClick={() => handleGroupByChange(grp)}
-                                            className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
-                                                groupBy === grp
-                                                    ? 'bg-[color:var(--surface)] text-[color:var(--text)] shadow-xs'
-                                                    : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
-                                            }`}
-                                        >
-                                            {grp === 'hierarchy' ? 'Hierarchy' : grp === 'due_date' ? 'Due Date' : grp === 'priority' ? 'Priority' : grp === 'project' ? 'Event' : 'Status'}
-                                        </button>
+                    {/* Search and Filter Controls */}
+                    <div className="space-y-3.5 sm:space-y-4 pb-4 sm:pb-5 border-b border-[color:var(--border)]">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-3.5">
+                            {/* Search Input */}
+                            <div className="relative lg:col-span-2">
+                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[color:var(--muted)] pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Search tasks, deliverables, events..."
+                                    value={searchTerm}
+                                    onChange={(e) => handleSearchChange(e.target.value)}
+                                    className="w-full pl-9 pr-8 py-2 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] placeholder:text-[color:var(--muted)] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors"
+                                />
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSearchChange('')}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[color:var(--muted)] hover:text-[color:var(--text)] cursor-pointer"
+                                        aria-label="Clear search"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Project Filter */}
+                            <div>
+                                <select
+                                    value={projectFilter}
+                                    onChange={(e) => handleProjectFilterChange(e.target.value)}
+                                    className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
+                                    aria-label="Filter by event"
+                                >
+                                    <option value="ALL">All events ({projectOptions.length})</option>
+                                    {projectOptions.map((proj) => (
+                                        <option key={proj.id} value={proj.id}>
+                                            {proj.title}
+                                        </option>
                                     ))}
+                                </select>
+                            </div>
+
+                            {/* Status Filter */}
+                            <div>
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => handleStatusFilterChange(e.target.value)}
+                                    className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
+                                    aria-label="Filter by status"
+                                >
+                                    <option value="ALL">All statuses</option>
+                                    <option value="ACTIVE">All active</option>
+                                    <option value="To Do">To Do</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Under Review">Under Review</option>
+                                    <option value="Returned">Returned</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                            </div>
+
+                            {/* Priority Filter */}
+                            <div>
+                                <select
+                                    value={priorityFilter}
+                                    onChange={(e) => handlePriorityFilterChange(e.target.value)}
+                                    className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
+                                    aria-label="Filter by priority"
+                                >
+                                    <option value="ALL">All priorities</option>
+                                    <option value="Urgent">Urgent</option>
+                                    <option value="High">High</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="Low">Low</option>
+                                </select>
+                            </div>
+
+                            {/* Due Date Filter */}
+                            <div>
+                                <select
+                                    value={dueDateFilter}
+                                    onChange={(e) => handleDueDateFilterChange(e.target.value)}
+                                    className="w-full py-2 px-3 text-[13px] bg-[color:var(--soft-surface)] text-[color:var(--text)] border border-[color:var(--border)] rounded-[8px] focus-visible:outline-2 focus-visible:outline-[color:var(--primary)] transition-colors cursor-pointer"
+                                    aria-label="Filter by due date"
+                                >
+                                    <option value="ALL">All due dates</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="today">Due today</option>
+                                    <option value="this_week">Due this week</option>
+                                    <option value="later">Later</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Grouping Controls (When in List View) */}
+                        {viewMode === 'list' && (
+                            <div className="flex items-center justify-between gap-3 text-[12px] text-[color:var(--muted)] flex-wrap pt-0.5">
+                                <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-[color:var(--text)]">Group by:</span>
+                                    <div className="inline-flex rounded-md border border-[color:var(--border)] bg-[color:var(--soft-surface)] p-0.5">
+                                        {(['hierarchy', 'due_date', 'priority', 'project', 'status'] as const).map((grp) => (
+                                            <button
+                                                key={grp}
+                                                type="button"
+                                                onClick={() => handleGroupByChange(grp)}
+                                                className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors cursor-pointer ${
+                                                    groupBy === grp
+                                                        ? 'bg-[color:var(--surface)] text-[color:var(--text)] shadow-xs'
+                                                        : 'text-[color:var(--muted)] hover:text-[color:var(--text)]'
+                                                }`}
+                                            >
+                                                {grp === 'hierarchy' ? 'Hierarchy' : grp === 'due_date' ? 'Due Date' : grp === 'priority' ? 'Priority' : grp === 'project' ? 'Event' : 'Status'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                            <span className="tabular-nums">
-                                Showing {filteredTasks.length} task{filteredTasks.length === 1 ? '' : 's'}
-                            </span>
+                        )}
+                    </div>
+
+                    {/* Task Results or Empty State */}
+                    {totalItems === 0 ? (
+                        <div className="py-8 sm:py-10">
+                            <EmptyState
+                                className="border-0 bg-transparent p-0 shadow-none"
+                                title={totalTasksCount === 0 ? 'No assigned tasks yet' : 'No tasks found'}
+                                description={
+                                    totalTasksCount === 0
+                                        ? 'You currently have no tasks assigned to you across any events.'
+                                        : 'No tasks matched your active filter criteria. Try adjusting your search or filters.'
+                                }
+                                actionLabel={
+                                    totalTasksCount > 0 && (searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || dueDateFilter !== 'ALL')
+                                        ? 'Reset filters'
+                                        : undefined
+                                }
+                                onAction={
+                                    totalTasksCount > 0 && (searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || dueDateFilter !== 'ALL')
+                                        ? () => {
+                                              setStatusFilter('ALL');
+                                              setProjectFilter('ALL');
+                                              setPriorityFilter('ALL');
+                                              setDueDateFilter('ALL');
+                                              setSearchTerm('');
+                                              updateUrlParams(viewMode, 'ALL', 'ALL', 'ALL', 'ALL', groupBy, '', 1, pageSize);
+                                          }
+                                        : undefined
+                                }
+                            />
                         </div>
-                    )}
-                </Card>
+                    ) : viewMode === 'board' ? (
+                        /* ══════ KANBAN BOARD VIEW ══════ */
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3.5 items-start">
+                            {KANBAN_COLUMNS.map((col) => {
+                                const colTasks = filteredTasks.filter((t) => {
+                                    const isDone = isTaskCompleted(t.id, t.status);
+                                    if (col.id === 'Completed') return isDone;
+                                    if (isDone) return false;
+                                    return t.status === col.id;
+                                });
 
-                {/* ══ 4. View Rendering (List vs Kanban Board) ══ */}
-                {totalItems === 0 ? (
-                    <EmptyState
-                        title="No tasks found"
-                        description={
-                            searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || dueDateFilter !== 'ALL'
-                                ? 'No tasks matched your active filter settings.'
-                                : 'You do not have any assigned tasks currently.'
-                        }
-                        actionLabel={
-                            searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || dueDateFilter !== 'ALL'
-                                ? 'Reset filters'
-                                : undefined
-                        }
-                        onAction={
-                            searchTerm || projectFilter !== 'ALL' || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || dueDateFilter !== 'ALL'
-                                ? () => {
-                                      setStatusFilter('ALL');
-                                      setProjectFilter('ALL');
-                                      setPriorityFilter('ALL');
-                                      setDueDateFilter('ALL');
-                                      setSearchTerm('');
-                                      updateUrlParams(viewMode, 'ALL', 'ALL', 'ALL', 'ALL', groupBy, '', 1, pageSize);
-                                  }
-                                : undefined
-                        }
-                    />
-                ) : viewMode === 'board' ? (
-                    /* ══════ KANBAN BOARD VIEW ══════ */
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 items-start">
-                        {KANBAN_COLUMNS.map((col) => {
-                            const colTasks = filteredTasks.filter((t) => {
-                                const isDone = isTaskCompleted(t.id, t.status);
-                                if (col.id === 'Completed') return isDone;
-                                if (isDone) return false;
-                                return t.status === col.id;
-                            });
+                                return (
+                                    <div
+                                        key={col.id}
+                                        className={`rounded-xl border ${col.color} bg-[color:var(--soft-surface)]/60 p-3 flex flex-col min-h-[420px] shadow-xs`}
+                                    >
+                                        {/* Column Header */}
+                                        <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-[color:var(--border)]">
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-[13px] font-bold text-[color:var(--text)]">
+                                                    {col.title}
+                                                </h3>
+                                                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-[color:var(--card)] text-[color:var(--muted)] border border-[color:var(--border)] tabular-nums">
+                                                    {colTasks.length}
+                                                </span>
+                                            </div>
+                                        </div>
 
-                            return (
-                                <div
-                                    key={col.id}
-                                    className={`rounded-xl border ${col.color} bg-[color:var(--surface)] p-3 flex flex-col min-h-[420px] shadow-xs`}
-                                >
-                                    {/* Column Header */}
-                                    <div className="flex items-center justify-between pb-3 mb-2 border-b border-[color:var(--border)]">
+                                        {/* Column Cards */}
+                                        <div className="space-y-2.5 flex-1 overflow-y-auto">
+                                            {colTasks.length === 0 ? (
+                                                <div className="py-8 text-center text-[12px] text-[color:var(--muted)]">
+                                                    No tasks
+                                                </div>
+                                            ) : (
+                                                colTasks.map((task) => {
+                                                    const isDone = isTaskCompleted(task.id, task.status);
+                                                    return (
+                                                        <motion.div
+                                                            key={`kanban-${task.id}`}
+                                                            layout
+                                                            whileHover={{ y: -2 }}
+                                                            onClick={() => setSelectedTask(task)}
+                                                            className="p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] hover:border-[color:var(--primary)] hover:shadow-xs cursor-pointer transition-all space-y-2"
+                                                        >
+                                                            {/* Top tag & priority */}
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span className="text-[11px] font-semibold text-[color:var(--muted)] truncate">
+                                                                    {task.project.title}
+                                                                </span>
+                                                                <div className="shrink-0 flex items-center gap-1.5">
+                                                                    {renderPriorityBadge(task.priority)}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Task Title */}
+                                                            <h4 className={`text-[13px] font-bold text-[color:var(--text)] line-clamp-2 ${isDone ? 'line-through opacity-70' : ''}`}>
+                                                                {task.title}
+                                                            </h4>
+
+                                                            {/* Activity / committee breadcrumb */}
+                                                            <p className="text-[11px] text-[color:var(--muted)] truncate">
+                                                                {task.committee.name} · {task.activity.title}
+                                                            </p>
+
+                                                            {/* Footer: Due date, checklist ratio */}
+                                                            <div className="pt-2 border-t border-[color:var(--border)] flex items-center justify-between text-[11px] text-[color:var(--muted)]">
+                                                                <div className="flex items-center gap-1">
+                                                                    {renderDaysBadge(task, isDone)}
+                                                                </div>
+
+                                                                {task.checklist_total > 0 && (
+                                                                    <div className="flex items-center gap-1 tabular-nums font-medium text-[color:var(--muted)]">
+                                                                        <CheckSquare className="w-3 h-3 text-[color:var(--primary)]" />
+                                                                        <span>
+                                                                            {task.checklist_completed}/{task.checklist_total}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </motion.div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        /* ══════ LIST VIEW ══════ */
+                        <div className="space-y-6">
+                            {groupedListTasks.map((group) => (
+                                <div key={group.id} className="space-y-2">
+                                    {/* Group Header */}
+                                    <div className="flex items-center justify-between pb-2 border-b border-[color:var(--border)]">
                                         <div className="flex items-center gap-2">
-                                            <h3 className="text-[14px] font-bold text-[color:var(--text)]">
-                                                {col.title}
+                                            <h3 className="text-[15px] font-bold text-[color:var(--text)]">
+                                                {group.title}
                                             </h3>
                                             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)] tabular-nums">
-                                                {colTasks.length}
+                                                {group.tasks.length}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* Column Cards */}
-                                    <div className="space-y-3 flex-1 overflow-y-auto">
-                                        {colTasks.length === 0 ? (
-                                            <div className="py-8 text-center text-[12px] text-[color:var(--muted)]">
-                                                No tasks
-                                            </div>
-                                        ) : (
-                                            colTasks.map((task) => {
-                                                const isDone = isTaskCompleted(task.id, task.status);
+                                    {/* Task Rows */}
+                                    <motion.div
+                                        variants={staggerContainer}
+                                        initial="hidden"
+                                        animate="visible"
+                                        className="divide-y divide-[color:var(--border)]"
+                                    >
+                                        <AnimatePresence mode="popLayout">
+                                            {group.tasks.map((task) => {
+                                                const isCompleting = completingTaskIds.has(task.id);
+                                                const isCompleted = isTaskCompleted(task.id, task.status);
+
                                                 return (
                                                     <motion.div
-                                                        key={`kanban-${task.id}`}
+                                                        key={task.id}
+                                                        variants={rowVariant}
                                                         layout
-                                                        whileHover={{ y: -2 }}
-                                                        onClick={() => setSelectedTask(task)}
-                                                        className="p-3.5 rounded-lg border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] hover:shadow-sm cursor-pointer transition-all space-y-2.5"
+                                                        whileHover={{ x: 2 }}
+                                                        className={`py-3 first:pt-1 last:pb-1 flex items-start gap-3 transition-opacity ${
+                                                            isCompleting ? 'opacity-40 pointer-events-none' : ''
+                                                        }`}
                                                     >
-                                                        {/* Top tag & priority */}
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <span className="text-[11px] font-semibold text-[color:var(--muted)] truncate">
-                                                                {task.project.title}
-                                                            </span>
-                                                            <div className="shrink-0 flex items-center gap-1.5">
-                                                                {renderPriorityBadge(task.priority)}
-                                                            </div>
+                                                        {/* Inline Completion Checkbox */}
+                                                        <div className="pt-0.5 shrink-0" title={!task.is_mine ? `Assigned to ${task.assignee?.name || 'team member'} — view details to manage` : undefined}>
+                                                            <Checkbox
+                                                                checked={isCompleted}
+                                                                disabled={!task.is_mine}
+                                                                onChange={() => {
+                                                                    if (task.is_mine) {
+                                                                        handleToggleTaskCompletion(task);
+                                                                    }
+                                                                }}
+                                                                aria-label={`Mark task ${task.title} as ${isCompleted ? 'incomplete' : 'completed'}`}
+                                                            />
                                                         </div>
 
-                                                        {/* Task Title */}
-                                                        <h4 className={`text-[13px] font-bold text-[color:var(--text)] line-clamp-2 ${isDone ? 'line-through opacity-70' : ''}`}>
-                                                            {task.title}
-                                                        </h4>
-
-                                                        {/* Activity / committee breadcrumb */}
-                                                        <p className="text-[11px] text-[color:var(--muted)] truncate">
-                                                            {task.committee.name} · {task.activity.title}
-                                                        </p>
-
-                                                        {/* Footer: Due date, checklist ratio */}
-                                                        <div className="pt-2 border-t border-[color:var(--border)] flex items-center justify-between text-[11px] text-[color:var(--muted)]">
-                                                            <div className="flex items-center gap-1">
-                                                                {renderDaysBadge(task, isDone)}
-                                                            </div>
-
-                                                            {task.checklist_total > 0 && (
-                                                                <div className="flex items-center gap-1 tabular-nums font-medium text-[color:var(--muted)]">
-                                                                    <CheckSquare className="w-3 h-3 text-[color:var(--primary)]" />
-                                                                    <span>
-                                                                        {task.checklist_completed}/{task.checklist_total}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </motion.div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    /* ══════ LIST VIEW ══════ */
-                    <div className="space-y-6">
-                        {groupedListTasks.map((group) => (
-                            <Card key={group.id} className="p-5 space-y-3">
-                                {/* Group Header */}
-                                <div className="flex items-center justify-between pb-3 border-b border-[color:var(--border)]">
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="text-[16px] font-bold text-[color:var(--text)]">
-                                            {group.title}
-                                        </h2>
-                                        <span className="text-[12px] font-bold px-2 py-0.5 rounded-full bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)] tabular-nums">
-                                            {group.tasks.length}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Task Rows */}
-                                <motion.div
-                                    variants={staggerContainer}
-                                    initial="hidden"
-                                    animate="visible"
-                                    className="divide-y divide-[color:var(--border)]"
-                                >
-                                    <AnimatePresence mode="popLayout">
-                                        {group.tasks.map((task) => {
-                                            const isCompleting = completingTaskIds.has(task.id);
-                                            const isCompleted = isTaskCompleted(task.id, task.status);
-
-                                            return (
-                                                <motion.div
-                                                    key={task.id}
-                                                    variants={rowVariant}
-                                                    layout
-                                                    whileHover={{ x: 2 }}
-                                                    className={`py-3 first:pt-1 last:pb-1 flex items-start gap-3 transition-opacity ${
-                                                        isCompleting ? 'opacity-40 pointer-events-none' : ''
-                                                    }`}
-                                                >
-                                                    {/* Inline Completion Checkbox */}
-                                                    <div className="pt-0.5 shrink-0" title={!task.is_mine ? `Assigned to ${task.assignee?.name || 'team member'} — view details to manage` : undefined}>
-                                                        <Checkbox
-                                                            checked={isCompleted}
-                                                            disabled={!task.is_mine}
-                                                            onChange={() => {
-                                                                if (task.is_mine) {
-                                                                    handleToggleTaskCompletion(task);
-                                                                }
-                                                            }}
-                                                            aria-label={`Mark task ${task.title} as ${isCompleted ? 'incomplete' : 'completed'}`}
-                                                        />
-                                                    </div>
-
-                                                    {/* Task Details */}
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setSelectedTask(task)}
-                                                                className={`text-[14px] font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] text-left transition-colors truncate cursor-pointer ${
-                                                                    isCompleted ? 'line-through text-[color:var(--muted)]' : ''
-                                                                }`}
-                                                            >
-                                                                {task.title}
-                                                            </button>
-
-                                                            <div className="flex items-center gap-2 shrink-0">
-                                                                {renderPriorityBadge(task.priority)}
-                                                                {renderDaysBadge(task, isCompleted)}
-                                                                <Badge variant={isCompleted ? 'accent' : task.status === 'Under Review' ? 'secondary' : task.status === 'Returned' ? 'danger' : 'soft'}>
-                                                                    {isCompleted ? 'Completed' : task.status}
-                                                                </Badge>
+                                                        {/* Task Details */}
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center justify-between gap-3 flex-wrap">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setSelectedTask(task)}
-                                                                    className="px-2 py-1 text-[11px] font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] rounded border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:bg-[color:var(--surface)] transition-colors cursor-pointer"
+                                                                    className={`text-[14px] font-semibold text-[color:var(--text)] hover:text-[color:var(--primary)] text-left transition-colors truncate cursor-pointer ${
+                                                                        isCompleted ? 'line-through text-[color:var(--muted)]' : ''
+                                                                    }`}
                                                                 >
-                                                                    Details
+                                                                    {task.title}
                                                                 </button>
+
+                                                                <div className="flex items-center gap-2 shrink-0">
+                                                                    {renderPriorityBadge(task.priority)}
+                                                                    {renderDaysBadge(task, isCompleted)}
+                                                                    <Badge variant={isCompleted ? 'accent' : task.status === 'Under Review' ? 'secondary' : task.status === 'Returned' ? 'danger' : 'soft'}>
+                                                                        {isCompleted ? 'Completed' : task.status}
+                                                                    </Badge>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setSelectedTask(task)}
+                                                                        className="px-2 py-1 text-[11px] font-medium text-[color:var(--muted)] hover:text-[color:var(--text)] rounded border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:bg-[color:var(--surface)] transition-colors cursor-pointer"
+                                                                    >
+                                                                        Details
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 text-[12px] text-[color:var(--muted)] mt-1 flex-wrap">
+                                                                <span className="font-medium text-[color:var(--text)]">
+                                                                    {task.project.title}
+                                                                </span>
+                                                                <span>·</span>
+                                                                <span>{task.committee.name}</span>
+                                                                <span>·</span>
+                                                                <span>{task.activity.title}</span>
+                                                                {task.checklist_total > 0 && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span className="font-medium tabular-nums">
+                                                                            {task.checklist_completed}/{task.checklist_total} subtasks
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                                {task.due_date_formatted && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span className="tabular-nums">Due {task.due_date_formatted}</span>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
+                                                    </motion.div>
+                                                );
+                                            })}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                </div>
+                            ))}
 
-                                                        <div className="flex items-center gap-2 text-[12px] text-[color:var(--muted)] mt-1 flex-wrap">
-                                                            <span className="font-medium text-[color:var(--text)]">
-                                                                {task.project.title}
-                                                            </span>
-                                                            <span>·</span>
-                                                            <span>{task.committee.name}</span>
-                                                            <span>·</span>
-                                                            <span>{task.activity.title}</span>
-                                                            {task.checklist_total > 0 && (
-                                                                <>
-                                                                    <span>·</span>
-                                                                    <span className="font-medium tabular-nums">
-                                                                        {task.checklist_completed}/{task.checklist_total} subtasks
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                            {task.due_date_formatted && (
-                                                                <>
-                                                                    <span>·</span>
-                                                                    <span className="tabular-nums">Due {task.due_date_formatted}</span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </motion.div>
-                                            );
-                                        })}
-                                    </AnimatePresence>
-                                </motion.div>
-                            </Card>
-                        ))}
-
-                        {/* Pagination for List View */}
-                        <div className="pt-2 flex justify-center w-full">
-                            <Pagination
-                                currentPage={safePage}
-                                totalPages={totalPages}
-                                totalItems={totalItems}
-                                pageSize={pageSize}
-                                onPageChange={handlePageChange}
-                                onPageSizeChange={handlePageSizeChange}
-                                pageSizeOptions={[10, 25, 50]}
-                            />
+                            {/* Pagination for List View */}
+                            <div className="pt-4 border-t border-[color:var(--border)] flex justify-center w-full">
+                                <Pagination
+                                    currentPage={safePage}
+                                    totalPages={totalPages}
+                                    totalItems={totalItems}
+                                    pageSize={pageSize}
+                                    onPageChange={handlePageChange}
+                                    onPageSizeChange={handlePageSizeChange}
+                                    pageSizeOptions={[10, 25, 50]}
+                                />
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </Card>
             </div>
 
             {/* ══ 5. Slide-Over Task Detail Panel (Sheet) ══ */}

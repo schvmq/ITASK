@@ -99,6 +99,12 @@ export const ROLE_CONFIGS: Record<ProjectRole, RoleConfig> = {
                 actionEvent: 'itask:open-create-project',
             },
             {
+                name: 'Import from S.O.',
+                description: 'Auto-parse Special Order PDF into committees',
+                icon: Sparkles,
+                href: '/projects/smart-import',
+            },
+            {
                 name: 'Manage Committees',
                 description: 'Organize event committees & assign members',
                 icon: Users,
@@ -251,6 +257,12 @@ export const GLOBAL_NAV_ITEMS: NavItem[] = [
         description: 'Personal task assignments and checklists',
     },
     {
+        name: 'Eligibility & Strengths',
+        href: '/eligibility-profile',
+        icon: UserCheck,
+        description: 'Strengths questionnaire, CV screening, and task suitability',
+    },
+    {
         name: 'Events',
         href: '/projects',
         icon: FolderOpen,
@@ -316,7 +328,7 @@ export const ADMIN_NAV_ITEM: NavItem = {
 };
 
 /**
- * Returns role-tailored navigation items (admin has dedicated dashboard, all three roles share identical 7 tabs)
+ * Returns role-tailored navigation items (admin has dedicated dashboard, all three roles share identical 8 tabs)
  */
 export function getNavigationForRole(role?: string | null, isAdmin?: boolean): NavItem[] {
     if (isAdmin) {

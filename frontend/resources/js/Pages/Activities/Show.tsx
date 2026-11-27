@@ -8,6 +8,7 @@ import { FormField } from '@/Components/FormField';
 import { Label } from '@/Components/Label';
 import { InputError } from '@/Components/InputError';
 import { Button } from '@/Components/Button';
+import { TaskAssigneeDeliberationPanel } from '@/Components/TaskAssigneeDeliberationPanel';
 import {
     ArrowLeft,
     Bell,
@@ -840,33 +841,33 @@ export default function ActivityShow({
     const getActivityStatusBadge = (status: ActivityData['status']) => {
         switch (status) {
             case 'Completed':
-                return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                return 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40';
             case 'In Progress':
-                return 'bg-blue-50 text-blue-700 border-blue-200';
+                return 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40';
             case 'Under Review':
-                return 'bg-amber-50 text-amber-700 border-amber-200';
+                return 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40';
             case 'Returned':
             case 'Returned for Revision':
-                return 'bg-rose-50 text-rose-700 border-rose-200';
+                return 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/40';
             case 'To Do':
             default:
-                return 'bg-slate-100 text-slate-700 border-slate-200';
+                return 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
         }
     };
 
     const getTaskStatusBadge = (status: TaskItem['status']) => {
         switch (status) {
             case 'Completed':
-                return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                return 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40';
             case 'In Progress':
-                return 'bg-blue-50 text-blue-700 border-blue-200';
+                return 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/40';
             case 'Under Review':
-                return 'bg-amber-50 text-amber-700 border-amber-200';
+                return 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40';
             case 'Returned':
-                return 'bg-rose-50 text-rose-700 border-rose-200';
+                return 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/40';
             case 'To Do':
             default:
-                return 'bg-slate-100 text-slate-700 border-slate-200';
+                return 'bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
         }
     };
 
@@ -901,29 +902,29 @@ export default function ActivityShow({
 
             <div className="max-w-6xl mx-auto space-y-6">
                 {/* ── Breadcrumb Navigation ── */}
-                <div className="flex items-center gap-2 text-xs text-[color:var(--color-text-subtle)] flex-wrap">
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                     <Link
                         href="/projects"
-                        className="hover:text-[color:var(--color-brand-action-orange)] transition-colors"
+                        className="hover:text-[color:var(--primary)] transition-colors"
                     >
                         Events
                     </Link>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                     <Link
                         href={`/projects/${project.id}`}
-                        className="hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate max-w-[180px]"
+                        className="hover:text-[color:var(--primary)] transition-colors truncate max-w-[180px]"
                     >
                         {project.title}
                     </Link>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                     <Link
                         href={`/projects/${project.id}/committees/${committee.id}`}
-                        className="hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate max-w-[180px]"
+                        className="hover:text-[color:var(--primary)] transition-colors truncate max-w-[180px]"
                     >
                         {committee.name}
                     </Link>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-semibold text-slate-700 truncate max-w-[200px]">
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
+                    <span className="font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[200px]">
                         {activity.title}
                     </span>
                 </div>
@@ -932,25 +933,25 @@ export default function ActivityShow({
 
                 {/* 1. Returned for Revision Banner */}
                 {(activity.status === 'Returned' || activity.status === 'Returned for Revision') && (
-                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h3 className="text-sm font-bold text-rose-900">Deliverable Returned for Revision</h3>
+                                    <h3 className="text-sm font-bold text-rose-900 dark:text-rose-200">Deliverable Returned for Revision</h3>
                                     {activity.reviewed_at && (
-                                        <span className="text-xs text-rose-700">
+                                        <span className="text-xs text-rose-700 dark:text-rose-400">
                                             Reviewed on {activity.reviewed_at} {activity.reviewer ? `by ${activity.reviewer.name}` : ''}
                                         </span>
                                     )}
                                 </div>
                                 {activity.review_feedback && (
-                                    <div className="mt-1 p-3 rounded-lg bg-white/90 border border-rose-200 text-xs text-rose-800 leading-relaxed">
-                                        <span className="font-semibold block mb-0.5 text-rose-900">Chairperson Review Feedback:</span>
+                                    <div className="mt-1 p-3 rounded-lg bg-[color:var(--card)] border border-rose-200 dark:border-rose-900/50 text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
+                                        <span className="font-semibold block mb-0.5 text-rose-900 dark:text-rose-200">Chairperson Review Feedback:</span>
                                         {activity.review_feedback}
                                     </div>
                                 )}
-                                <p className="text-xs text-rose-700 pt-0.5">
+                                <p className="text-xs text-rose-700 dark:text-rose-400 pt-0.5">
                                     Please revise your assigned tasks to address the reviewer feedback. You may resubmit the deliverable when finished.
                                 </p>
                             </div>
@@ -971,17 +972,17 @@ export default function ActivityShow({
 
                 {/* 2. Under Review Banner */}
                 {activity.status === 'Under Review' && (
-                    <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-start gap-3">
                             <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                             <div className="space-y-1">
-                                <h3 className="text-sm font-bold text-amber-900">Deliverable is Under Review</h3>
-                                <p className="text-xs text-amber-700">
+                                <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">Deliverable is Under Review</h3>
+                                <p className="text-xs text-amber-700 dark:text-amber-400">
                                     This deliverable has been submitted and is currently awaiting verification by the committee head (Chairperson).
                                 </p>
                                 {activity.submission_notes && (
-                                    <div className="mt-2 p-2.5 rounded-lg bg-white/90 border border-amber-200 text-xs text-amber-800">
-                                        <span className="font-semibold text-amber-900">Member Submission Note: </span>
+                                    <div className="mt-2 p-2.5 rounded-lg bg-[color:var(--card)] border border-amber-200 dark:border-amber-900/50 text-xs text-amber-800 dark:text-amber-300">
+                                        <span className="font-semibold text-amber-900 dark:text-amber-200">Member Submission Note: </span>
                                         {activity.submission_notes}
                                     </div>
                                 )}
@@ -992,7 +993,7 @@ export default function ActivityShow({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    className="text-rose-700 border-rose-200 hover:bg-rose-50"
+                                    className="text-rose-700 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                     onClick={handleOpenReviewReturnModal}
                                 >
                                     <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-600" />
@@ -1014,22 +1015,22 @@ export default function ActivityShow({
 
                 {/* 3. Completed Banner */}
                 {activity.status === 'Completed' && (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 shadow-xs flex items-start gap-3">
+                    <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-xl p-5 shadow-xs flex items-start gap-3">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                         <div className="space-y-0.5">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="text-sm font-bold text-emerald-900">Deliverable Completed</h3>
+                                <h3 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">Deliverable Completed</h3>
                                 {activity.reviewed_at && (
-                                    <span className="text-xs text-emerald-700">
+                                    <span className="text-xs text-emerald-700 dark:text-emerald-400">
                                         Approved on {activity.reviewed_at} {activity.reviewer ? `by ${activity.reviewer.name}` : ''}
                                     </span>
                                 )}
                             </div>
-                            <p className="text-xs text-emerald-700">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-400">
                                 This deliverable has been officially verified and approved as complete.
                             </p>
                             {activity.submission_notes && (
-                                <p className="text-[11px] text-emerald-800 pt-1">
+                                <p className="text-[11px] text-emerald-800 dark:text-emerald-300 pt-1">
                                     <span className="font-semibold">Submission note: </span>
                                     {activity.submission_notes}
                                 </p>
@@ -1039,26 +1040,26 @@ export default function ActivityShow({
                 )}
 
                 {/* ── Activity Header Banner ── */}
-                <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)]">
+                <div className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-6 shadow-xs">
                     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                         <div className="space-y-2">
-                            <div className="flex items-center gap-1.5 text-xs text-slate-500 flex-wrap">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                                 <Link
                                     href={`/projects/${project.id}`}
-                                    className="font-medium text-slate-600 hover:text-[color:var(--primary)] transition-colors inline-flex items-center gap-1"
+                                    className="font-medium text-slate-600 dark:text-slate-300 hover:text-[color:var(--primary)] transition-colors inline-flex items-center gap-1"
                                 >
                                     <ArrowLeft className="w-3.5 h-3.5" />
                                     <span>{project.title}</span>
                                 </Link>
-                                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                 <Link
                                     href={`/projects/${project.id}/committees/${committee.id}`}
-                                    className="font-medium text-slate-600 hover:text-[color:var(--primary)] transition-colors"
+                                    className="font-medium text-slate-600 dark:text-slate-300 hover:text-[color:var(--primary)] transition-colors"
                                 >
                                     {committee.name}
                                 </Link>
-                                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                                <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                                     Deliverable
                                 </span>
                                 <span
@@ -1070,31 +1071,31 @@ export default function ActivityShow({
                                 </span>
                             </div>
 
-                            <h1 className="text-xl md:text-2xl font-bold text-[color:var(--color-text-main)]">
+                            <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100">
                                 {activity.title}
                             </h1>
 
-                            <div className="flex items-center gap-4 text-xs text-[color:var(--color-text-subtle)] flex-wrap pt-1">
+                            <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 flex-wrap pt-1">
                                 {activity.start_date && (
-                                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
-                                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                         <span>Start: {activity.start_date}</span>
                                     </span>
                                 )}
                                 {activity.due_date && (
-                                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-700">
-                                        <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                         <span>Target Due: {activity.due_date}</span>
                                     </span>
                                 )}
                                 {activity.creator && (
                                     <span className="inline-flex items-center gap-1.5">
-                                        <User className="w-3.5 h-3.5 text-slate-400" />
+                                        <User className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                         <span>Created by {activity.creator.name}</span>
                                     </span>
                                 )}
                                 <span className="inline-flex items-center gap-1.5">
-                                    <Layers className="w-3.5 h-3.5 text-slate-400" />
+                                    <Layers className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                     <span>{committee.name}</span>
                                 </span>
                             </div>
@@ -1141,9 +1142,9 @@ export default function ActivityShow({
                                 <button
                                     type="button"
                                     onClick={handleOpenEditActivity}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors shadow-xs"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors shadow-xs cursor-pointer"
                                 >
-                                    <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                                    <Edit3 className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                     <span>Edit</span>
                                 </button>
                             )}
@@ -1153,7 +1154,7 @@ export default function ActivityShow({
                                 <button
                                     type="button"
                                     onClick={() => setIsDeleteActivityModalOpen(true)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-white border border-rose-200 hover:bg-rose-50 transition-colors shadow-xs"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors shadow-xs cursor-pointer"
                                 >
                                     <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                                     <span>Delete</span>
@@ -1164,8 +1165,8 @@ export default function ActivityShow({
 
                     {/* Description */}
                     {activity.description && (
-                        <div className="mt-4 pt-4 border-t border-slate-100">
-                            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">
+                        <div className="mt-4 pt-4 border-t border-[color:var(--border)]">
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
                                 {activity.description}
                             </p>
                         </div>
@@ -1182,11 +1183,11 @@ export default function ActivityShow({
                     <motion.div
                         variants={cardVariant}
                         whileHover={{ y: -2 }}
-                        className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5"
+                        className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-4 shadow-xs space-y-1.5"
                     >
-                        <span className="text-[11px] font-semibold text-slate-500">Tasks Completed</span>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tasks Completed</span>
                         <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-slate-900">
+                            <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
                                 {completedTasksCount} / {activity.tasks.length}
                             </span>
                             <motion.span
@@ -1194,20 +1195,17 @@ export default function ActivityShow({
                                 initial={{ scale: 1.15 }}
                                 animate={{ scale: 1 }}
                                 transition={{ type: 'spring', damping: 15 }}
-                                className="text-xs font-bold text-[color:var(--color-brand-dark-green)]"
+                                className="text-xs font-bold text-emerald-600 dark:text-emerald-400"
                             >
                                 {taskProgressPercent}%
                             </motion.span>
                         </div>
-                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full bg-[color:var(--soft-surface)] rounded-full overflow-hidden">
                             <motion.div
-                                className="h-full rounded-full"
+                                className="h-full rounded-full bg-emerald-500"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${taskProgressPercent}%` }}
                                 transition={{ type: 'spring', stiffness: 220, damping: 26 }}
-                                style={{
-                                    backgroundColor: 'var(--color-brand-dark-green)',
-                                }}
                             />
                         </div>
                     </motion.div>
@@ -1215,26 +1213,26 @@ export default function ActivityShow({
                     <motion.div
                         variants={cardVariant}
                         whileHover={{ y: -2 }}
-                        className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5"
+                        className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-4 shadow-xs space-y-1.5"
                     >
-                        <span className="text-[11px] font-semibold text-slate-500">Committee Supervision</span>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Committee Supervision</span>
                         <div className="flex items-center gap-1.5">
                             <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span className="text-sm font-bold text-slate-800 truncate">
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                                 {committee.head?.name ?? 'Unassigned Chairperson'}
                             </span>
                         </div>
-                        <p className="text-[11px] text-slate-400 truncate">Chairperson (Head)</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Chairperson (Head)</p>
                     </motion.div>
 
                     <motion.div
                         variants={cardVariant}
                         whileHover={{ y: -2 }}
-                        className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-4 shadow-xs space-y-1.5"
+                        className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-4 shadow-xs space-y-1.5"
                     >
-                        <span className="text-[11px] font-semibold text-slate-500">Parent Event</span>
-                        <p className="text-sm font-bold text-slate-800 truncate">{project.title}</p>
-                        <p className="text-[11px] text-slate-400">Status: {project.status}</p>
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Parent Event</span>
+                        <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{project.title}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Status: {project.status}</p>
                     </motion.div>
                 </motion.div>
 
@@ -1266,13 +1264,13 @@ export default function ActivityShow({
                 )}
 
                 {/* ── Tasks Section ── */}
-                <div className="bg-white rounded-xl border border-[color:var(--color-border-light)] p-6 shadow-[0_1px_3px_0_rgb(0,0,0,0.04)] space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="bg-[color:var(--card)] rounded-xl border border-[color:var(--border)] p-6 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[color:var(--border)]">
                         <div>
-                            <h3 className="text-base font-bold text-[color:var(--color-text-main)]">
+                            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                 Deliverable Tasks ({activity.tasks.length})
                             </h3>
-                            <p className="text-xs text-[color:var(--color-text-muted)] mt-0.5">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 Actionable work items executed by committee members
                             </p>
                         </div>
@@ -1290,16 +1288,17 @@ export default function ActivityShow({
                     </div>
 
                     {/* ── Staff Review Queue (Tasks Awaiting Review) ── */}
+                    {/* ── Staff Review Queue (Tasks Awaiting Review) ── */}
                     {tasksAwaitingReview.length > 0 && (
-                        <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-3">
+                        <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 space-y-3">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                 <div className="flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
-                                    <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                                    <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <h4 className="text-xs font-bold text-amber-950 dark:text-amber-200 uppercase tracking-wider">
                                         Chairperson Review Queue ({tasksAwaitingReview.length} awaiting review)
                                     </h4>
                                 </div>
-                                <span className="text-[11px] font-medium text-amber-800">
+                                <span className="text-[11px] font-medium text-amber-800 dark:text-amber-300">
                                     {activity.can.review ? 'Action required: Review task deliverables below' : 'Awaiting Chairperson review'}
                                 </span>
                             </div>
@@ -1312,23 +1311,23 @@ export default function ActivityShow({
                                     return (
                                         <div
                                             key={revTask.id}
-                                            className="p-3 bg-white rounded-lg border border-amber-200 shadow-2xs flex flex-col justify-between space-y-2.5"
+                                            className="p-3 bg-white dark:bg-[#181D24] rounded-lg border border-amber-200 dark:border-amber-900/40 shadow-2xs flex flex-col justify-between space-y-2.5"
                                         >
                                             <div className="space-y-1">
                                                 <div className="flex items-start justify-between gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={() => setViewingTask(revTask)}
-                                                        className="text-xs font-bold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors text-left line-clamp-1 cursor-pointer"
+                                                        className="text-xs font-bold text-slate-900 dark:text-slate-100 hover:text-[color:var(--primary)] transition-colors text-left line-clamp-1 cursor-pointer"
                                                     >
                                                         {revTask.title}
                                                     </button>
-                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700 shrink-0">
-                                                        <Shield className="w-2.5 h-2.5 text-purple-600" />
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-900/50 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 shrink-0">
+                                                        <Shield className="w-2.5 h-2.5 text-purple-600 dark:text-purple-400" />
                                                         <span>Review Required</span>
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
                                                     <span className="flex items-center gap-1">
                                                         <User className="w-3 h-3 text-slate-400" />
                                                         <span>{revTask.assignee ? revTask.assignee.name : 'Unassigned'}</span>
@@ -1344,19 +1343,19 @@ export default function ActivityShow({
                                                         <span>Checklist: {done}/{count}</span>
                                                     </span>
                                                     {revTask.evidences && revTask.evidences.length > 0 && (
-                                                        <span className="flex items-center gap-1 font-semibold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
-                                                            <Paperclip className="w-2.5 h-2.5 text-orange-600" />
+                                                        <span className="flex items-center gap-1 font-semibold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 px-1.5 py-0.5 rounded border border-orange-200 dark:border-orange-900/50">
+                                                            <Paperclip className="w-2.5 h-2.5 text-orange-600 dark:text-orange-400" />
                                                             <span>MOV: {revTask.evidences.length}</span>
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                                            <div className="pt-2 border-t border-amber-100 dark:border-amber-900/40 flex items-center justify-between gap-2 flex-wrap">
                                                 <button
                                                     type="button"
                                                     onClick={() => setViewingTask(revTask)}
-                                                    className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                                                    className="text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 cursor-pointer"
                                                 >
                                                     View Details
                                                 </button>
@@ -1367,11 +1366,11 @@ export default function ActivityShow({
                                                             type="button"
                                                             variant="outline"
                                                             size="sm"
-                                                            className="text-rose-700 border-rose-300 hover:bg-rose-50 text-[11px] h-7 px-2"
+                                                            className="text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-[11px] h-7 px-2"
                                                             onClick={() => handleOpenReturnTask(revTask)}
                                                             disabled={taskActionProcessing}
                                                         >
-                                                            <AlertTriangle className="w-3 h-3 mr-1 text-rose-600" />
+                                                            <AlertTriangle className="w-3 h-3 mr-1 text-rose-600 dark:text-rose-400" />
                                                             <span>Return</span>
                                                         </Button>
                                                         <Button
@@ -1397,14 +1396,14 @@ export default function ActivityShow({
 
                     {/* ── Task Filter Tabs ── */}
                     {activity.tasks.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap pt-1 pb-1 border-b border-slate-100 text-xs">
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1 pb-1 border-b border-slate-100 dark:border-slate-800 text-xs">
                             <button
                                 type="button"
                                 onClick={() => setTaskFilter('all')}
                                 className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
                                     taskFilter === 'all'
-                                        ? 'bg-slate-900 text-white shadow-2xs'
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                        ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                                 }`}
                             >
                                 All ({activity.tasks.length})
@@ -1417,13 +1416,13 @@ export default function ActivityShow({
                                     taskFilter === 'under_review'
                                         ? 'bg-amber-600 text-white shadow-2xs'
                                         : tasksAwaitingReview.length > 0
-                                        ? 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200'
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                        ? 'text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 dark:text-amber-300 dark:bg-amber-950/40 dark:border-amber-900/50 dark:hover:bg-amber-900/40'
+                                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                                 }`}
                             >
                                 <span>Needs Review</span>
                                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                    taskFilter === 'under_review' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800'
+                                    taskFilter === 'under_review' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
                                 }`}>
                                     {tasksAwaitingReview.length}
                                 </span>
@@ -1435,7 +1434,7 @@ export default function ActivityShow({
                                 className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
                                     taskFilter === 'in_progress'
                                         ? 'bg-blue-600 text-white shadow-2xs'
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                                 }`}
                             >
                                 In Progress ({inProgressTasks.length})
@@ -1448,14 +1447,14 @@ export default function ActivityShow({
                                     taskFilter === 'returned'
                                         ? 'bg-rose-600 text-white shadow-2xs'
                                         : returnedTasks.length > 0
-                                        ? 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200'
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                        ? 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200 dark:text-rose-300 dark:bg-rose-950/40 dark:border-rose-900/50 dark:hover:bg-rose-900/40'
+                                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                                 }`}
                             >
                                 <span>Returned</span>
                                 {returnedTasks.length > 0 && (
                                     <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                        taskFilter === 'returned' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+                                        taskFilter === 'returned' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300'
                                     }`}>
                                         {returnedTasks.length}
                                     </span>
@@ -1468,7 +1467,7 @@ export default function ActivityShow({
                                 className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
                                     taskFilter === 'completed'
                                         ? 'bg-emerald-600 text-white shadow-2xs'
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                                 }`}
                             >
                                 Completed ({completedTasks.length})
@@ -1480,8 +1479,8 @@ export default function ActivityShow({
                                     onClick={() => setTaskFilter('my_tasks')}
                                     className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
                                         taskFilter === 'my_tasks'
-                                            ? 'bg-slate-800 text-white shadow-2xs'
-                                            : 'text-slate-600 hover:bg-slate-100'
+                                            ? 'bg-slate-800 dark:bg-slate-200 dark:text-slate-900 text-white shadow-2xs'
+                                            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                                     }`}
                                 >
                                     My Tasks ({myTasks.length})
@@ -1496,7 +1495,7 @@ export default function ActivityShow({
                                 variants={staggerContainer}
                                 initial="hidden"
                                 animate="visible"
-                                className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden"
+                                className="divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-xl overflow-hidden"
                             >
                                 <AnimatePresence mode="popLayout">
                                     {filteredTasks.map((task) => {
@@ -1511,7 +1510,7 @@ export default function ActivityShow({
                                                 variants={rowVariant}
                                                 layout
                                                 whileHover={{ x: 2 }}
-                                                className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50/70 transition-colors"
+                                                className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-[color:var(--soft-surface)]/70 transition-colors"
                                             >
                                         <div className="space-y-1.5 max-w-xl">
                                             <div className="flex items-center gap-2 flex-wrap">
@@ -1529,7 +1528,7 @@ export default function ActivityShow({
                                                         title="Click to update task status"
                                                     >
                                                         {getAvailableStatusOptions(task).map((opt) => (
-                                                            <option key={opt} value={opt}>
+                                                            <option key={opt} value={opt} className="bg-white dark:bg-[#14181F] text-slate-900 dark:text-slate-100">
                                                                 {opt}
                                                             </option>
                                                         ))}
@@ -1547,10 +1546,10 @@ export default function ActivityShow({
                                                 {/* Review Required Badge */}
                                                 {task.requires_review && (
                                                     <span
-                                                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700"
+                                                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-900/50 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300"
                                                         title="Requires Staff Review before completion"
                                                     >
-                                                        <Shield className="w-3 h-3 text-purple-600" />
+                                                        <Shield className="w-3 h-3 text-purple-600 dark:text-purple-400" />
                                                         <span>Review Required</span>
                                                     </span>
                                                 )}
@@ -1558,25 +1557,25 @@ export default function ActivityShow({
                                                 <button
                                                     type="button"
                                                     onClick={() => setViewingTask(task)}
-                                                    className="text-sm font-bold text-[color:var(--color-text-main)] hover:text-[color:var(--color-brand-action-orange)] transition-colors text-left cursor-pointer"
+                                                    className="text-sm font-bold text-slate-900 dark:text-slate-100 hover:text-[color:var(--primary)] transition-colors text-left cursor-pointer"
                                                 >
                                                     {task.title}
                                                 </button>
                                             </div>
                                             {task.description && (
-                                                <p className="text-xs text-slate-500 line-clamp-2">
+                                                <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
                                                     {task.description}
                                                 </p>
                                             )}
-                                            <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-0.5 flex-wrap">
+                                            <div className="flex items-center gap-4 text-[11px] text-slate-500 dark:text-slate-400 pt-0.5 flex-wrap">
                                                 {task.due_date && (
                                                     <span className="flex items-center gap-1">
-                                                        <Calendar className="w-3 h-3 text-slate-400" />
+                                                        <Calendar className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                                                         <span>Due: {task.due_date}</span>
                                                     </span>
                                                 )}
                                                 <span className="flex items-center gap-1">
-                                                    <User className="w-3 h-3 text-slate-400" />
+                                                    <User className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                                                     <span>
                                                         {task.assignee ? task.assignee.name : 'Unassigned'}
                                                         {task.is_assigned_to_me ? ' (You)' : ''}
@@ -1585,9 +1584,9 @@ export default function ActivityShow({
                                                 <button
                                                     type="button"
                                                     onClick={() => setViewingTask(task)}
-                                                    className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                                    className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 hover:text-[color:var(--primary)] transition-colors cursor-pointer"
                                                 >
-                                                    <CheckSquare className="w-3 h-3 text-slate-400" />
+                                                    <CheckSquare className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                                                     <span>
                                                         Checklist ({checklistCompleted}/{checklistCount})
                                                     </span>
@@ -1596,10 +1595,10 @@ export default function ActivityShow({
                                                     <button
                                                         type="button"
                                                         onClick={() => setViewingTask(task)}
-                                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded hover:bg-orange-100 transition-colors cursor-pointer"
+                                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/50 px-1.5 py-0.5 rounded hover:bg-orange-100 dark:hover:bg-orange-900/50 transition-colors cursor-pointer"
                                                         title="Supporting Evidence / MOV uploaded"
                                                     >
-                                                        <Paperclip className="w-3 h-3 text-orange-600" />
+                                                        <Paperclip className="w-3 h-3 text-orange-600 dark:text-orange-400" />
                                                         <span>
                                                             Evidence ({task.evidences.length})
                                                         </span>
@@ -1635,7 +1634,7 @@ export default function ActivityShow({
                                                         size="sm"
                                                         onClick={() => handleResubmitTask(task)}
                                                         disabled={taskActionProcessing}
-                                                        className="text-[11px] h-7 px-2.5 text-rose-700 border-rose-300 hover:bg-rose-50"
+                                                        className="text-[11px] h-7 px-2.5 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                                                     >
                                                         <RotateCcw className="w-3 h-3 mr-1" />
                                                         <span>Continue Work</span>
@@ -1648,7 +1647,7 @@ export default function ActivityShow({
                                                     <button
                                                         type="button"
                                                         onClick={() => handleOpenReturnTask(task)}
-                                                        className="px-2 py-1 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md transition-colors cursor-pointer"
+                                                        className="px-2 py-1 text-[11px] font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-900/40 rounded-md transition-colors cursor-pointer"
                                                     >
                                                         Return
                                                     </button>
@@ -1664,7 +1663,7 @@ export default function ActivityShow({
 
                                             {/* Awaiting Review notice for non-reviewers */}
                                             {task.status === 'Under Review' && !task.can.review && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md">
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 px-2 py-1 rounded-md">
                                                     <Clock className="w-3 h-3 text-amber-500" />
                                                     <span>Awaiting Staff Review</span>
                                                 </span>
@@ -1678,9 +1677,9 @@ export default function ActivityShow({
                                                         type="button"
                                                         onClick={() => handleTaskStatusChange(task, 'Completed')}
                                                         disabled={statusUpdatingTaskId === task.id}
-                                                        className="px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors cursor-pointer"
+                                                        className="px-2.5 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-900/40 rounded-md transition-colors cursor-pointer"
                                                     >
-                                                        <CheckCircle2 className="w-3 h-3 inline mr-1 text-emerald-600" />
+                                                        <CheckCircle2 className="w-3 h-3 inline mr-1 text-emerald-600 dark:text-emerald-400" />
                                                         <span>Mark Completed</span>
                                                     </button>
                                                 )}
@@ -1688,7 +1687,7 @@ export default function ActivityShow({
                                             <button
                                                 type="button"
                                                 onClick={() => setViewingTask(task)}
-                                                className="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                                className="px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors cursor-pointer shadow-2xs"
                                             >
                                                 Details & Checklist
                                             </button>
@@ -1696,7 +1695,7 @@ export default function ActivityShow({
                                                 <button
                                                     type="button"
                                                     onClick={() => handleOpenEditTask(task)}
-                                                    className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                                                     title="Edit Task"
                                                 >
                                                     <Edit3 className="w-4 h-4" />
@@ -1706,7 +1705,7 @@ export default function ActivityShow({
                                                 <button
                                                     type="button"
                                                     onClick={() => setDeletingTask(task)}
-                                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                                    className="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer"
                                                     title="Delete Task"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -1719,24 +1718,24 @@ export default function ActivityShow({
                                 </AnimatePresence>
                             </motion.div>
                         ) : (
-                            <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
-                                <p className="text-xs text-slate-500">
+                            <div className="py-8 px-4 text-center rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
                                     No tasks found matching the &ldquo;{taskFilter.replace('_', ' ')}&rdquo; filter.
                                 </p>
                                 <button
                                     type="button"
                                     onClick={() => setTaskFilter('all')}
-                                    className="mt-2 text-xs font-semibold text-[color:var(--color-brand-action-orange)] hover:underline cursor-pointer"
+                                    className="mt-2 text-xs font-semibold text-[color:var(--primary)] hover:underline cursor-pointer"
                                 >
                                     Clear filter
                                 </button>
                             </div>
                         )
                     ) : (
-                        <div className="p-8 rounded-xl border border-dashed border-slate-200 text-center bg-slate-50/50">
-                            <ListTodo className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                            <h4 className="text-sm font-bold text-slate-800">No Tasks Created Yet</h4>
-                            <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                        <div className="p-8 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center bg-slate-50/50 dark:bg-slate-900/30">
+                            <ListTodo className="w-10 h-10 text-slate-400 dark:text-slate-500 mx-auto mb-2" />
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Tasks Created Yet</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mt-1 leading-relaxed">
                                 Break down this activity into actionable tasks and assign them to committee members.
                             </p>
                             {activity.can.createTask && (
@@ -1771,9 +1770,9 @@ export default function ActivityShow({
                     {viewingTask && (
                         <div className="space-y-5 pt-1">
                             {/* Meta Grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800">
                                 <div className="space-y-1">
-                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                                         Status
                                     </span>
                                     {viewingTask.can.updateStatus ? (
@@ -1788,7 +1787,7 @@ export default function ActivityShow({
                                             )}`}
                                         >
                                             {getAvailableStatusOptions(viewingTask).map((opt) => (
-                                                <option key={opt} value={opt}>
+                                                <option key={opt} value={opt} className="bg-white dark:bg-[#14181F] text-slate-900 dark:text-slate-100">
                                                     {opt}
                                                 </option>
                                             ))}
@@ -1805,27 +1804,27 @@ export default function ActivityShow({
                                 </div>
 
                                 <div className="space-y-1">
-                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                                         Review Requirement
                                     </span>
                                     {viewingTask.requires_review ? (
-                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-md">
-                                            <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/50 px-2.5 py-1 rounded-md">
+                                            <Shield className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
                                             <span>Staff Review Required</span>
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center text-xs font-medium text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md">
+                                        <span className="inline-flex items-center text-xs font-medium text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-md">
                                             <span>Standard (No Review)</span>
                                         </span>
                                     )}
                                 </div>
 
                                 <div className="space-y-1">
-                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                                         Assignee
                                     </span>
-                                    <span className="text-xs font-medium text-slate-800 flex items-center gap-1.5 py-1">
-                                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span className="text-xs font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5 py-1">
+                                        <User className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                                         <span className="truncate">
                                             {viewingTask.assignee ? viewingTask.assignee.name : 'Unassigned'}
                                             {viewingTask.is_assigned_to_me ? ' (You)' : ''}
@@ -1834,11 +1833,11 @@ export default function ActivityShow({
                                 </div>
 
                                 <div className="space-y-1">
-                                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                                         Target Due Date
                                     </span>
-                                    <span className="text-xs font-medium text-slate-800 flex items-center gap-1.5 py-1">
-                                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span className="text-xs font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1.5 py-1">
+                                        <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                                         <span>{viewingTask.due_date ?? 'No deadline set'}</span>
                                     </span>
                                 </div>
@@ -1846,12 +1845,12 @@ export default function ActivityShow({
 
                             {/* Contextual Workflow Action Banners */}
                             {viewingTask.status === 'Under Review' && (
-                                <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="p-3.5 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-900/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <div className="flex items-start gap-2.5">
                                         <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                                         <div className="space-y-0.5">
-                                            <p className="text-xs font-bold text-amber-900">Task is Under Chairperson Review</p>
-                                            <p className="text-[11px] text-amber-700">
+                                            <p className="text-xs font-bold text-amber-900 dark:text-amber-200">Task is Under Chairperson Review</p>
+                                            <p className="text-[11px] text-amber-700 dark:text-amber-400">
                                                 {viewingTask.can.review
                                                     ? 'The assignee has submitted this task for verification.'
                                                     : 'Awaiting review and approval by Chairperson.'}
@@ -1864,10 +1863,10 @@ export default function ActivityShow({
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                className="text-rose-700 border-rose-300 hover:bg-rose-50 text-xs"
+                                                className="text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs"
                                                 onClick={() => handleOpenReturnTask(viewingTask)}
                                             >
-                                                <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-600" />
+                                                <AlertTriangle className="w-3.5 h-3.5 mr-1 text-rose-600 dark:text-rose-400" />
                                                 <span>Return for Revision</span>
                                             </Button>
                                             <Button
@@ -1886,12 +1885,12 @@ export default function ActivityShow({
                             )}
 
                             {viewingTask.status === 'Returned' && viewingTask.requires_review && (
-                                <div className="p-3.5 bg-rose-50 rounded-xl border border-rose-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="p-3.5 bg-rose-50 dark:bg-rose-950/20 rounded-xl border border-rose-200 dark:border-rose-900/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <div className="flex items-start gap-2.5">
                                         <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                                         <div className="space-y-0.5">
-                                            <p className="text-xs font-bold text-rose-900">Task Returned for Revision</p>
-                                            <p className="text-[11px] text-rose-700">
+                                            <p className="text-xs font-bold text-rose-900 dark:text-rose-200">Task Returned for Revision</p>
+                                            <p className="text-[11px] text-rose-700 dark:text-rose-400">
                                                 Please review staff feedback, address the requested revisions, and continue work.
                                             </p>
                                         </div>
@@ -1913,12 +1912,12 @@ export default function ActivityShow({
                             )}
 
                             {viewingTask.status === 'In Progress' && viewingTask.requires_review && (viewingTask.can.submitReview || viewingTask.is_assigned_to_me) && (
-                                <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div className="p-3.5 bg-purple-50/70 dark:bg-purple-950/20 rounded-xl border border-purple-200 dark:border-purple-900/40 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                     <div className="flex items-start gap-2.5">
                                         <Shield className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
                                         <div className="space-y-0.5">
-                                            <p className="text-xs font-bold text-purple-900">Staff Review Required</p>
-                                            <p className="text-[11px] text-purple-700">
+                                            <p className="text-xs font-bold text-purple-900 dark:text-purple-200">Staff Review Required</p>
+                                            <p className="text-[11px] text-purple-700 dark:text-purple-400">
                                                 When you finish this task, submit it for staff review instead of marking it complete directly.
                                             </p>
                                         </div>
@@ -1937,8 +1936,8 @@ export default function ActivityShow({
                             )}
 
                             {viewingTask.status === 'In Progress' && !viewingTask.requires_review && (viewingTask.can.updateStatus && viewingTask.is_assigned_to_me) && (
-                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-3">
-                                    <p className="text-xs text-slate-600">Standard task with normal completion workflow.</p>
+                                <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Standard task with normal completion workflow.</p>
                                     <Button
                                         type="button"
                                         variant="primary"
@@ -1955,22 +1954,22 @@ export default function ActivityShow({
                             {/* Task Description */}
                             {viewingTask.description && (
                                 <div className="space-y-1">
-                                    <span className="text-xs font-semibold text-slate-700">Description</span>
-                                    <p className="text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-200 leading-relaxed whitespace-pre-line">
+                                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Description</span>
+                                    <p className="text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-200 dark:border-slate-800 leading-relaxed whitespace-pre-line">
                                         {viewingTask.description}
                                     </p>
                                 </div>
                             )}
 
                             {/* Checklist Section */}
-                            <div className="space-y-3 pt-3 border-t border-slate-200">
+                            <div className="space-y-3 pt-3 border-t border-[color:var(--border)]">
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div>
-                                        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                            <CheckSquare className="w-4 h-4 text-[color:var(--color-brand-action-orange)]" />
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                            <CheckSquare className="w-4 h-4 text-[color:var(--primary)]" />
                                             <span>Task Checklist</span>
                                         </h4>
-                                        <p className="text-[11px] text-slate-500">
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                             Actionable items and deliverables to complete for this task
                                         </p>
                                     </div>
@@ -1981,14 +1980,14 @@ export default function ActivityShow({
                                             initial={{ scale: 1.15 }}
                                             animate={{ scale: 1 }}
                                             transition={{ type: 'spring', damping: 15 }}
-                                            className="text-xs font-bold text-slate-800"
+                                            className="text-xs font-bold text-slate-700 dark:text-slate-200"
                                         >
                                             {viewingTask.checklist_items?.filter((i) => i.is_completed).length ?? 0} /{' '}
                                             {viewingTask.checklist_items?.length ?? 0} completed
                                         </motion.span>
-                                        <div className="w-32 h-1.5 bg-slate-200 rounded-full mt-1 overflow-hidden">
+                                        <div className="w-32 h-1.5 bg-[color:var(--soft-surface)] rounded-full mt-1 overflow-hidden">
                                             <motion.div
-                                                className="h-full bg-[color:var(--color-brand-dark-green)] rounded-full"
+                                                className="h-full bg-emerald-500 rounded-full"
                                                 initial={{ width: 0 }}
                                                 animate={{
                                                     width: `${
@@ -2017,7 +2016,7 @@ export default function ActivityShow({
                                             variants={staggerContainer}
                                             initial="hidden"
                                             animate="visible"
-                                            className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden bg-white"
+                                            className="divide-y divide-[color:var(--border)] border border-[color:var(--border)] rounded-lg overflow-hidden bg-[color:var(--card)]"
                                         >
                                             <AnimatePresence mode="popLayout">
                                                 {viewingTask.checklist_items.map((item) => (
@@ -2027,7 +2026,7 @@ export default function ActivityShow({
                                                         layout
                                                         whileHover={{ x: 2 }}
                                                         className={`p-3 flex items-start justify-between gap-3 transition-colors ${
-                                                            item.is_completed ? 'bg-slate-50/70' : 'hover:bg-slate-50/40'
+                                                            item.is_completed ? 'bg-[color:var(--soft-surface)]/60' : 'hover:bg-[color:var(--soft-surface)]/40'
                                                         }`}
                                                     >
                                                         <div className="flex items-start gap-2.5 flex-1 min-w-0">
@@ -2039,8 +2038,8 @@ export default function ActivityShow({
                                                                 onClick={() => handleToggleChecklist(viewingTask, item)}
                                                                 className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
                                                                     item.is_completed
-                                                                        ? 'bg-[color:var(--color-brand-action-orange)] border-[color:var(--color-brand-action-orange)] text-white'
-                                                                        : 'border-slate-300 hover:border-slate-400 bg-white'
+                                                                        ? 'bg-[color:var(--primary)] border-[color:var(--primary)] text-white'
+                                                                        : 'border-[color:var(--border)] hover:border-[color:var(--muted)] bg-[color:var(--card)]'
                                                                 } ${
                                                                     viewingTask.can.manageChecklist
                                                                         ? 'cursor-pointer'
@@ -2048,9 +2047,7 @@ export default function ActivityShow({
                                                                 }`}
                                                                 title={
                                                                     viewingTask.can.manageChecklist
-                                                                        ? item.is_completed
-                                                                            ? 'Mark incomplete'
-                                                                            : 'Mark complete'
+                                                                        ? (item.is_completed ? 'Mark as incomplete' : 'Mark as complete')
                                                                         : 'Only assigned personnel, Chairperson, or Overall Chair can toggle checklist items'
                                                                 }
                                                             >
@@ -2073,7 +2070,7 @@ export default function ActivityShow({
                                                                         onChange={(e) =>
                                                                             setEditingChecklistContent(e.target.value)
                                                                         }
-                                                                        className="w-full px-2.5 py-1 text-xs border border-slate-300 rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
+                                                                        className="w-full px-2.5 py-1 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md focus:outline-none focus:ring-1 focus:ring-orange-500"
                                                                         autoFocus
                                                                         maxLength={500}
                                                                     />
@@ -2084,14 +2081,14 @@ export default function ActivityShow({
                                                                                 handleSaveEditChecklist(viewingTask, item)
                                                                             }
                                                                             disabled={checklistProcessing}
-                                                                            className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[color:var(--color-brand-action-orange)] hover:opacity-90 transition-opacity"
+                                                                            className="px-2 py-0.5 rounded text-[11px] font-semibold text-white bg-[color:var(--primary)] hover:opacity-90 transition-opacity"
                                                                         >
                                                                             Save
                                                                         </button>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => setEditingChecklistId(null)}
-                                                                            className="px-2 py-0.5 rounded text-[11px] text-slate-600 hover:bg-slate-100 transition-colors"
+                                                                            className="px-2 py-0.5 rounded text-[11px] text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                                                         >
                                                                             Cancel
                                                                         </button>
@@ -2101,8 +2098,8 @@ export default function ActivityShow({
                                                                 <span
                                                                     className={`text-xs leading-relaxed break-words flex-1 ${
                                                                         item.is_completed
-                                                                            ? 'line-through text-slate-400'
-                                                                            : 'text-slate-700'
+                                                                            ? 'line-through text-slate-400 dark:text-slate-500'
+                                                                            : 'text-slate-800 dark:text-slate-200'
                                                                     }`}
                                                                 >
                                                                     {item.content}
@@ -2119,7 +2116,7 @@ export default function ActivityShow({
                                                                             setEditingChecklistId(item.id);
                                                                             setEditingChecklistContent(item.content);
                                                                         }}
-                                                                        className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                                                        className="p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors cursor-pointer"
                                                                         title="Edit item"
                                                                     >
                                                                         <Edit3 className="w-3.5 h-3.5" />
@@ -2130,7 +2127,7 @@ export default function ActivityShow({
                                                                             handleDeleteChecklist(viewingTask, item)
                                                                         }
                                                                         disabled={checklistProcessing}
-                                                                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                                                        className="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded transition-colors cursor-pointer"
                                                                         title="Delete item"
                                                                     >
                                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -2142,7 +2139,7 @@ export default function ActivityShow({
                                             </AnimatePresence>
                                         </motion.div>
                                     ) : (
-                                        <div className="p-4 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50 text-xs text-slate-500">
+                                        <div className="p-4 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 text-center bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-500 dark:text-slate-400">
                                             No checklist items created for this task yet.
                                         </div>
                                     )}
@@ -2165,7 +2162,7 @@ export default function ActivityShow({
                                                         onChange={(e) => setNewChecklistContent(e.target.value)}
                                                         placeholder="Add a new checklist item..."
                                                         maxLength={500}
-                                                        className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
+                                                        className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-[color:var(--muted)]"
                                                     />
                                                     <Button
                                                         type="submit"
@@ -2190,19 +2187,19 @@ export default function ActivityShow({
                             </div>
 
                             {/* Evidence / MOV (Optional) Section */}
-                            <div className="space-y-3 pt-3 border-t border-slate-100">
+                            <div className="space-y-3 pt-3 border-t border-[color:var(--border)]">
                                 <div className="flex items-start justify-between">
                                     <div>
-                                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                                            <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+                                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                                            <Paperclip className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                             <span>Evidence / MOV (Optional)</span>
                                         </h4>
-                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                                             Optional supporting evidence for this task.
                                         </p>
                                     </div>
                                     {viewingTask.evidences && viewingTask.evidences.length > 0 && (
-                                        <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                                        <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700">
                                             {viewingTask.evidences.length} {viewingTask.evidences.length === 1 ? 'file' : 'files'}
                                         </span>
                                     )}
@@ -2214,10 +2211,10 @@ export default function ActivityShow({
                                         {viewingTask.evidences.map((ev) => (
                                             <div
                                                 key={ev.id}
-                                                className="p-3 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors flex items-start justify-between gap-3"
+                                                className="p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--card)] hover:border-slate-400 dark:hover:border-slate-600 transition-colors flex items-start justify-between gap-3"
                                             >
                                                 <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                                    <div className="p-2 rounded-md bg-orange-50 text-[color:var(--color-brand-action-orange)] shrink-0 mt-0.5">
+                                                    <div className="p-2 rounded-md bg-orange-50 dark:bg-orange-950/30 text-[color:var(--primary)] shrink-0 mt-0.5">
                                                         <FileText className="w-4 h-4" />
                                                     </div>
                                                     <div className="min-w-0 flex-1 space-y-1">
@@ -2226,21 +2223,21 @@ export default function ActivityShow({
                                                                 href={ev.download_url}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
-                                                                className="text-xs font-semibold text-slate-900 hover:text-[color:var(--color-brand-action-orange)] transition-colors truncate max-w-xs sm:max-w-md cursor-pointer"
+                                                                className="text-xs font-semibold text-slate-900 dark:text-slate-100 hover:text-[color:var(--primary)] transition-colors truncate max-w-xs sm:max-w-md cursor-pointer"
                                                                 title={ev.original_name}
                                                             >
                                                                 {ev.original_name}
                                                             </a>
-                                                            <span className="text-[10px] font-medium text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                                            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-1.5 py-0.5 rounded">
                                                                 {ev.file_size_formatted}
                                                             </span>
                                                         </div>
                                                         {ev.remarks && (
-                                                            <p className="text-[11px] text-slate-600 italic">
+                                                            <p className="text-[11px] text-slate-600 dark:text-slate-300 italic">
                                                                 "{ev.remarks}"
                                                             </p>
                                                         )}
-                                                        <div className="flex items-center gap-3 text-[10px] text-slate-400 flex-wrap">
+                                                        <div className="flex items-center gap-3 text-[10px] text-slate-400 dark:text-slate-500 flex-wrap">
                                                             {ev.uploader && (
                                                                 <span className="flex items-center gap-1">
                                                                     <User className="w-3 h-3" />
@@ -2262,7 +2259,7 @@ export default function ActivityShow({
                                                         href={ev.download_url}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors cursor-pointer"
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors cursor-pointer"
                                                         title="Download / View evidence file"
                                                     >
                                                         <Download className="w-3 h-3" />
@@ -2272,7 +2269,7 @@ export default function ActivityShow({
                                                         <button
                                                             type="button"
                                                             onClick={() => setDeletingEvidence({ task: viewingTask, evidence: ev })}
-                                                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                                            className="p-1 text-slate-400 dark:text-slate-500 hover:text-rose-600 rounded transition-colors cursor-pointer"
                                                             title="Delete evidence"
                                                         >
                                                             <Trash2 className="w-3.5 h-3.5" />
@@ -2283,7 +2280,7 @@ export default function ActivityShow({
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="p-4 rounded-lg border border-dashed border-slate-200 text-center bg-slate-50/50 text-xs text-slate-500">
+                                    <div className="p-4 rounded-lg border border-dashed border-slate-200 dark:border-slate-800 text-center bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-500 dark:text-slate-400">
                                         No evidence uploaded yet.
                                     </div>
                                 )}
@@ -2292,10 +2289,10 @@ export default function ActivityShow({
                                 {viewingTask.can.uploadEvidence && (
                                     <form
                                         onSubmit={(e) => handleUploadEvidence(e, viewingTask)}
-                                        className="pt-2 border-t border-slate-100 space-y-2"
+                                        className="pt-2 border-t border-[color:var(--border)] space-y-2"
                                     >
                                         <div className="space-y-1">
-                                            <label className="block text-[11px] font-semibold text-slate-700">
+                                            <label className="block text-[11px] font-semibold text-[color:var(--text)]">
                                                 Upload Supporting Evidence (Optional)
                                             </label>
                                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -2306,7 +2303,7 @@ export default function ActivityShow({
                                                         setEvidenceFile(e.target.files?.[0] ?? null);
                                                         setEvidenceError(null);
                                                     }}
-                                                    className="text-xs file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-[color:var(--color-brand-action-orange)] hover:file:bg-orange-100 text-slate-500 cursor-pointer"
+                                                    className="text-xs file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 dark:file:bg-orange-950/30 file:text-[color:var(--primary)] hover:file:bg-orange-100 text-slate-500 dark:text-slate-400 cursor-pointer"
                                                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt,.xls,.xlsx,.zip"
                                                 />
                                                 <input
@@ -2315,7 +2312,7 @@ export default function ActivityShow({
                                                     onChange={(e) => setEvidenceRemarks(e.target.value)}
                                                     placeholder="Remarks or notes (optional)"
                                                     maxLength={500}
-                                                    className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400"
+                                                    className="flex-1 px-3 py-1.5 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-lg shadow-2xs focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                                 />
                                                 <Button
                                                     type="submit"
@@ -2348,7 +2345,7 @@ export default function ActivityShow({
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-between">
                                 <div>
                                     {viewingTask.can.delete && (
                                         <button
@@ -2408,19 +2405,19 @@ export default function ActivityShow({
                                 rows={4}
                                 value={submitData.submission_notes}
                                 onChange={(e) => setSubmitData('submission_notes', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="Explain completed work, relevant links, or notes for the reviewer..."
                             />
                             <InputError message={submitErrors.submission_notes} />
                         </div>
 
-                        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
+                        <div className="p-3 bg-[color:var(--soft-surface)] rounded-lg border border-[color:var(--border)] text-xs text-slate-600 dark:text-slate-400">
                             <p>
-                                Submitting will change the deliverable status to <span className="font-semibold text-amber-700">Under Review</span>. Your committee chairperson will be notified to review the completed tasks.
+                                Submitting will change the deliverable status to <span className="font-semibold text-amber-700 dark:text-amber-400">Under Review</span>. Your committee chairperson will be notified to review the completed tasks.
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2451,14 +2448,14 @@ export default function ActivityShow({
                     maxWidth="md"
                 >
                     <form onSubmit={handleReviewSubmit} className="space-y-4 pt-1">
-                        <div className="p-3.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
                             <p className="font-semibold">Confirm Deliverable Completion</p>
                             <p>
                                 Marking this deliverable as Completed verifies that all required tasks have been reviewed. Task completion states will remain preserved.
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2500,20 +2497,20 @@ export default function ActivityShow({
                                 rows={4}
                                 value={reviewData.review_feedback}
                                 onChange={(e) => setReviewData('review_feedback', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="Specify what adjustments or missing items need to be resolved..."
                                 required
                             />
                             <InputError message={reviewErrors.review_feedback} />
                         </div>
 
-                        <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-800">
+                        <div className="p-3 bg-rose-50 dark:bg-rose-950/20 rounded-lg border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300">
                             <p>
-                                This activity will be returned to committee members with status <span className="font-semibold text-rose-700">Returned for Revision</span> so they can update their work and resubmit.
+                                This activity will be returned to committee members with status <span className="font-semibold text-rose-700 dark:text-rose-400">Returned for Revision</span> so they can update their work and resubmit.
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2564,7 +2561,7 @@ export default function ActivityShow({
                                 rows={3}
                                 value={taskData.description}
                                 onChange={(e) => setTaskData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="Details or instructions for the assignee..."
                             />
                             <InputError message={taskErrors.description} />
@@ -2592,7 +2589,7 @@ export default function ActivityShow({
                                             e.target.value as TaskStatus
                                         )
                                     }
-                                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                    className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors cursor-pointer"
                                 >
                                     <option value="To Do">To Do</option>
                                     <option value="In Progress">In Progress</option>
@@ -2604,6 +2601,15 @@ export default function ActivityShow({
                             </div>
                         </div>
 
+                        <TaskAssigneeDeliberationPanel
+                            projectId={project.id}
+                            committeeId={committee.id}
+                            taskTitle={taskData.title}
+                            taskDescription={taskData.description}
+                            selectedUserId={taskData.assigned_to}
+                            onSelectAssignee={(userId) => setTaskData('assigned_to', userId)}
+                        />
+
                         <div className="space-y-1.5">
                             <Label htmlFor="create-task-assignee">Assignee (Optional)</Label>
                             <select
@@ -2611,7 +2617,7 @@ export default function ActivityShow({
                                 name="assigned_to"
                                 value={taskData.assigned_to}
                                 onChange={(e) => setTaskData('assigned_to', e.target.value)}
-                                className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors cursor-pointer"
                             >
                                 <option value="">-- Unassigned --</option>
                                 {eligibleAssignees.map((assignee) => (
@@ -2624,26 +2630,26 @@ export default function ActivityShow({
                         </div>
 
                         {/* Requires Staff Review */}
-                        <div className="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 bg-slate-50/50">
+                        <div className="flex items-start gap-2.5 p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--soft-surface)]/40">
                             <input
                                 id="create-task-requires-review"
                                 name="requires_review"
                                 type="checkbox"
                                 checked={taskData.requires_review}
                                 onChange={(e) => setTaskData('requires_review', e.target.checked)}
-                                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[color:var(--color-brand-action-orange)] focus:ring-[color:var(--color-brand-action-orange)] cursor-pointer"
+                                className="mt-0.5 h-4 w-4 rounded border-[color:var(--border)] text-[color:var(--primary)] focus:ring-[color:var(--primary)] cursor-pointer"
                             />
                             <div className="space-y-0.5">
-                                <Label htmlFor="create-task-requires-review" className="cursor-pointer font-medium text-slate-800">
+                                <Label htmlFor="create-task-requires-review" className="cursor-pointer font-medium text-slate-900 dark:text-slate-100">
                                     Requires Chairperson Review
                                 </Label>
-                                <p className="text-[11px] text-slate-500 leading-normal">
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
                                     When enabled, this task must be submitted to Chairperson for review before it can be completed.
                                 </p>
                             </div>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2691,7 +2697,7 @@ export default function ActivityShow({
                                 rows={3}
                                 value={editTaskData.description}
                                 onChange={(e) => setEditTaskData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                             />
                             <InputError message={editTaskErrors.description} />
                         </div>
@@ -2718,7 +2724,7 @@ export default function ActivityShow({
                                             e.target.value as TaskStatus
                                         )
                                     }
-                                    className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                    className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors cursor-pointer"
                                 >
                                     <option value="To Do">To Do</option>
                                     <option value="In Progress">In Progress</option>
@@ -2737,7 +2743,7 @@ export default function ActivityShow({
                                 name="assigned_to"
                                 value={editTaskData.assigned_to}
                                 onChange={(e) => setEditTaskData('assigned_to', e.target.value)}
-                                className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                className="w-full px-3 py-2 text-xs bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors cursor-pointer"
                             >
                                 <option value="">-- Unassigned --</option>
                                 {eligibleAssignees.map((assignee) => (
@@ -2751,27 +2757,27 @@ export default function ActivityShow({
 
                         {/* Requires Staff Review (Staff / Leader only) */}
                         {editingTask?.can.delete && (
-                            <div className="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200 bg-slate-50/50">
+                            <div className="flex items-start gap-2.5 p-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--soft-surface)]/40">
                                 <input
                                     id="edit-task-requires-review"
                                     name="requires_review"
                                     type="checkbox"
                                     checked={editTaskData.requires_review}
                                     onChange={(e) => setEditTaskData('requires_review', e.target.checked)}
-                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[color:var(--color-brand-action-orange)] focus:ring-[color:var(--color-brand-action-orange)] cursor-pointer"
+                                    className="mt-0.5 h-4 w-4 rounded border-[color:var(--border)] text-[color:var(--primary)] focus:ring-[color:var(--primary)] cursor-pointer"
                                 />
                                 <div className="space-y-0.5">
-                                    <Label htmlFor="edit-task-requires-review" className="cursor-pointer font-medium text-slate-800">
+                                    <Label htmlFor="edit-task-requires-review" className="cursor-pointer font-medium text-slate-900 dark:text-slate-100">
                                         Requires Chairperson Review
                                     </Label>
-                                    <p className="text-[11px] text-slate-500 leading-normal">
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
                                         When enabled, this task must be submitted to Chairperson for review before it can be completed.
                                     </p>
                                 </div>
                             </div>
                         )}
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2801,10 +2807,10 @@ export default function ActivityShow({
                     maxWidth="md"
                 >
                     <div className="space-y-4 pt-1">
-                        <p className="text-xs text-slate-600">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
                             This task will be permanently removed from this activity. This action cannot be undone.
                         </p>
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2853,7 +2859,7 @@ export default function ActivityShow({
                                 rows={3}
                                 value={editActivityData.description}
                                 onChange={(e) => setEditActivityData('description', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                             />
                             <InputError message={editActivityErrors.description} />
                         </div>
@@ -2890,7 +2896,7 @@ export default function ActivityShow({
                                         e.target.value as ActivityData['status']
                                     )
                                 }
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors cursor-pointer"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors cursor-pointer"
                             >
                                 <option value="To Do">To Do</option>
                                 <option value="In Progress">In Progress</option>
@@ -2901,7 +2907,7 @@ export default function ActivityShow({
                             <InputError message={editActivityErrors.status} />
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2931,13 +2937,13 @@ export default function ActivityShow({
                     maxWidth="md"
                 >
                     <div className="space-y-4 pt-1">
-                        <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
-                            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300 flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                             <p>
                                 Deleting this deliverable will permanently remove all associated tasks ({activity.tasks.length}). This action cannot be undone.
                             </p>
                         </div>
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -2976,7 +2982,7 @@ export default function ActivityShow({
                                 rows={4}
                                 value={submittingTaskNotes}
                                 onChange={(e) => setSubmittingTaskNotes(e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--primary)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="Explain completed work, deliverables, or notes for the reviewer..."
                             />
                             {taskActionError && (
@@ -2984,13 +2990,13 @@ export default function ActivityShow({
                             )}
                         </div>
 
-                        <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-xs text-purple-800">
+                        <div className="p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-900/40 text-xs text-purple-800 dark:text-purple-300">
                             <p>
-                                Submitting will transition this task to <span className="font-semibold text-purple-900">Under Review</span>. The Chairperson will review your submission and either approve it or return it for revision.
+                                Submitting will transition this task to <span className="font-semibold text-purple-900 dark:text-purple-200">Under Review</span>. The Chairperson will review your submission and either approve it or return it for revision.
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -3021,10 +3027,10 @@ export default function ActivityShow({
                     maxWidth="md"
                 >
                     <form onSubmit={handleApproveTask} className="space-y-4 pt-1">
-                        <div className="p-3.5 bg-emerald-50 rounded-lg border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-emerald-200 dark:border-emerald-900/40 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
                             <p className="font-semibold">Confirm Task Approval</p>
                             <p>
-                                Approving this task confirms that all deliverables and checklist items have been verified. The task status will transition to <span className="font-semibold text-emerald-900">Completed</span>.
+                                Approving this task confirms that all deliverables and checklist items have been verified. The task status will transition to <span className="font-semibold text-emerald-900 dark:text-emerald-200">Completed</span>.
                             </p>
                         </div>
 
@@ -3032,7 +3038,7 @@ export default function ActivityShow({
                             <p className="text-xs text-rose-600 font-medium">{taskActionError}</p>
                         )}
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -3074,7 +3080,7 @@ export default function ActivityShow({
                                 rows={4}
                                 value={returningTaskFeedback}
                                 onChange={(e) => setReturningTaskFeedback(e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400"
+                                className="w-full px-3 py-2 text-sm bg-[color:var(--card)] border border-[color:var(--border)] text-[color:var(--text)] rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500"
                                 placeholder="Specify what adjustments, corrections, or missing items need to be resolved..."
                                 required
                             />
@@ -3083,13 +3089,13 @@ export default function ActivityShow({
                             )}
                         </div>
 
-                        <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-800">
+                        <div className="p-3 bg-rose-50 dark:bg-rose-950/20 rounded-lg border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300">
                             <p>
-                                This task will be returned to the assignee with status <span className="font-semibold text-rose-700">Returned</span>. They can continue work, make changes, and resubmit for review.
+                                This task will be returned to the assignee with status <span className="font-semibold text-rose-700 dark:text-rose-400">Returned</span>. They can continue work, make changes, and resubmit for review.
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -3120,13 +3126,13 @@ export default function ActivityShow({
                     maxWidth="sm"
                 >
                     <div className="space-y-4 pt-1">
-                        <div className="p-3 bg-rose-50 rounded-lg border border-rose-200 text-xs text-rose-800">
+                        <div className="p-3 bg-rose-50 dark:bg-rose-950/20 rounded-lg border border-rose-200 dark:border-rose-900/40 text-xs text-rose-800 dark:text-rose-300">
                             <p>
                                 Deleting this file will permanently remove the uploaded evidence from this task.
                             </p>
                         </div>
 
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                        <div className="pt-3 border-t border-[color:var(--border)] flex items-center justify-end gap-2.5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -3156,28 +3162,28 @@ export default function ActivityShow({
                 >
                     <form onSubmit={handleSendReminderSubmit} className="space-y-4 pt-1">
                         {/* Activity Context Card */}
-                        <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                        <div className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                                 Deliverable
                             </span>
-                            <p className="text-sm font-bold text-slate-900 mt-1">
+                            <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">
                                 {activity.title}
                             </p>
                         </div>
 
                         {/* Recipient Scope Explanation */}
-                        <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100">
-                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                        <div className="p-3.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
                                 Recipients
                             </span>
-                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
                                 This reminder will be sent to personnel assigned to tasks under this deliverable.
                             </p>
                         </div>
 
                         {/* Optional Message Field */}
                         <div className="space-y-1.5">
-                            <Label htmlFor="activity-reminder-message" className="text-xs font-semibold text-slate-700">
+                            <Label htmlFor="activity-reminder-message" className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                                 Optional Message
                             </Label>
                             <textarea
@@ -3188,7 +3194,7 @@ export default function ActivityShow({
                                 onChange={(e) => setReminderData('message', e.target.value)}
                                 disabled={reminderProcessing}
                                 maxLength={2000}
-                                className="w-full px-3 py-2.5 text-sm bg-white border border-slate-300 rounded-xl shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 disabled:opacity-60 disabled:bg-slate-50 resize-y"
+                                className="w-full px-3 py-2.5 text-sm bg-white dark:bg-[#14181F] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-xl shadow-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[color:var(--color-brand-action-orange)] transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-60 disabled:bg-slate-50 dark:disabled:bg-slate-900/40 resize-y"
                                 placeholder="Add a message for the assigned personnel (optional)"
                             />
                             {reminderErrors.message && (

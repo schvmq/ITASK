@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/Components/Button';
 import { Badge } from '@/Components/Badge';
+import { TaskAssigneeDeliberationPanel } from '@/Components/TaskAssigneeDeliberationPanel';
 
 export interface AssigneeOption {
     id: number;
@@ -298,6 +299,16 @@ export function CreateProjectTaskModal({
                             </div>
                         )}
                     </div>
+
+                    {/* AI Deliberation Panel (Strengths, Questionnaire & CV) */}
+                    <TaskAssigneeDeliberationPanel
+                        projectId={projectId}
+                        committeeId={data.committee_id}
+                        taskTitle={data.title}
+                        taskDescription={data.description}
+                        selectedUserId={data.assigned_to}
+                        onSelectAssignee={(userId) => setData('assigned_to', userId)}
+                    />
 
                     {/* Assignee & Due Date Row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

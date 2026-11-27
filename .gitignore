@@ -3,6 +3,8 @@
 .env
 .env.backup
 .env.production
+.env.testing
+.env.*.local
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -25,3 +27,9 @@ storage/pail
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Ephemeral AI execution scratch & diff packages (NEVER commit)
+.superpowers/
+.worktrees/
+.claude/
+*.tmp

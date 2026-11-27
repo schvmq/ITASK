@@ -43,7 +43,7 @@ import { Pagination } from '@/Components/Pagination';
 import { EmptyState } from '@/Components/EmptyState';
 import { ProjectRoleBadge } from '@/Components/ProjectRoleBadge';
 import { JoinProjectModal } from '@/Components/JoinProjectModal';
-import { getProgressBarGradient } from '@/lib/progress';
+import { getProgressBarGradient, calculateProgressPercentage } from '@/lib/progress';
 import { Avatar, AvatarFallback } from '@/Components/ui/avatar';
 
 interface DashboardPageProps {
@@ -356,7 +356,7 @@ export default function Welcome({
 
     const completedTasksCount = computedCompletedTasks.length;
     const totalTasksCount = assignedTasks.length;
-    const percentDone = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 100;
+    const percentDone = calculateProgressPercentage(completedTasksCount, totalTasksCount);
 
     // ── Tasks Ordered by Strict Hierarchy of Importance ──
     // Tier 1: Overdue -> Tier 2: Revision Required -> Tier 3: Due Today -> Tier 4: In Review -> Tier 5: Due Soon -> Tier 6: Other Active -> Tier 7: Completed
@@ -409,8 +409,8 @@ export default function Welcome({
     const totalProjects = filteredProjects.length;
     const totalPages = Math.max(1, Math.ceil(totalProjects / pageSize));
 
-    // Handle shrinking last page after deletions/filter changes, allowing navigation across tabs 1..5
-    const safePage = Math.min(currentPage, Math.max(5, totalPages));
+    // Handle shrinking last page after deletions/filter changes, bounded by actual total pages with data
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
     const paginatedProjects = useMemo(() => {
         const startIndex = (safePage - 1) * pageSize;
         return filteredProjects.slice(startIndex, startIndex + pageSize);
@@ -941,7 +941,7 @@ export default function Welcome({
                                             transition={{ type: 'spring', damping: 15 }}
                                             className="text-[16px] font-bold text-[color:var(--text)] tabular-nums block inline-block"
                                         >
-                                            {percentDone}% done
+                                            {totalTasksCount === 0 ? '0%' : `${percentDone}% done`}
                                         </motion.span>
                                         <span className="text-[11px] font-medium text-[color:var(--muted)] tabular-nums">
                                             {completedTasksCount} of {totalTasksCount} completed
@@ -952,7 +952,7 @@ export default function Welcome({
                                 {/* ── Dynamic Progress Bar (10-30% Red, 40-70% Yellow, Green Complete) ── */}
                                 <div className="space-y-1.5">
                                     {(() => {
-                                        const overallStyles = getProgressBarGradient(percentDone, percentDone >= 100);
+                                        const overallStyles = getProgressBarGradient(percentDone, totalTasksCount > 0 && percentDone >= 100);
                                         return (
                                             <div className="w-full h-3 rounded-full bg-[color:var(--soft-surface)] border border-[color:var(--border)] overflow-hidden shadow-inner p-[1px]">
                                                 <motion.div

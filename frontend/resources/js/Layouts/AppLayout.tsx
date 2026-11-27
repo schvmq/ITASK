@@ -31,6 +31,8 @@ import {
     Check,
     ShieldCheck,
     Settings,
+    UserCheck,
+    Sparkles,
 } from 'lucide-react';
 
 import {
@@ -130,15 +132,15 @@ function SidebarNavItem({
 }: SidebarNavItemProps) {
     const Icon = item.icon;
 
-    // Active item marked by soft background and a primary left marker
+    // Active item marked by soft surface tint, 1px hairline, and Warm Ember icon
     const activeClass =
-        'bg-[color:var(--soft-surface)] text-[color:var(--text)] font-semibold border-l-4 border-l-[color:var(--primary)]';
+        'bg-[color:var(--status-primary-bg)] text-[color:var(--text)] font-semibold border border-[color:var(--status-primary-border)]';
     const inactiveClass =
-        'text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] font-medium border-l-4 border-l-transparent';
+        'text-[color:var(--muted)] hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] font-medium border border-transparent';
 
     const baseClass = isCollapsed
         ? 'group relative flex items-center justify-center w-10 h-10 mx-auto rounded-[8px] transition-colors duration-150 cursor-pointer'
-        : 'group relative flex items-center gap-3 px-3 py-2 rounded-r-[8px] text-[14px] transition-colors duration-150 w-full cursor-pointer';
+        : 'group relative flex items-center gap-3 px-3 py-2 min-h-[44px] md:min-h-[38px] rounded-[8px] text-[14px] transition-colors duration-150 w-full cursor-pointer';
 
     const linkContent = (
         <Link
@@ -150,11 +152,10 @@ function SidebarNavItem({
         >
             <div className="relative shrink-0 flex items-center justify-center">
                 <Icon
-                    className={`w-[18px] h-[18px] shrink-0 stroke-[2px] transition-colors ${
-                        isActive
-                            ? 'text-[color:var(--primary)]'
-                            : 'text-[color:var(--muted)] group-hover:text-[color:var(--text)]'
-                    }`}
+                    className={`w-[18px] h-[18px] shrink-0 stroke-[2px] transition-colors ${isActive
+                        ? 'text-[color:var(--primary)]'
+                        : 'text-[color:var(--muted)] group-hover:text-[color:var(--text)]'
+                        }`}
                 />
                 {isHighlighted && !isActive && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[color:var(--primary)] ring-2 ring-[color:var(--card)]" />
@@ -174,11 +175,10 @@ function SidebarNavItem({
 
             {!isCollapsed && badgeCount !== undefined && badgeCount > 0 && (
                 <span
-                    className={`px-1.5 py-0.5 text-[11px] font-semibold rounded-full tabular-nums shrink-0 ${
-                        isUrgent
-                            ? 'bg-[color:var(--status-danger-bg)] text-[color:var(--primary)] border border-[color:var(--status-danger-border)]'
-                            : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)]'
-                    }`}
+                    className={`px-1.5 py-0.5 text-[11px] font-semibold rounded-full tabular-nums shrink-0 ${isUrgent
+                        ? 'bg-[color:var(--status-danger-bg)] text-[color:var(--primary)] border border-[color:var(--status-danger-border)]'
+                        : 'bg-[color:var(--soft-surface)] text-[color:var(--muted)] border border-[color:var(--border)]'
+                        }`}
                 >
                     {badgeCount}
                 </span>
@@ -257,9 +257,8 @@ function SidebarContent({
         <div className="flex flex-col h-full bg-[color:var(--card)] border-r border-[color:var(--border)] select-none">
             {/* ── Brand Header (Flat, no gradients) ── */}
             <div
-                className={`h-16 border-b border-[color:var(--border)] flex items-center shrink-0 ${
-                    isCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'
-                }`}
+                className={`h-16 border-b border-[color:var(--border)] flex items-center shrink-0 ${isCollapsed ? 'px-2 justify-center' : 'px-4 justify-between'
+                    }`}
             >
                 {!isCollapsed ? (
                     <>
@@ -271,14 +270,9 @@ function SidebarContent({
                             <div className="w-8 h-8 rounded-[8px] bg-[color:var(--primary)] flex items-center justify-center shrink-0 text-white shadow-2xs">
                                 <CheckSquare className="w-4 h-4 stroke-[2px]" />
                             </div>
-                            <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-[16px] tracking-tight text-[color:var(--text)] block leading-none">
-                                    ITASK
-                                </span>
-                                <span className="text-[11px] text-[color:var(--muted)] font-normal mt-0.5 truncate">
-                                    {isAdmin ? 'System Admin' : formatRole(userRole)}
-                                </span>
-                            </div>
+                            <span className="font-bold text-[16px] tracking-tight text-[color:var(--text)] block leading-none">
+                                ITASK
+                            </span>
                         </Link>
                         {onToggleCollapse && (
                             <motion.button
@@ -327,19 +321,28 @@ function SidebarContent({
                 {/* Main Links */}
                 <nav className="space-y-0.5" aria-label="Main Navigation">
                     {navItems.map((item) => {
+                        const currentPathname = currentPage.split('?')[0];
                         const isMessages = item.name === 'Messages' || item.name.includes('Messages');
                         const isNotifications = item.name === 'Notifications';
                         const isDashboard = item.name === 'Home' || item.name === 'Dashboard' || item.href === '/dashboard' || item.name === 'Dashboard Overview';
+                        const isEligibility = item.href === '/eligibility-profile';
+                        const isEvents = item.href === '/projects';
                         const isActive =
                             item.href.includes('?')
-                                ? currentPage === item.href
+                                ? currentPage === item.href || currentPage.startsWith(`${item.href}&`)
                                 : item.exact || isDashboard
-                                ? currentPage === item.href || (isDashboard && (currentPage === '/' || currentPage === '/dashboard')) || (item.href === '/admin/dashboard' && currentPage.startsWith('/admin/dashboard') && !currentPage.includes('tab='))
-                                : isMessages
-                                ? currentPage.startsWith('/messages') || currentPage.startsWith('/chat')
-                                : isNotifications
-                                ? currentPage.startsWith('/notifications')
-                                : currentPage === item.href || currentPage.startsWith(`${item.href}/`);
+                                    ? currentPathname === item.href ||
+                                    (isDashboard && (currentPathname === '/' || currentPathname === '/dashboard')) ||
+                                    (item.href === '/admin/dashboard' && currentPathname.startsWith('/admin/dashboard') && !currentPage.includes('tab='))
+                                    : isMessages
+                                        ? currentPathname.startsWith('/messages') || currentPathname.startsWith('/chat')
+                                        : isNotifications
+                                            ? currentPathname.startsWith('/notifications')
+                                            : isEligibility
+                                                ? currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/')
+                                                : isEvents
+                                                    ? currentPathname === '/projects' || currentPathname === '/projects/smart-import' || currentPathname.startsWith('/projects/')
+                                                    : currentPathname === item.href || currentPathname.startsWith(`${item.href}/`);
 
                         let badgeCount: number | undefined;
                         let isUrgent = false;
@@ -380,21 +383,24 @@ function SidebarContent({
                 {/* ── Favorites Section (Section 4 requirement) ── */}
                 {!isCollapsed && !isAdmin && (
                     <div className="pt-2 border-t border-[color:var(--border)]">
-                        <div
+                        <button
+                            type="button"
                             onClick={() => setShowFavorites(!showFavorites)}
-                            className="flex items-center justify-between px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)] cursor-pointer hover:text-[color:var(--text)] select-none"
+                            aria-expanded={showFavorites}
+                            aria-controls="sidebar-favorites-list"
+                            className="w-full flex items-center justify-between px-3 py-1.5 min-h-[44px] md:min-h-[32px] rounded-[6px] text-[11px] font-semibold uppercase tracking-wider text-[color:var(--muted)] cursor-pointer hover:text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors select-none focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
                         >
                             <span className="flex items-center gap-1.5">
                                 <Star className="w-3 h-3 stroke-[2px]" />
                                 Favorites
                             </span>
                             <ChevronDown className={`w-3 h-3 stroke-[2px] transition-transform ${showFavorites ? '' : '-rotate-90'}`} />
-                        </div>
+                        </button>
 
                         {showFavorites && (
-                            <div className="mt-1 space-y-0.5">
+                            <div id="sidebar-favorites-list" className="mt-1 space-y-0.5">
                                 {pinnedProjects.length === 0 ? (
-                                    <div className="px-3 py-2 text-[12px] text-[color:var(--muted)] italic bg-[color:var(--soft-surface)] rounded-[6px] border border-[color:var(--border)] text-center">
+                                    <div className="px-3 py-2 text-[12px] text-[color:var(--text)]/70 italic bg-[color:var(--soft-surface)] rounded-[6px] border border-[color:var(--border)] text-center">
                                         No favorites yet
                                     </div>
                                 ) : (
@@ -403,7 +409,7 @@ function SidebarContent({
                                             key={p.id}
                                             href={`/projects/${p.id}`}
                                             onClick={onNavClick}
-                                            className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] text-[13px] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors truncate"
+                                            className="flex items-center gap-2 px-3 py-1.5 min-h-[44px] md:min-h-[32px] rounded-[6px] text-[13px] text-[color:var(--text)] hover:bg-[color:var(--soft-surface)] transition-colors truncate"
                                         >
                                             <FolderOpen className="w-3.5 h-3.5 text-[color:var(--secondary)] shrink-0 stroke-[2px]" />
                                             <span className="truncate">{p.title}</span>
@@ -489,7 +495,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     } | undefined>(undefined);
 
     useEffect(() => {
-
         const handleOpenCreateProject = (e: Event) => {
             if (isAdmin) return; // Admins cannot create projects
             const customEvent = e as CustomEvent;
@@ -505,16 +510,24 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         const handleOpenCommandPalette = () => {
             setIsCommandPaletteOpen(true);
         };
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                setIsCommandPaletteOpen((prev) => !prev);
+            }
+        };
 
         window.addEventListener('itask:open-create-project', handleOpenCreateProject);
         window.addEventListener('itask:open-create-committee', handleOpenCreateCommittee);
         window.addEventListener('itask:open-create-task', handleOpenCreateTask);
         window.addEventListener('itask:open-command-palette', handleOpenCommandPalette);
+        window.addEventListener('keydown', handleGlobalKeyDown);
         return () => {
             window.removeEventListener('itask:open-create-project', handleOpenCreateProject);
             window.removeEventListener('itask:open-create-committee', handleOpenCreateCommittee);
             window.removeEventListener('itask:open-create-task', handleOpenCreateTask);
             window.removeEventListener('itask:open-command-palette', handleOpenCommandPalette);
+            window.removeEventListener('keydown', handleGlobalKeyDown);
         };
     }, [isAdmin]);
 
@@ -548,6 +561,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     const currentPath = typeof window !== 'undefined'
         ? window.location.pathname + window.location.search
         : url || '/dashboard';
+    const currentPathname = currentPath.split('?')[0];
     const transitionKey = pageKey ?? currentPath;
 
     const handleLogout = () => {
@@ -564,11 +578,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
     return (
         <div className="min-h-screen flex bg-[color:var(--background)] text-[color:var(--text)] antialiased">
+            <a
+                href="#main-content"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:min-h-[44px] focus:inline-flex focus:items-center focus:rounded-[8px] focus:bg-[color:var(--primary-btn-active)] focus:text-white focus:font-semibold focus:text-sm"
+            >
+                Skip to main content
+            </a>
+
             {/* ══ Desktop / Tablet Sidebar (Hidden on mobile < 768px) ════════ */}
             <aside
-                className={`hidden md:flex md:flex-col shrink-0 fixed inset-y-0 left-0 z-30 transition-all duration-200 ease-in-out border-r border-[color:var(--border)] ${
-                    isCollapsed ? 'w-[72px]' : 'w-64'
-                }`}
+                aria-label="Primary sidebar"
+                className={`hidden md:flex md:flex-col shrink-0 fixed inset-y-0 left-0 z-30 transition-all duration-200 ease-in-out border-r border-[color:var(--border)] ${isCollapsed ? 'w-[72px]' : 'w-64'
+                    }`}
             >
                 <SidebarContent
                     currentPage={currentPath}
@@ -588,14 +609,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
             {/* ══ Main Shell Area (Offset for sidebar on >= 768px) ═════════ */}
             <div
-                className={`flex flex-col min-w-0 w-full transition-all duration-200 ease-in-out ${
-                    isCollapsed ? 'md:pl-[72px]' : 'md:pl-64'
-                }`}
+                className={`flex flex-col min-w-0 w-full transition-all duration-200 ease-in-out ${isCollapsed ? 'md:pl-[72px]' : 'md:pl-64'
+                    }`}
             >
                 {/* ── Sticky Top Bar (Section 2 & Section 4 requirement) ── */}
-                <header className="h-14 px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
-                    {/* Left: Mobile Drawer Trigger */}
-                    <div className="flex items-center gap-2.5 min-w-0">
+                <header className="h-14 px-4 sm:px-6 border-b border-[color:var(--border)] flex items-center justify-between gap-2 bg-[color:var(--card)] shrink-0 sticky top-0 z-20">
+                    {/* Left: Mobile Drawer Trigger & Global Quick Search */}
+                    <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
                             <SheetTrigger asChild>
                                 <motion.button
@@ -628,6 +648,23 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                 />
                             </SheetContent>
                         </Sheet>
+
+                        <button
+                            type="button"
+                            onClick={() => setIsCommandPaletteOpen(true)}
+                            className="inline-flex items-center gap-2 px-2.5 sm:px-3 py-1.5 min-h-[44px] md:min-h-[38px] sm:min-w-[220px] rounded-[8px] border border-[color:var(--border)] bg-[color:var(--soft-surface)] hover:border-[color:var(--primary)] text-[13px] text-[color:var(--text)]/80 hover:text-[color:var(--text)] transition-colors cursor-pointer focus-visible:outline-3 focus-visible:outline-[color:var(--primary)] focus-visible:outline-offset-2"
+                            aria-label="Search or jump to page or action (Ctrl+K)"
+                        >
+                            <Search className="w-4 h-4 shrink-0 text-[color:var(--muted)]" />
+                            <span className="hidden sm:inline flex-1 text-left">Jump to page or action...</span>
+                            <span className="sm:hidden">Search</span>
+                            <kbd
+                                aria-hidden="true"
+                                className="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[color:var(--card)] border border-[color:var(--border)] rounded text-[color:var(--muted)]"
+                            >
+                                Ctrl+K
+                            </kbd>
+                        </button>
                     </div>
 
                     {/* Right: Current Role Label, Theme Toggle, Notifications, User Identity Badge */}
@@ -733,20 +770,57 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                                         <>
                                             <DropdownMenuItem
                                                 onClick={() => router.visit('/my-tasks')}
-                                                className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/my-tasks' || currentPathname.startsWith('/my-tasks/')
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
                                             >
-                                                <CheckSquare className="w-3.5 h-3.5 mr-2 stroke-[2px]" />
+                                                <CheckSquare className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/my-tasks' ? 'text-[color:var(--primary)]' : ''}`} />
                                                 My Tasks
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onClick={() => router.visit('/projects')}
-                                                className="text-[13px] font-medium text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px]"
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/projects'
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
                                             >
-                                                <FolderOpen className="w-3.5 h-3.5 mr-2 stroke-[2px]" />
+                                                <FolderOpen className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/projects' ? 'text-[color:var(--primary)]' : ''}`} />
                                                 Events
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => router.visit('/eligibility-profile')}
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/')
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
+                                            >
+                                                <UserCheck className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/eligibility-profile' || currentPathname.startsWith('/eligibility-profile/') ? 'text-[color:var(--primary)]' : ''}`} />
+                                                Eligibility & Strengths
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => router.visit('/projects/smart-import')}
+                                                className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${currentPathname === '/projects/smart-import'
+                                                    ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                    : 'font-medium'
+                                                    }`}
+                                            >
+                                                <Sparkles className={`w-3.5 h-3.5 mr-2 stroke-[2px] ${currentPathname === '/projects/smart-import' ? 'text-[color:var(--primary)]' : ''}`} />
+                                                Smart S.O. Import
                                             </DropdownMenuItem>
                                         </>
                                     )}
+                                    <DropdownMenuItem
+                                        onClick={() => router.visit('/profile/skills')}
+                                        className={`text-[13px] text-[color:var(--text)] cursor-pointer hover:bg-[color:var(--soft-surface)] rounded-[6px] ${
+                                            currentPathname === '/profile/skills' || currentPathname.startsWith('/profile/skills/')
+                                                ? 'bg-[color:var(--soft-surface)] font-semibold'
+                                                : 'font-medium'
+                                        }`}
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 mr-2 stroke-[2px] text-amber-500" />
+                                        My Skill Profile
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-[color:var(--border)]" />
                                     <DropdownMenuItem
                                         onClick={handleLogout}
@@ -770,21 +844,45 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
                 {/* ── Optional Breadcrumbs Bar on Deep Pages (Section 4 requirement) ── */}
                 {breadcrumbs && breadcrumbs.length > 0 && (
-                    <div className="px-4 sm:px-6 py-2 bg-[color:var(--soft-surface)] border-b border-[color:var(--border)] flex items-center gap-1.5 text-[12px] text-[color:var(--muted)]">
-                        <Link href="/dashboard" className="hover:text-[color:var(--text)]">Home</Link>
-                        {breadcrumbs.map((crumb, idx) => (
-                            <React.Fragment key={idx}>
-                                <span className="text-[color:var(--muted)]">/</span>
-                                {crumb.href ? (
-                                    <Link href={crumb.href} className="hover:text-[color:var(--text)]">
-                                        {crumb.label}
-                                    </Link>
-                                ) : (
-                                    <span className="text-[color:var(--text)] font-medium truncate">{crumb.label}</span>
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </div>
+                    <nav
+                        aria-label="Breadcrumb"
+                        className="px-4 sm:px-6 py-2 bg-[color:var(--soft-surface)] border-b border-[color:var(--border)]"
+                    >
+                        <ol className="flex items-center gap-1.5 flex-wrap text-[12px] text-[color:var(--text)]/75">
+                            <li>
+                                <Link
+                                    href={isAdmin ? '/admin/dashboard' : '/dashboard'}
+                                    className="hover:text-[color:var(--text)] rounded-[4px] transition-colors"
+                                >
+                                    Home
+                                </Link>
+                            </li>
+                            {breadcrumbs.map((crumb, idx) => {
+                                const isLast = idx === breadcrumbs.length - 1;
+                                return (
+                                    <li key={`${crumb.label}-${idx}`} className="flex items-center gap-1.5 min-w-0">
+                                        <span aria-hidden="true" className="text-[color:var(--text)]/55">/</span>
+                                        {crumb.href ? (
+                                            <Link
+                                                href={crumb.href}
+                                                aria-current={isLast ? 'page' : undefined}
+                                                className="hover:text-[color:var(--text)] rounded-[4px] transition-colors"
+                                            >
+                                                {crumb.label}
+                                            </Link>
+                                        ) : (
+                                            <span
+                                                aria-current={isLast ? 'page' : undefined}
+                                                className="text-[color:var(--text)] font-medium truncate"
+                                            >
+                                                {crumb.label}
+                                            </span>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ol>
+                    </nav>
                 )}
 
                 {/* ── Optional Page Heading Banner ── */}
@@ -807,7 +905,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 )}
 
                 {/* ── Main Content Container Wrapped in ErrorBoundary ── */}
-                <main className="flex-1 p-4 sm:p-6 w-full max-w-7xl mx-auto">
+                <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6 w-full max-w-7xl mx-auto">
                     {/* Global Flash Alerts with Spring Motion */}
                     <AnimatePresence>
                         {(flash?.success || flash?.status) && dismissedFlash !== (flash.success || flash.status) && (
@@ -925,3 +1023,5 @@ export function openCommandPalette() {
         window.dispatchEvent(new CustomEvent('itask:open-command-palette'));
     }
 }
+
+export default AppLayout;

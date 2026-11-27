@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Services\ProjectProgressService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class ProgressCalculationRevisionTest extends TestCase
@@ -224,5 +225,60 @@ class ProgressCalculationRevisionTest extends TestCase
         // so Committee and Event progress count it as 1 completed deliverable!
         $this->assertSame(100, $this->progressService->calculateCommitteeProgress($this->committeeA)['progress']);
         $this->assertSame(100, $this->progressService->calculateProjectProgress($this->project)['progress']);
+    }
+
+    public function test_my_tasks_zero_assigned_tasks_stats(): void
+    {
+        $member = User::factory()->create(['email_verified_at' => now()]);
+
+        $response = $this->actingAs($member)->get('/my-tasks');
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('MyTasks/Index')
+            ->where('stats.total', 0)
+            ->where('stats.completed', 0)
+            ->where('stats.todo', 0)
+            ->where('stats.in_progress', 0)
+            ->where('stats.under_review', 0)
+            ->where('stats.returned', 0)
+            ->where('stats.overdue', 0)
+            ->has('tasks', 0)
+        );
+    }
+
+    public function test_my_tasks_partially_completed_tasks_stats_do_not_count_review_or_returned_as_completed(): void
+    {
+        $member = User::factory()->create(['email_verified_at' => now()]);
+
+        $activity = Activity::create([
+            'project_id' => $this->project->id,
+            'committee_id' => $this->committeeA->id,
+            'title' => 'Deliverable with Mixed Tasks',
+            'status' => Activity::STATUS_IN_PROGRESS,
+            'created_by' => $this->staff1->id,
+        ]);
+
+        // 5 tasks assigned to member:
+        // 2 Completed
+        Task::create(['activity_id' => $activity->id, 'title' => 'T1', 'status' => Task::STATUS_COMPLETED, 'assigned_to' => $member->id]);
+        Task::create(['activity_id' => $activity->id, 'title' => 'T2', 'status' => Task::STATUS_COMPLETED, 'assigned_to' => $member->id]);
+        // 1 Under Review (must NOT count as completed)
+        Task::create(['activity_id' => $activity->id, 'title' => 'T3', 'status' => Task::STATUS_UNDER_REVIEW, 'assigned_to' => $member->id]);
+        // 1 Returned (must NOT count as completed)
+        Task::create(['activity_id' => $activity->id, 'title' => 'T4', 'status' => Task::STATUS_RETURNED, 'assigned_to' => $member->id]);
+        // 1 In Progress
+        Task::create(['activity_id' => $activity->id, 'title' => 'T5', 'status' => Task::STATUS_IN_PROGRESS, 'assigned_to' => $member->id]);
+
+        $response = $this->actingAs($member)->get('/my-tasks');
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('MyTasks/Index')
+            ->where('stats.total', 5)
+            ->where('stats.completed', 2)
+            ->where('stats.under_review', 1)
+            ->where('stats.returned', 1)
+            ->where('stats.in_progress', 1)
+            ->has('tasks', 5)
+        );
     }
 }
